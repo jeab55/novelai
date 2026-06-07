@@ -3,9 +3,10 @@ import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Save, Loader2, Download, Copy, MoreHorizontal, Maximize2, Minimize2, Sparkles, Clock, X, RefreshCw } from "lucide-react";
+import { ArrowLeft, Save, Loader2, Download, Copy, MoreHorizontal, Maximize2, Minimize2, Sparkles, Clock, X, RefreshCw, Volume2 } from "lucide-react";
 import AiDraftDialog from "./AiDraftDialog";
 import EditorReviewPanel from "./EditorReviewPanel";
+import TextToSpeechPanel from "./TextToSpeechPanel";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
@@ -35,6 +36,7 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
   const [status, setStatus] = useState(chapter.status || "ร่าง");
   const [saving, setSaving] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
+  const [ttsOpen, setTtsOpen] = useState(false);
   const [draftOpen, setDraftOpen] = useState(false);
   const [changeEventOpen, setChangeEventOpen] = useState(false);
   const [selectedPlotEventId, setSelectedPlotEventId] = useState("");
@@ -138,6 +140,18 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
         <span className="text-xs text-muted-foreground tabular-nums">
           {wordCount.toLocaleString()} คำ
         </span>
+
+        {/* TTS button */}
+        <Button
+          variant="outline"
+          size="sm"
+          className={`gap-1.5 h-8 text-xs border-amber-300 hover:bg-amber-50 ${ttsOpen ? "bg-amber-100 text-amber-800" : "text-amber-700"}`}
+          onClick={() => setTtsOpen((v) => !v)}
+          title="อ่านด้วยเสียง"
+        >
+          <Volume2 className="w-3.5 h-3.5" />
+          ฟังเสียง
+        </Button>
 
         {/* AI Draft button */}
         <Button
@@ -344,6 +358,12 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
     <div className="flex flex-col h-[calc(100vh-7rem)]">
       {toolbar}
       {timelineBanner}
+      {ttsOpen && (
+        <TextToSpeechPanel
+          content={content}
+          onClose={() => setTtsOpen(false)}
+        />
+      )}
       <EditorReviewPanel
         chapter={{ ...chapter, content, editor_review: editorReview, previous_content: previousContent, plot_event_id: plotEventId, plot_event_title: plotEventTitle, plot_event_description: plotEventDescription, plot_event_order: plotEventOrder }}
         novel={novel || { title: "" }}
