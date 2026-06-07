@@ -8,10 +8,11 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, Users, Trash2, Edit2, User, Loader2, History } from "lucide-react";
+import { Plus, Users, Trash2, Edit2, User, Loader2, History, Network } from "lucide-react";
 import VersionHistoryDialog from "./VersionHistoryDialog";
 import { motion, AnimatePresence } from "framer-motion";
 import CharacterForm from "./CharacterForm";
+import CharacterRelationshipMap from "./CharacterRelationshipMap";
 
 const roleColors = {
   "ตัวเอก": "bg-amber-100 text-amber-700",
@@ -61,25 +62,28 @@ export default function CharacterBible({ novelId }) {
           <h2 className="font-heading text-lg font-semibold">คลังตัวละคร</h2>
           <p className="text-sm text-muted-foreground">{characters.length} ตัวละคร</p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={(v) => { setDialogOpen(v); if (!v) setEditing(null); }}>
-          <DialogTrigger asChild>
-            <Button size="sm" className="gap-1.5">
-              <Plus className="w-3.5 h-3.5" />
-              เพิ่มตัวละคร
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="font-heading">{editing ? "แก้ไขตัวละคร" : "เพิ่มตัวละครใหม่"}</DialogTitle>
-            </DialogHeader>
-            <CharacterForm
-              novelId={novelId}
-              character={editing}
-              novelIdForVersion={novelId}
-              onDone={() => { setDialogOpen(false); setEditing(null); }}
-            />
-          </DialogContent>
-        </Dialog>
+        <div className="flex items-center gap-2">
+          <CharacterRelationshipMap novelId={novelId} />
+          <Dialog open={dialogOpen} onOpenChange={(v) => { setDialogOpen(v); if (!v) setEditing(null); }}>
+            <DialogTrigger asChild>
+              <Button size="sm" className="gap-1.5">
+                <Plus className="w-3.5 h-3.5" />
+                เพิ่มตัวละคร
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle className="font-heading">{editing ? "แก้ไขตัวละคร" : "เพิ่มตัวละครใหม่"}</DialogTitle>
+              </DialogHeader>
+              <CharacterForm
+                novelId={novelId}
+                character={editing}
+                novelIdForVersion={novelId}
+                onDone={() => { setDialogOpen(false); setEditing(null); }}
+              />
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       {/* สรุปบทบาทตัวละคร */}
