@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -14,7 +16,7 @@ import {
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
   AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Loader2, Sparkles, Plus, Trash2, RefreshCw, FileText, CheckCircle2, AlertCircle } from "lucide-react";
+import { Loader2, Sparkles, Plus, Trash2, RefreshCw, FileText, CheckCircle2, AlertCircle, ChevronDown, ChevronUp, Users } from "lucide-react";
 
 function stripCodeFence(text) {
   if (typeof text !== "string") return text;
@@ -27,14 +29,16 @@ function parseAiResult(raw) {
   if (raw && typeof raw === "object" && !Array.isArray(raw)) {
     const outline = raw.plot_outline || raw.plotOutline || raw.outline || raw.summary || "";
     const eventsRaw = raw.events || raw.timeline || raw.plot_events || raw.items || [];
-    return { outline, eventsRaw };
+    const charsRaw = raw.characters || raw.chars || [];
+    return { outline, eventsRaw, charsRaw };
   }
   // Otherwise try to parse string
   const cleaned = stripCodeFence(String(raw));
   const parsed = JSON.parse(cleaned);
   const outline = parsed.plot_outline || parsed.plotOutline || parsed.outline || parsed.summary || "";
   const eventsRaw = parsed.events || parsed.timeline || parsed.plot_events || parsed.items || [];
-  return { outline, eventsRaw };
+  const charsRaw = parsed.characters || parsed.chars || [];
+  return { outline, eventsRaw, charsRaw };
 }
 
 function buildPrompt(novel, writer, characters) {
@@ -52,17 +56,30 @@ function buildPrompt(novel, writer, characters) {
 - ยุคสมัย/ฉากหลัง: ${novel.era || "ไม่ระบุ"}
 - จำนวนตอนที่ต้องการ: ${targetChapters} ตอน
 
-ตัวละคร:
+ตัวละครที่มีอยู่แล้ว (ห้ามสร้างซ้ำชื่อเหล่านี้):
 ${charList}
 
-จงแบ่งโครงเรื่อง 3 องก์ออกเป็น ${targetChapters} ตอนเท่าๆ กัน โดยแต่ละตอนต้องมี:
+งานที่ต้องทำ 2 ส่วน:
+
+[ส่วนที่ 1] สร้างตัวละครหลักของเรื่อง (2-5 คน ตามความเหมาะสม) โดยแต่ละตัวต้องมีฟิลด์:
+- name: ชื่อตัวละคร
+- role: บทบาท (ตัวเอก / ตัวรอง / ตัวร้าย / ตัวประกอบ)
+- age: อายุ (ข้อความ เช่น "25 ปี")
+- appearance: ลักษณะภายนอก
+- personality: นิสัยและบุคลิก
+- background: ปูมหลัง
+- desire: สิ่งที่ต้องการ (want — สิ่งที่ตัวละครคิดว่าตัวเองต้องการ)
+- wound: สิ่งที่ต้องการจริง (need — สิ่งที่ตัวละครต้องการจริงๆ) รวมกับปมในใจ (wound)
+- relationships: ความสัมพันธ์กับตัวละครอื่น
+
+[ส่วนที่ 2] แบ่งโครงเรื่อง 3 องก์ออกเป็น ${targetChapters} ตอนเท่าๆ กัน โดยแต่ละตอนต้องมี:
 - order: เลขลำดับตอน (1-${targetChapters})
 - title: ชื่อตอน
 - description: สรุปเหตุการณ์สำคัญในตอน (2-3 บรรทัด)
 - act: องก์ที่สังกัด (1=ต้นเรื่อง, 2=กลางเรื่อง, 3=จุด Climax และบทสรุป)
 
 ตอบด้วย JSON โครงสร้างนี้เท่านั้น (ไม่มี markdown, ไม่มี backtick):
-{"plot_outline":"สรุปโครงเรื่อง 3 องก์ แก่น/ธีม คำถามหลักของเรื่อง จุดหักเห (เขียนเป็นภาษาไทย)","events":[{"order":1,"title":"ชื่อตอน","description":"สรุปเหตุการณ์","act":1},{"order":2,"title":"...","description":"...","act":1}]}
+{"plot_outline":"สรุปโครงเรื่อง 3 องก์ แก่น/ธีม คำถามหลักของเรื่อง จุดหักเห","characters":[{"name":"ชื่อ","role":"ตัวเอก","age":"25 ปี","appearance":"...","personality":"...","background":"...","desire":"...","wound":"...","relationships":"..."}],"events":[{"order":1,"title":"ชื่อตอน","description":"สรุปเหตุการณ์","act":1}]}
 
 สร้างโครงเรื่องให้ครบ ${targetChapters} ตอน ครอบคลุมทั้งสามองก์ ปรับให้เหมาะกับแนว "${novel.genre || "ทั่วไป"}" ตอบเป็นภาษาไทยทั้งหมด ตอบด้วย JSON ล้วนเท่านั้น`;
 }
@@ -138,6 +155,7 @@ export default function AiPlotDialog({ open, onClose, novel, novelId, onOpenChap
   const [step, setStep] = useState("idle"); // idle | generating | review | error
   const [outline, setOutline] = useState("");
   const [events, setEvents] = useState([]);
+  const [aiCharacters, setAiCharacters] = useState([]); // { ...fields, checked, expanded, alreadyExists }
   const [replaceConfirm, setReplaceConfirm] = useState(false);
   const [parseError, setParseError] = useState("");
   // draftStatus: map of event index -> "drafting" | "done" | ""
@@ -181,7 +199,6 @@ export default function AiPlotDialog({ open, onClose, novel, novelId, onOpenChap
       await base44.entities.Novel.update(novelId, { plot_outline: outline });
 
       if (replace) {
-        // Delete existing events
         await Promise.all(existingEvents.map((e) => base44.entities.PlotEvent.delete(e.id)));
       }
 
@@ -196,13 +213,36 @@ export default function AiPlotDialog({ open, onClose, novel, novelId, onOpenChap
           })
         )
       );
+
+      // Save checked characters
+      const charsToSave = aiCharacters.filter((c) => c.checked && c.name);
+      if (charsToSave.length > 0) {
+        await Promise.all(
+          charsToSave.map((c) =>
+            base44.entities.Character.create({
+              novel_id: novelId,
+              name: c.name,
+              role: c.role,
+              age: c.age,
+              appearance: c.appearance,
+              personality: c.personality,
+              background: c.background,
+              desire: c.desire,
+              wound: c.wound,
+              relationships: c.relationships,
+            })
+          )
+        );
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["plotEvents", novelId] });
+      queryClient.invalidateQueries({ queryKey: ["characters", novelId] });
       onClose();
       setStep("idle");
       setOutline("");
       setEvents([]);
+      setAiCharacters([]);
     },
   });
 
@@ -213,40 +253,70 @@ export default function AiPlotDialog({ open, onClose, novel, novelId, onOpenChap
 
     const userPrompt = buildPrompt(novel, writer, characters);
 
-    // Request as plain string so we can handle parsing ourselves robustly
-    const raw = await base44.integrations.Core.InvokeLLM({
-      prompt: userPrompt,
-      model: "claude_sonnet_4_6",
-    });
+    let raw;
+    try {
+      raw = await base44.integrations.Core.InvokeLLM({
+        prompt: userPrompt,
+        model: "claude_sonnet_4_6",
+      });
+    } catch (err) {
+      setParseError(`เรียก AI ไม่สำเร็จ: ${err.message}`);
+      setStep("review");
+      return;
+    }
 
-    let outline = "";
+    let parsedOutline = "";
     let eventsRaw = [];
+    let charsRaw = [];
     try {
       const parsed = parseAiResult(raw);
-      outline = parsed.outline;
+      parsedOutline = parsed.outline;
       eventsRaw = parsed.eventsRaw;
-      if (!outline && !eventsRaw.length) throw new Error("ไม่พบข้อมูลใน response");
+      charsRaw = parsed.charsRaw;
+      if (!parsedOutline && !eventsRaw.length) throw new Error("ไม่พบข้อมูลใน response");
     } catch (err) {
-      // Last resort: raw is a string, show it in outline box
       if (typeof raw === "string" && raw.length > 10) {
-        outline = raw;
+        parsedOutline = raw;
         eventsRaw = [];
+        charsRaw = [];
         setParseError("ไม่สามารถแยก JSON ได้ แสดงข้อความดิบจาก AI ในช่องโครงเรื่อง กรุณาแก้ไขหรือลองใหม่");
       } else {
         setParseError(`แยกผลลัพธ์ไม่สำเร็จ: ${err.message} — กรุณากด "เขียนใหม่"`);
         setStep("review");
         setOutline("");
         setEvents([]);
+        setAiCharacters([]);
         return;
       }
     }
 
-    setOutline(outline);
+    // Build character list with duplicate detection
+    const existingNames = new Set(characters.map((c) => c.name.toLowerCase().trim()));
+    const mappedChars = charsRaw.map((c) => {
+      const alreadyExists = existingNames.has((c.name || "").toLowerCase().trim());
+      return {
+        name: c.name || "",
+        role: c.role || "ตัวประกอบ",
+        age: c.age || "",
+        appearance: c.appearance || "",
+        personality: c.personality || "",
+        background: c.background || "",
+        desire: c.desire || "",
+        wound: c.wound || "",
+        relationships: c.relationships || "",
+        checked: !alreadyExists,
+        expanded: false,
+        alreadyExists,
+      };
+    });
+
+    setOutline(parsedOutline);
     setEvents(eventsRaw.map((e, i) => ({
       order: e.order ?? i + 1,
       title: e.title || e.name || "",
       description: e.description || e.desc || e.content || "",
     })));
+    setAiCharacters(mappedChars);
     setStep("review");
   };
 
@@ -344,7 +414,13 @@ export default function AiPlotDialog({ open, onClose, novel, novelId, onOpenChap
     setStep("idle");
     setOutline("");
     setEvents([]);
+    setAiCharacters([]);
     setDraftStatus({});
+    setParseError("");
+  };
+
+  const updateAiChar = (idx, field, value) => {
+    setAiCharacters((prev) => prev.map((c, i) => i === idx ? { ...c, [field]: value } : c));
   };
 
   return (
@@ -361,8 +437,9 @@ export default function AiPlotDialog({ open, onClose, novel, novelId, onOpenChap
           {step === "idle" && (
             <div className="py-6 text-center space-y-4">
               <p className="text-sm text-muted-foreground leading-relaxed">
-                AI จะวิเคราะห์ข้อมูลนิยาย ตัวละคร และสไตล์ของนักเขียนประจำเรื่อง
+                AI จะวิเคราะห์ข้อมูลนิยายและสไตล์ของนักเขียนประจำเรื่อง
                 <br />แล้ววางโครงเรื่อง 3 องก์ พร้อมไทม์ไลน์เหตุการณ์หลัก
+                <br /><span className="text-primary/80 font-medium">และสร้างตัวละครหลักของเรื่องให้ในครั้งเดียว</span>
               </p>
               {writer && (
                 <p className="text-xs text-primary/80 bg-primary/5 border border-primary/20 rounded-lg px-3 py-2 inline-block">
@@ -500,9 +577,102 @@ export default function AiPlotDialog({ open, onClose, novel, novelId, onOpenChap
                 </div>
               </div>
 
+              {/* Characters section */}
+              {aiCharacters.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Users className="w-4 h-4 text-primary" />
+                    <label className="text-sm font-semibold text-foreground">ตัวละครที่ AI สร้าง</label>
+                    <span className="text-xs text-muted-foreground ml-auto">
+                      เลือก {aiCharacters.filter((c) => c.checked).length}/{aiCharacters.length} ตัว
+                    </span>
+                  </div>
+                  <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+                    {aiCharacters.map((char, idx) => (
+                      <div key={idx} className={`border rounded-lg p-3 space-y-2 ${char.alreadyExists ? "border-amber-200 bg-amber-50/40" : "border-border/60 bg-muted/30"}`}>
+                        <div className="flex items-center gap-2">
+                          <Checkbox
+                            checked={char.checked}
+                            onCheckedChange={(v) => updateAiChar(idx, "checked", !!v)}
+                            disabled={char.alreadyExists}
+                            id={`char-check-${idx}`}
+                          />
+                          <label htmlFor={`char-check-${idx}`} className="flex items-center gap-2 flex-1 cursor-pointer">
+                            <span className="text-sm font-semibold">{char.name || "(ไม่มีชื่อ)"}</span>
+                            <span className="text-xs text-muted-foreground">· {char.role}</span>
+                            {char.alreadyExists && (
+                              <Badge variant="outline" className="text-xs text-amber-700 border-amber-300 bg-amber-50 ml-1">มีอยู่แล้ว</Badge>
+                            )}
+                          </label>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-muted-foreground shrink-0"
+                            onClick={() => updateAiChar(idx, "expanded", !char.expanded)}
+                          >
+                            {char.expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                          </Button>
+                        </div>
+
+                        {char.expanded && (
+                          <div className="space-y-2 pt-1 border-t border-border/40">
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <label className="text-xs text-muted-foreground mb-1 block">ชื่อ</label>
+                                <Input value={char.name} onChange={(e) => updateAiChar(idx, "name", e.target.value)} className="h-7 text-xs" />
+                              </div>
+                              <div>
+                                <label className="text-xs text-muted-foreground mb-1 block">บทบาท</label>
+                                <Select value={char.role} onValueChange={(v) => updateAiChar(idx, "role", v)}>
+                                  <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="ตัวเอก">ตัวเอก</SelectItem>
+                                    <SelectItem value="ตัวรอง">ตัวรอง</SelectItem>
+                                    <SelectItem value="ตัวร้าย">ตัวร้าย</SelectItem>
+                                    <SelectItem value="ตัวประกอบ">ตัวประกอบ</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
+                            <div>
+                              <label className="text-xs text-muted-foreground mb-1 block">อายุ</label>
+                              <Input value={char.age} onChange={(e) => updateAiChar(idx, "age", e.target.value)} className="h-7 text-xs" placeholder="เช่น 25 ปี" />
+                            </div>
+                            <div>
+                              <label className="text-xs text-muted-foreground mb-1 block">ลักษณะภายนอก</label>
+                              <Textarea value={char.appearance} onChange={(e) => updateAiChar(idx, "appearance", e.target.value)} rows={2} className="text-xs" />
+                            </div>
+                            <div>
+                              <label className="text-xs text-muted-foreground mb-1 block">นิสัยและบุคลิก</label>
+                              <Textarea value={char.personality} onChange={(e) => updateAiChar(idx, "personality", e.target.value)} rows={2} className="text-xs" />
+                            </div>
+                            <div>
+                              <label className="text-xs text-muted-foreground mb-1 block">ปูมหลัง</label>
+                              <Textarea value={char.background} onChange={(e) => updateAiChar(idx, "background", e.target.value)} rows={2} className="text-xs" />
+                            </div>
+                            <div>
+                              <label className="text-xs text-muted-foreground mb-1 block">สิ่งที่ต้องการ (want)</label>
+                              <Input value={char.desire} onChange={(e) => updateAiChar(idx, "desire", e.target.value)} className="h-7 text-xs" />
+                            </div>
+                            <div>
+                              <label className="text-xs text-muted-foreground mb-1 block">สิ่งที่ต้องการจริง / ปม (need / wound)</label>
+                              <Textarea value={char.wound} onChange={(e) => updateAiChar(idx, "wound", e.target.value)} rows={2} className="text-xs" />
+                            </div>
+                            <div>
+                              <label className="text-xs text-muted-foreground mb-1 block">ความสัมพันธ์</label>
+                              <Textarea value={char.relationships} onChange={(e) => updateAiChar(idx, "relationships", e.target.value)} rows={2} className="text-xs" />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Actions */}
               <div className="flex gap-2 pt-2">
-                <Button variant="outline" className="gap-2 flex-1" onClick={() => { setStep("idle"); setOutline(""); setEvents([]); }}>
+                <Button variant="outline" className="gap-2 flex-1" onClick={() => { setStep("idle"); setOutline(""); setEvents([]); setAiCharacters([]); }}>
                   <RefreshCw className="w-3.5 h-3.5" />
                   เขียนใหม่
                 </Button>
@@ -513,6 +683,9 @@ export default function AiPlotDialog({ open, onClose, novel, novelId, onOpenChap
                 >
                   {saveMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                   บันทึกลงไทม์ไลน์
+                  {aiCharacters.filter((c) => c.checked).length > 0 && (
+                    <span className="text-xs opacity-70">+ {aiCharacters.filter((c) => c.checked).length} ตัวละคร</span>
+                  )}
                 </Button>
               </div>
             </div>
