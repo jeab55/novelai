@@ -130,38 +130,6 @@ export default function AiDraftDialog({ open, onClose, chapter, novel, novelId, 
     select: (data) => data.find((w) => String(w.id) === String(novel?.writer_id)),
   });
 
-  // Sync plot event and auto-fill summary when dialog opens
-  useEffect(() => {
-    if (open && chapter) {
-      const plotEventId = chapter?.plot_event_id || "";
-      setLinkedPlotEventId(plotEventId);
-      
-      // Priority 1: prefillSummary prop (from WritingRoom quick button)
-      // Priority 2: linked plot event description
-      // Priority 3: chapter's stored plot_event_description
-      let autoSummary = prefillSummary || "";
-      
-      if (!autoSummary && plotEventId && plotEvents.length > 0) {
-        const linkedEv = plotEvents.find((e) => e.id === plotEventId);
-        if (linkedEv?.description) {
-          autoSummary = linkedEv.description;
-        }
-      }
-      
-      if (!autoSummary && chapter?.plot_event_description) {
-        autoSummary = chapter.plot_event_description;
-      }
-      
-      setForm((f) => ({
-        ...f,
-        chapterTitle: chapter?.title || "",
-        summary: autoSummary || f.summary || "",
-      }));
-    }
-  }, [open, chapter, plotEvents, prefillSummary]);
-
-  const selectedWriter = novelWriter;
-
   const { data: characters = [] } = useQuery({
     queryKey: ["characters", novelId],
     queryFn: () => base44.entities.Character.filter({ novel_id: novelId }),
@@ -182,6 +150,38 @@ export default function AiDraftDialog({ open, onClose, chapter, novel, novelId, 
     queryFn: () => base44.entities.Chapter.filter({ novel_id: novelId }, "order"),
     enabled: open,
   });
+
+  const selectedWriter = novelWriter;
+
+  // Sync plot event and auto-fill summary when dialog opens
+  useEffect(() => {
+    if (open && chapter) {
+      const plotEventId = chapter?.plot_event_id || "";
+      setLinkedPlotEventId(plotEventId);
+      
+      // Priority 1: prefillSummary prop (from WritingRoom quick button)
+      // Priority 2: linked plot event description
+      // Priority 3: chapter's stored plot_event_description
+      let autoSummary = prefillSummary || "";
+      
+      if (!autoSummary && plotEventId && plotEvents && plotEvents.length > 0) {
+        const linkedEv = plotEvents.find((e) => e.id === plotEventId);
+        if (linkedEv?.description) {
+          autoSummary = linkedEv.description;
+        }
+      }
+      
+      if (!autoSummary && chapter?.plot_event_description) {
+        autoSummary = chapter.plot_event_description;
+      }
+      
+      setForm((f) => ({
+        ...f,
+        chapterTitle: chapter?.title || "",
+        summary: autoSummary || f.summary || "",
+      }));
+    }
+  }, [open, chapter, plotEvents, prefillSummary]);
 
   const getSystemPrompt = () =>
     buildDraftSystemPrompt(novel, characters, worldEntries, plotEvents, chapters, chapter, selectedWriter?.system_prompt, linkedEvent);
