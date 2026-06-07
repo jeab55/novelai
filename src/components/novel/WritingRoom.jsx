@@ -27,6 +27,7 @@ export default function WritingRoom({ novelId, novel }) {
   const [newTitle, setNewTitle] = useState("");
   const [selectedPlotEventId, setSelectedPlotEventId] = useState("");
   const [aiGenerateOpen, setAiGenerateOpen] = useState(false);
+  const [aiChapterGeneratorOpen, setAiChapterGeneratorOpen] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: chapters = [], isLoading } = useQuery({
