@@ -127,7 +127,7 @@ export default function AiDraftDialog({ open, onClose, chapter, novel, novelId, 
     queryKey: ["writers-all"],
     queryFn: () => base44.entities.Writer.list(),
     enabled: open && !!novel?.writer_id,
-    select: (data) => data.find((w) => w.id === novel?.writer_id),
+    select: (data) => data.find((w) => String(w.id) === String(novel?.writer_id)),
   });
 
   // Sync plot event when chapter changes (e.g. when dialog opens)

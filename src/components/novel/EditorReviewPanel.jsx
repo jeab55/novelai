@@ -83,7 +83,7 @@ export default function EditorReviewPanel({ chapter, novel, novelId, onContentUp
     queryKey: ["writers-all"],
     queryFn: () => base44.entities.Writer.list(),
     enabled: open && !!novel?.writer_id,
-    select: (data) => data.find((w) => w.id === novel?.writer_id),
+    select: (data) => data.find((w) => String(w.id) === String(novel?.writer_id)),
   });
 
   const { data: characters = [] } = useQuery({

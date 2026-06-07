@@ -22,17 +22,17 @@ export default function NovelWorkspace() {
   const { data: novel, isLoading } = useQuery({
     queryKey: ["novel", novelId],
     queryFn: async () => {
-      const novels = await base44.entities.Novel.filter({ id: novelId });
-      return novels[0];
+      const all = await base44.entities.Novel.list();
+      return all.find((n) => String(n.id) === String(novelId));
     },
     enabled: !!novelId,
   });
 
   const { data: novelWriter } = useQuery({
-    queryKey: ["writer", novel?.writer_id],
-    queryFn: () => base44.entities.Writer.filter({ id: novel.writer_id }),
+    queryKey: ["writers-all"],
+    queryFn: () => base44.entities.Writer.list(),
     enabled: !!novel?.writer_id,
-    select: (data) => data[0],
+    select: (data) => data.find((w) => String(w.id) === String(novel?.writer_id)),
   });
 
   if (isLoading) {
