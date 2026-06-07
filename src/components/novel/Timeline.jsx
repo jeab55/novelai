@@ -8,25 +8,41 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, Clock, Trash2, Edit2, BookOpen, Landmark, Loader2, Sparkles, History, Calendar, Users } from "lucide-react";
+import { Plus, Clock, Trash2, Edit2, BookOpen, Landmark, Loader2, Sparkles, History, Calendar, List } from "lucide-react";
 import VersionHistoryDialog from "./VersionHistoryDialog";
 import { saveVersion } from "@/lib/saveVersion";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import AiPlotDialog from "./AiPlotDialog";
 import CharacterRelationshipDiagram from "./CharacterRelationshipDiagram";
+import TimelineCalendarView from "./TimelineCalendarView";
 
 export default function Timeline({ novelId, novel, onOpenChapter }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [aiDialogOpen, setAiDialogOpen] = useState(false);
   const [editing, setEditing] = useState(null);
-  const [form, setForm] = useState({ title: "", description: "", order: 0, time_period: "", characters_involved: "", is_historical: false });
+  const [form, setForm] = useState({ title: "", description: "", order: 0, time_period: "", location: "", characters_involved: "", is_historical: false });
   const [versionEvent, setVersionEvent] = useState(null);
+  const [viewMode, setViewMode] = useState("list"); // list | calendar
   const queryClient = useQueryClient();
 
   const { data: events = [], isLoading } = useQuery({
     queryKey: ["plotEvents", novelId],
     queryFn: () => base44.entities.PlotEvent.filter({ novel_id: novelId }, "order"),
   });
+
+  const { data: chapters = [] } = useQuery({
+    queryKey: ["chapters", novelId],
+    queryFn: () => base44.entities.Chapter.filter({ novel_id: novelId }, "order"),
+  });
+
+  // Map plot_event_id -> chapter for calendar view
+  const linkedChaptersByEvent = (() => {
+    const map = {};
+    for (const ch of chapters) {
+      if (ch.plot_event_id) map[ch.plot_event_id] = ch;
+    }
+    return map;
+  })();
 
   const saveMutation = useMutation({
     mutationFn: async (data) => {
@@ -57,7 +73,7 @@ export default function Timeline({ novelId, novel, onOpenChapter }) {
   const closeDialog = () => {
     setDialogOpen(false);
     setEditing(null);
-    setForm({ title: "", description: "", order: events.length + 1, time_period: "", characters_involved: "", is_historical: false });
+    setForm({ title: "", description: "", order: events.length + 1, time_period: "", location: "", characters_involved: "", is_historical: false });
   };
 
   const openEdit = (ev) => {
@@ -67,6 +83,7 @@ export default function Timeline({ novelId, novel, onOpenChapter }) {
       description: ev.description || "",
       order: ev.order || 0,
       time_period: ev.time_period || "",
+      location: ev.location || "",
       characters_involved: ev.characters_involved || "",
       is_historical: ev.is_historical || false,
     });
@@ -81,6 +98,29 @@ export default function Timeline({ novelId, novel, onOpenChapter }) {
           <p className="text-sm text-muted-foreground">{events.length} เหตุการณ์</p>
         </div>
         <div className="flex items-center gap-2">
+          {/* View toggle */}
+          <div className="flex items-center border border-border rounded-lg overflow-hidden">
+            <Button
+              variant={viewMode === "list" ? "default" : "ghost"}
+              size="sm"
+              className="h-8 rounded-none gap-1.5 px-2.5"
+              onClick={() => setViewMode("list")}
+              title="มุมมองรายการ"
+            >
+              <List className="w-3.5 h-3.5" />
+              <span className="text-xs">รายการ</span>
+            </Button>
+            <Button
+              variant={viewMode === "calendar" ? "default" : "ghost"}
+              size="sm"
+              className="h-8 rounded-none gap-1.5 px-2.5"
+              onClick={() => setViewMode("calendar")}
+              title="มุมมองปฏิทิน"
+            >
+              <Calendar className="w-3.5 h-3.5" />
+              <span className="text-xs">ปฏิทิน</span>
+            </Button>
+          </div>
           <Button
             variant="outline"
             size="sm"
@@ -112,6 +152,9 @@ export default function Timeline({ novelId, novel, onOpenChapter }) {
                 <div><label className="text-sm font-medium mb-1.5 block">ช่วงเวลา</label>
                   <Input value={form.time_period} onChange={(e) => setForm({ ...form, time_period: e.target.value })} placeholder="เช่น ปี พ.ศ. 2310" />
                 </div>
+              </div>
+              <div><label className="text-sm font-medium mb-1.5 block">สถานที่</label>
+                <Input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="เช่น กรุงศรีอยุธยา, ทุ่งพระเมรุ" />
               </div>
               <div><label className="text-sm font-medium mb-1.5 block">คำอธิบาย</label>
                 <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={3} placeholder="อธิบายเหตุการณ์..." />
@@ -162,6 +205,14 @@ export default function Timeline({ novelId, novel, onOpenChapter }) {
           <Clock className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
           <p className="text-muted-foreground">ยังไม่มีเหตุการณ์ในไทม์ไลน์</p>
         </div>
+      ) : viewMode === "calendar" ? (
+        <TimelineCalendarView
+          events={events}
+          linkedChaptersByEvent={linkedChaptersByEvent}
+          onEdit={openEdit}
+          onDelete={(id) => deleteMutation.mutate(id)}
+          onVersionHistory={(ev) => setVersionEvent(ev)}
+        />
       ) : (
         <div className="relative pl-8">
           {/* Timeline line */}
@@ -193,6 +244,7 @@ export default function Timeline({ novelId, novel, onOpenChapter }) {
                         )}
                       </div>
                       {ev.time_period && <p className="text-xs text-primary/70 mb-1">{ev.time_period}</p>}
+                      {ev.location && <p className="text-xs text-muted-foreground mb-1">📍 {ev.location}</p>}
                       {ev.description && <p className="text-sm text-muted-foreground">{ev.description}</p>}
                       {ev.characters_involved && (
                         <p className="text-xs text-muted-foreground mt-2">
