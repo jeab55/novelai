@@ -14,10 +14,33 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Loader2, Sparkles, Plus, Trash2, RefreshCw } from "lucide-react";
 
+function stripCodeFence(text) {
+  if (typeof text !== "string") return text;
+  // Remove ```json ... ``` or ``` ... ``` fences
+  return text.replace(/^```[\w]*\n?/m, "").replace(/\n?```$/m, "").trim();
+}
+
+function parseAiResult(raw) {
+  // If already an object (InvokeLLM returned parsed JSON), use directly
+  if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+    const outline = raw.plot_outline || raw.plotOutline || raw.outline || raw.summary || "";
+    const eventsRaw = raw.events || raw.timeline || raw.plot_events || raw.items || [];
+    return { outline, eventsRaw };
+  }
+  // Otherwise try to parse string
+  const cleaned = stripCodeFence(String(raw));
+  const parsed = JSON.parse(cleaned);
+  const outline = parsed.plot_outline || parsed.plotOutline || parsed.outline || parsed.summary || "";
+  const eventsRaw = parsed.events || parsed.timeline || parsed.plot_events || parsed.items || [];
+  return { outline, eventsRaw };
+}
+
 function buildPrompt(novel, writer, characters) {
   const charList = characters.map((c) => `- ${c.name} (${c.role || "ตัวละคร"}): ${c.personality || ""}`).join("\n") || "ยังไม่มีตัวละคร";
+  const writerContext = writer?.system_prompt ? `\nสไตล์การเขียน: ${writer.system_prompt}\n` : "";
 
-  return `คุณกำลังทำหน้าที่เป็นนักเขียน/บรรณาธิการที่ช่วยวางโครงเรื่อง
+  return `${writerContext}
+คุณคือบรรณาธิการที่ช่วยวางโครงเรื่องนิยาย ตอบเป็น JSON เท่านั้น ห้ามมีข้อความอื่นนอก JSON
 
 ข้อมูลนิยาย:
 - ชื่อเรื่อง: ${novel.title}
@@ -28,26 +51,19 @@ function buildPrompt(novel, writer, characters) {
 ตัวละคร:
 ${charList}
 
-กรุณาวางโครงเรื่องโดยตอบในรูปแบบ JSON ดังนี้:
-{
-  "plot_outline": "สรุปโครงเรื่องแบบ 3 องก์ รวมถึงแก่น/ธีม คำถามหลักของเรื่อง จุดหักเหสำคัญ เขียนเป็นย่อหน้าอ่านง่าย",
-  "events": [
-    { "order": 1, "title": "ชื่อเหตุการณ์", "description": "คำอธิบายโดยย่อ" },
-    ...
-  ]
-}
+ตอบด้วย JSON โครงสร้างนี้เท่านั้น (ไม่มี markdown, ไม่มี backtick):
+{"plot_outline":"สรุปโครงเรื่อง 3 องก์ แก่น/ธีม คำถามหลักของเรื่อง จุดหักเห (เขียนเป็นภาษาไทย)","events":[{"order":1,"title":"ชื่อเหตุการณ์","description":"คำอธิบายย่อ"},{"order":2,"title":"...","description":"..."}]}
 
-ไทม์ไลน์ควรมี 8-15 เหตุการณ์หลัก ครอบคลุมทั้งสามองก์ ปรับให้เหมาะกับแนวเรื่อง "${novel.genre || "ทั่วไป"}" โดยเฉพาะ
-ตอบเป็นภาษาไทยทั้งหมด`;
+สร้างไทม์ไลน์ 10-12 เหตุการณ์หลักครอบคลุมทั้งสามองก์ ปรับให้เหมาะกับแนว "${novel.genre || "ทั่วไป"}" ตอบเป็นภาษาไทยทั้งหมด ตอบด้วย JSON ล้วนเท่านั้น`;
 }
 
 export default function AiPlotDialog({ open, onClose, novel, novelId }) {
   const queryClient = useQueryClient();
-  const [step, setStep] = useState("idle"); // idle | generating | review
+  const [step, setStep] = useState("idle"); // idle | generating | review | error
   const [outline, setOutline] = useState("");
   const [events, setEvents] = useState([]);
   const [replaceConfirm, setReplaceConfirm] = useState(false);
-  const [pendingSave, setPendingSave] = useState(null); // "append" | "replace"
+  const [parseError, setParseError] = useState("");
 
   const { data: writer } = useQuery({
     queryKey: ["writer", novel?.writer_id],
@@ -102,35 +118,44 @@ export default function AiPlotDialog({ open, onClose, novel, novelId }) {
   const generate = async () => {
     if (!novel) return;
     setStep("generating");
-    const systemPrompt = writer?.system_prompt || "คุณเป็นนักเขียนนิยายที่มีประสบการณ์สูง";
+    setParseError("");
+
     const userPrompt = buildPrompt(novel, writer, characters);
 
-    const result = await base44.integrations.Core.InvokeLLM({
+    // Request as plain string so we can handle parsing ourselves robustly
+    const raw = await base44.integrations.Core.InvokeLLM({
       prompt: userPrompt,
       model: "claude_sonnet_4_6",
-      response_json_schema: {
-        type: "object",
-        properties: {
-          plot_outline: { type: "string" },
-          events: {
-            type: "array",
-            items: {
-              type: "object",
-              properties: {
-                order: { type: "number" },
-                title: { type: "string" },
-                description: { type: "string" },
-              },
-            },
-          },
-        },
-      },
     });
 
-    // Override system prompt context by prepending it
-    // (InvokeLLM doesn't have separate system param, so we prepend)
-    setOutline(result.plot_outline || "");
-    setEvents((result.events || []).map((e, i) => ({ ...e, order: e.order ?? i + 1 })));
+    let outline = "";
+    let eventsRaw = [];
+    try {
+      const parsed = parseAiResult(raw);
+      outline = parsed.outline;
+      eventsRaw = parsed.eventsRaw;
+      if (!outline && !eventsRaw.length) throw new Error("ไม่พบข้อมูลใน response");
+    } catch (err) {
+      // Last resort: raw is a string, show it in outline box
+      if (typeof raw === "string" && raw.length > 10) {
+        outline = raw;
+        eventsRaw = [];
+        setParseError("ไม่สามารถแยก JSON ได้ แสดงข้อความดิบจาก AI ในช่องโครงเรื่อง กรุณาแก้ไขหรือลองใหม่");
+      } else {
+        setParseError(`แยกผลลัพธ์ไม่สำเร็จ: ${err.message} — กรุณากด "เขียนใหม่"`);
+        setStep("review");
+        setOutline("");
+        setEvents([]);
+        return;
+      }
+    }
+
+    setOutline(outline);
+    setEvents(eventsRaw.map((e, i) => ({
+      order: e.order ?? i + 1,
+      title: e.title || e.name || "",
+      description: e.description || e.desc || e.content || "",
+    })));
     setStep("review");
   };
 
@@ -203,6 +228,11 @@ export default function AiPlotDialog({ open, onClose, novel, novelId }) {
 
           {step === "review" && (
             <div className="space-y-5">
+              {parseError && (
+                <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                  ⚠️ {parseError}
+                </div>
+              )}
               {/* Plot outline */}
               <div>
                 <label className="text-sm font-semibold mb-2 block text-foreground">โครงเรื่อง (3 องก์)</label>
