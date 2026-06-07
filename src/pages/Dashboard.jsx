@@ -8,8 +8,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Plus, BookOpen, Feather, Sparkles, Pencil, LogOut, Trash2 } from "lucide-react";
+import { Plus, BookOpen, Feather, Sparkles, Pencil, LogOut, Trash2, Share2 } from "lucide-react";
 import DeleteNovelDialog from "@/components/novel/DeleteNovelDialog";
+import ShareNovelDialog from "@/components/novel/ShareNovelDialog";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { useAuth } from "@/lib/AuthContext";
@@ -36,6 +37,7 @@ export default function Dashboard() {
   const [editForm, setEditForm] = useState({});
   const [editingId, setEditingId] = useState(null);
   const [deleteDialog, setDeleteDialog] = useState({ open: false, novel: null });
+  const [shareDialog, setShareDialog] = useState({ open: false, novel: null });
   const queryClient = useQueryClient();
   const { user, logout } = useAuth();
   const isAdmin = user?.role === "admin";
@@ -50,10 +52,14 @@ export default function Dashboard() {
   const { data: novels = [], isLoading } = useQuery({
     queryKey: ["novels", user?.id],
     queryFn: async () => {
-      const all = isAdmin
-        ? await base44.entities.Novel.list("-created_date")
-        : await base44.entities.Novel.filter({ created_by_id: user?.id }, "-created_date");
-      return all.filter((n) => !n.is_deleted);
+      const all = await base44.entities.Novel.list("-created_date");
+      return all.filter((n) => {
+        if (n.is_deleted) return false;
+        if (isAdmin) return true;
+        if (n.created_by_id === user?.id) return true;
+        if (Array.isArray(n.shared_with) && n.shared_with.includes(user?.email)) return true;
+        return false;
+      });
     },
     enabled: !!user,
   });
@@ -107,6 +113,11 @@ export default function Dashboard() {
       novel={deleteDialog.novel}
       mode="delete"
       isPending={softDeleteMutation.isPending}
+    />
+    <ShareNovelDialog
+      open={shareDialog.open}
+      onClose={() => setShareDialog({ open: false, novel: null })}
+      novel={shareDialog.novel}
     />
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -340,6 +351,15 @@ export default function Dashboard() {
                         >
                           <Pencil className="w-3.5 h-3.5" />
                         </button>
+                        {(isAdmin || novel.created_by_id === user?.id) && (
+                          <button
+                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShareDialog({ open: true, novel }); }}
+                            className="w-7 h-7 rounded-lg bg-secondary/60 hover:bg-primary/10 hover:text-primary flex items-center justify-center transition-all"
+                            title="แชร์เรื่อง"
+                          >
+                            <Share2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                         {(isAdmin || novel.created_by_id === user?.id) && (
                           <button
                             onClick={(e) => { e.preventDefault(); e.stopPropagation(); setDeleteDialog({ open: true, novel }); }}

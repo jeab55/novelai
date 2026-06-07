@@ -13,6 +13,7 @@ import ResetPassword from '@/pages/ResetPassword';
 import Dashboard from '@/pages/Dashboard';
 import NovelWorkspace from '@/pages/NovelWorkspace';
 import Trash from '@/pages/Trash';
+import PublicNovelView from '@/pages/PublicNovelView';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -36,6 +37,7 @@ const AuthenticatedApp = () => {
 
   return (
     <Routes>
+      <Route path="/novel/public/:token" element={<PublicNovelView />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />

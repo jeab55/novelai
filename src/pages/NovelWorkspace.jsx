@@ -4,10 +4,11 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Feather, PenTool, Users, Globe, Clock, Sparkles, Bot, Trash2 } from "lucide-react";
+import { ArrowLeft, Feather, PenTool, Users, Globe, Clock, Sparkles, Bot, Trash2, Share2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import DeleteNovelDialog from "@/components/novel/DeleteNovelDialog";
+import ShareNovelDialog from "@/components/novel/ShareNovelDialog";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/AuthContext";
 import WritingRoom from "@/components/novel/WritingRoom";
@@ -21,6 +22,7 @@ export default function NovelWorkspace() {
   const novelId = window.location.pathname.split("/novel/")[1];
   const [activeTab, setActiveTab] = useState("writing");
   const [deleteDialog, setDeleteDialog] = useState(false);
+  const [shareDialog, setShareDialog] = useState(false);
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
   const navigate = useNavigate();
@@ -59,8 +61,11 @@ export default function NovelWorkspace() {
     );
   }
 
-  // ตรวจสิทธิ์: ต้องเป็นเจ้าของหรือ admin
-  if (!novel || (!isAdmin && novel.created_by_id !== user?.id)) {
+  // ตรวจสิทธิ์: เจ้าของ, collaborator, หรือ admin
+  const isCollaborator = Array.isArray(novel?.shared_with) && novel.shared_with.includes(user?.email);
+  const canAccess = isAdmin || novel?.created_by_id === user?.id || isCollaborator;
+
+  if (!novel || !canAccess) {
     return (
       <div className="min-h-screen flex items-center justify-center flex-col gap-4">
         <p className="text-muted-foreground">ไม่พบนิยายเรื่องนี้ หรือคุณไม่มีสิทธิ์เข้าถึง</p>
@@ -70,6 +75,7 @@ export default function NovelWorkspace() {
   }
 
   const canDelete = isAdmin || novel.created_by_id === user?.id;
+  const canShare = isAdmin || novel.created_by_id === user?.id;
 
   return (
     <>
@@ -80,6 +86,11 @@ export default function NovelWorkspace() {
       novel={novel}
       mode="delete"
       isPending={softDeleteMutation.isPending}
+    />
+    <ShareNovelDialog
+      open={shareDialog}
+      onClose={() => setShareDialog(false)}
+      novel={novel}
     />
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
@@ -109,17 +120,30 @@ export default function NovelWorkspace() {
               </div>
             </div>
           </div>
-          {canDelete && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="shrink-0 text-muted-foreground hover:text-destructive ml-auto"
-              title="ย้ายไปถังขยะ"
-              onClick={() => setDeleteDialog(true)}
-            >
-              <Trash2 className="w-4 h-4" />
-            </Button>
-          )}
+          <div className="flex items-center gap-1 ml-auto shrink-0">
+            {canShare && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-muted-foreground hover:text-primary"
+                title="แชร์เรื่อง"
+                onClick={() => setShareDialog(true)}
+              >
+                <Share2 className="w-4 h-4" />
+              </Button>
+            )}
+            {canDelete && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-muted-foreground hover:text-destructive"
+                title="ย้ายไปถังขยะ"
+                onClick={() => setDeleteDialog(true)}
+              >
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            )}
+          </div>
         </div>
       </header>
 
