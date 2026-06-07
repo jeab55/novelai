@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, Save, Loader2, Download, Copy, MoreHorizontal, Maximize2, Minimize2, Sparkles, Clock, X, RefreshCw } from "lucide-react";
 import AiDraftDialog from "./AiDraftDialog";
+import EditorReviewPanel from "./EditorReviewPanel";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
@@ -42,6 +43,8 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
   const [plotEventTitle, setPlotEventTitle] = useState(chapter.plot_event_title || "");
   const [plotEventDescription, setPlotEventDescription] = useState(chapter.plot_event_description || "");
   const [plotEventOrder, setPlotEventOrder] = useState(chapter.plot_event_order || null);
+  const [previousContent, setPreviousContent] = useState(chapter.previous_content || "");
+  const [editorReview, setEditorReview] = useState(chapter.editor_review || "");
   const queryClient = useQueryClient();
 
   const { data: plotEvents = [] } = useQuery({
@@ -341,6 +344,21 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
     <div className="flex flex-col h-[calc(100vh-7rem)]">
       {toolbar}
       {timelineBanner}
+      <EditorReviewPanel
+        chapter={{ ...chapter, content, editor_review: editorReview, previous_content: previousContent, plot_event_id: plotEventId, plot_event_title: plotEventTitle, plot_event_description: plotEventDescription, plot_event_order: plotEventOrder }}
+        novel={novel || { title: "" }}
+        novelId={novelId}
+        onContentUpdate={(improved, oldContent) => {
+          setContent(improved);
+          setPreviousContent(oldContent);
+          queryClient.invalidateQueries({ queryKey: ["chapters", novelId] });
+        }}
+        onPreviousContentRestore={(restored) => {
+          setContent(restored);
+          setPreviousContent("");
+          queryClient.invalidateQueries({ queryKey: ["chapters", novelId] });
+        }}
+      />
       <div className="flex-1 overflow-auto bg-background">
         <div className="mx-auto px-8 py-10" style={{ maxWidth: "720px" }}>
           <textarea
