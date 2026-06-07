@@ -48,7 +48,19 @@ export default function NovelWorkspace() {
   });
 
   const softDeleteMutation = useMutation({
-    mutationFn: () => base44.entities.Novel.update(novelId, { is_deleted: true, deleted_at: new Date().toISOString() }),
+    mutationFn: async () => {
+      if (novel) {
+        await saveVersion({
+          entityType: "novel",
+          entityId: novelId,
+          novelId,
+          data: novel,
+          label: `ก่อนลบ: ${novel.title}`,
+          createdByName: user?.full_name || "",
+        });
+      }
+      return base44.entities.Novel.update(novelId, { is_deleted: true, deleted_at: new Date().toISOString() });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["novels"] });
       toast.success("ย้ายไปถังขยะแล้ว");
@@ -95,6 +107,18 @@ export default function NovelWorkspace() {
       onClose={() => setShareDialog(false)}
       novel={novel}
     />
+    {novel && (
+      <VersionHistoryDialog
+        open={novelVersionOpen}
+        onClose={() => setNovelVersionOpen(false)}
+        entityType="novel"
+        entityId={novelId}
+        novelId={novelId}
+        currentData={novel}
+        currentLabel={novel.title}
+        onRestored={() => queryClient.invalidateQueries({ queryKey: ["novel", novelId] })}
+      />
+    )}
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
       <header className="border-b border-border/60 bg-card/50 backdrop-blur-sm sticky top-0 z-10">
@@ -146,6 +170,15 @@ export default function NovelWorkspace() {
                 <Trash2 className="w-4 h-4" />
               </Button>
             )}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-muted-foreground hover:text-primary"
+              title="ประวัติเวอร์ชัน"
+              onClick={() => setNovelVersionOpen(true)}
+            >
+              <History className="w-4 h-4" />
+            </Button>
           </div>
         </div>
       </header>
