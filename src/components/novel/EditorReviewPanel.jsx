@@ -80,10 +80,10 @@ export default function EditorReviewPanel({ chapter, novel, novelId, onContentUp
 
   // ดึงนักเขียนประจำเรื่องจาก novel.writer_id
   const { data: novelWriter } = useQuery({
-    queryKey: ["writer", novel?.writer_id],
-    queryFn: () => base44.entities.Writer.filter({ id: novel.writer_id }),
+    queryKey: ["writers-all"],
+    queryFn: () => base44.entities.Writer.list(),
     enabled: open && !!novel?.writer_id,
-    select: (data) => data[0],
+    select: (data) => data.find((w) => w.id === novel?.writer_id),
   });
 
   const { data: characters = [] } = useQuery({
