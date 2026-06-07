@@ -127,6 +127,7 @@ export default function AiDraftDialog({ open, onClose, chapter, novel, novelId, 
     queryKey: ["writers"],
     queryFn: () => base44.entities.Writer.list(),
     enabled: open,
+    staleTime: 0,
   });
   const activeWriters = writers.filter((w) => w.is_active !== false);
 

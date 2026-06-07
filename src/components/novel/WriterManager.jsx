@@ -22,6 +22,7 @@ export default function WriterManager() {
   const { data: writers = [], isLoading } = useQuery({
     queryKey: ["writers"],
     queryFn: () => base44.entities.Writer.list(),
+    staleTime: 0,
   });
 
   const upsert = useMutation({
