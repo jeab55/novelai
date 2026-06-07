@@ -8,7 +8,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Plus, BookOpen, Feather, Sparkles, Pencil, LogOut } from "lucide-react";
+import { Plus, BookOpen, Feather, Sparkles, Pencil, LogOut, Trash2 } from "lucide-react";
+import DeleteNovelDialog from "@/components/novel/DeleteNovelDialog";
+import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { useAuth } from "@/lib/AuthContext";
 
@@ -33,6 +35,7 @@ export default function Dashboard() {
   const [editOpen, setEditOpen] = useState(false);
   const [editForm, setEditForm] = useState({});
   const [editingId, setEditingId] = useState(null);
+  const [deleteDialog, setDeleteDialog] = useState({ open: false, novel: null });
   const queryClient = useQueryClient();
   const { user, logout } = useAuth();
   const isAdmin = user?.role === "admin";
@@ -46,11 +49,22 @@ export default function Dashboard() {
 
   const { data: novels = [], isLoading } = useQuery({
     queryKey: ["novels", user?.id],
-    queryFn: () =>
-      isAdmin
-        ? base44.entities.Novel.list("-created_date")
-        : base44.entities.Novel.filter({ created_by_id: user?.id }, "-created_date"),
+    queryFn: async () => {
+      const all = isAdmin
+        ? await base44.entities.Novel.list("-created_date")
+        : await base44.entities.Novel.filter({ created_by_id: user?.id }, "-created_date");
+      return all.filter((n) => !n.is_deleted);
+    },
     enabled: !!user,
+  });
+
+  const softDeleteMutation = useMutation({
+    mutationFn: (id) => base44.entities.Novel.update(id, { is_deleted: true, deleted_at: new Date().toISOString() }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["novels"] });
+      toast.success("ย้ายไปถังขยะแล้ว");
+      setDeleteDialog({ open: false, novel: null });
+    },
   });
 
   const createMutation = useMutation({
@@ -85,6 +99,15 @@ export default function Dashboard() {
   };
 
   return (
+    <>
+    <DeleteNovelDialog
+      open={deleteDialog.open}
+      onClose={() => setDeleteDialog({ open: false, novel: null })}
+      onConfirm={() => softDeleteMutation.mutate(deleteDialog.novel?.id)}
+      novel={deleteDialog.novel}
+      mode="delete"
+      isPending={softDeleteMutation.isPending}
+    />
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b border-border/60 bg-card/50 backdrop-blur-sm sticky top-0 z-10">
@@ -100,6 +123,11 @@ export default function Dashboard() {
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground hidden sm:block">{user?.full_name || user?.email}</span>
+            <Link to="/trash">
+              <Button variant="ghost" size="icon" title="ถังขยะ" className="text-muted-foreground hover:text-destructive">
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            </Link>
             <Button variant="ghost" size="icon" onClick={() => logout()} title="ออกจากระบบ" className="text-muted-foreground hover:text-foreground">
               <LogOut className="w-4 h-4" />
             </Button>
@@ -304,13 +332,24 @@ export default function Dashboard() {
                       <h3 className="font-heading font-semibold text-lg leading-tight group-hover:text-primary transition-colors pr-8">
                         {novel.title}
                       </h3>
-                      <button
-                        onClick={(e) => openEdit(e, novel)}
-                        className="absolute top-4 right-4 w-7 h-7 rounded-lg bg-secondary/60 hover:bg-primary/10 hover:text-primary flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all"
-                        title="แก้ไขข้อมูลเรื่อง"
-                      >
-                        <Pencil className="w-3.5 h-3.5" />
-                      </button>
+                      <div className="absolute top-4 right-4 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                        <button
+                          onClick={(e) => openEdit(e, novel)}
+                          className="w-7 h-7 rounded-lg bg-secondary/60 hover:bg-primary/10 hover:text-primary flex items-center justify-center transition-all"
+                          title="แก้ไขข้อมูลเรื่อง"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        {(isAdmin || novel.created_by_id === user?.id) && (
+                          <button
+                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setDeleteDialog({ open: true, novel }); }}
+                            className="w-7 h-7 rounded-lg bg-secondary/60 hover:bg-destructive/10 hover:text-destructive flex items-center justify-center transition-all"
+                            title="ย้ายไปถังขยะ"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
                     </div>
                     {novel.genre && (
                       <Badge className={`${genreColors[novel.genre] || "bg-gray-100 text-gray-700"} text-xs mb-2`}>
@@ -348,5 +387,6 @@ export default function Dashboard() {
         )}
       </main>
     </div>
+    </>
   );
 }

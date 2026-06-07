@@ -4,7 +4,11 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Feather, PenTool, Users, Globe, Clock, Sparkles, Bot, User } from "lucide-react";
+import { ArrowLeft, Feather, PenTool, Users, Globe, Clock, Sparkles, Bot, Trash2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import DeleteNovelDialog from "@/components/novel/DeleteNovelDialog";
+import { toast } from "sonner";
 import { useAuth } from "@/lib/AuthContext";
 import WritingRoom from "@/components/novel/WritingRoom";
 import CharacterBible from "@/components/novel/CharacterBible";
@@ -16,8 +20,11 @@ import WriterManager from "@/components/novel/WriterManager";
 export default function NovelWorkspace() {
   const novelId = window.location.pathname.split("/novel/")[1];
   const [activeTab, setActiveTab] = useState("writing");
+  const [deleteDialog, setDeleteDialog] = useState(false);
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const { data: novel, isLoading } = useQuery({
     queryKey: ["novel", novelId],
@@ -33,6 +40,15 @@ export default function NovelWorkspace() {
     queryFn: () => base44.entities.Writer.list(),
     enabled: !!novel?.writer_id,
     select: (data) => data.find((w) => String(w.id) === String(novel?.writer_id)),
+  });
+
+  const softDeleteMutation = useMutation({
+    mutationFn: () => base44.entities.Novel.update(novelId, { is_deleted: true, deleted_at: new Date().toISOString() }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["novels"] });
+      toast.success("ย้ายไปถังขยะแล้ว");
+      navigate("/");
+    },
   });
 
   if (isLoading) {
@@ -53,7 +69,18 @@ export default function NovelWorkspace() {
     );
   }
 
+  const canDelete = isAdmin || novel.created_by_id === user?.id;
+
   return (
+    <>
+    <DeleteNovelDialog
+      open={deleteDialog}
+      onClose={() => setDeleteDialog(false)}
+      onConfirm={() => softDeleteMutation.mutate()}
+      novel={novel}
+      mode="delete"
+      isPending={softDeleteMutation.isPending}
+    />
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
       <header className="border-b border-border/60 bg-card/50 backdrop-blur-sm sticky top-0 z-10">
@@ -63,7 +90,7 @@ export default function NovelWorkspace() {
               <ArrowLeft className="w-4 h-4" />
             </Button>
           </Link>
-          <div className="flex items-center gap-3 min-w-0">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
             <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
               <Feather className="w-4 h-4 text-primary" />
             </div>
@@ -82,6 +109,17 @@ export default function NovelWorkspace() {
               </div>
             </div>
           </div>
+          {canDelete && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="shrink-0 text-muted-foreground hover:text-destructive ml-auto"
+              title="ย้ายไปถังขยะ"
+              onClick={() => setDeleteDialog(true)}
+            >
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          )}
         </div>
       </header>
 
@@ -140,5 +178,6 @@ export default function NovelWorkspace() {
         </div>
       </Tabs>
     </div>
+    </>
   );
 }

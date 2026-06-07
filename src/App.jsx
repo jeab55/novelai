@@ -12,6 +12,7 @@ import ForgotPassword from '@/pages/ForgotPassword';
 import ResetPassword from '@/pages/ResetPassword';
 import Dashboard from '@/pages/Dashboard';
 import NovelWorkspace from '@/pages/NovelWorkspace';
+import Trash from '@/pages/Trash';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -42,6 +43,7 @@ const AuthenticatedApp = () => {
       <Route element={<ProtectedRoute unauthenticatedElement={<Navigate to="/login" replace />} />}>
         <Route path="/" element={<Dashboard />} />
         <Route path="/novel/:id" element={<NovelWorkspace />} />
+        <Route path="/trash" element={<Trash />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>
