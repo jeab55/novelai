@@ -11,10 +11,19 @@ import { debounce } from "lodash";
 
 function countWords(text) {
   if (!text) return 0;
-  const cleaned = text.replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ");
-  const thai = cleaned.match(/[\u0E00-\u0E7F]+/g) || [];
-  const eng = cleaned.match(/[a-zA-Z]+/g) || [];
-  return thai.length + eng.length;
+  const cleaned = text.replace(/<[^>]*>/g, " ").replace(/&[a-z]+;/g, " ");
+  if (typeof Intl !== "undefined" && Intl.Segmenter) {
+    const segmenter = new Intl.Segmenter("th", { granularity: "word" });
+    let count = 0;
+    for (const seg of segmenter.segment(cleaned)) {
+      if (seg.isWordLike) count++;
+    }
+    return count;
+  }
+  // fallback: ประมาณจากอักขระไทย + คำอังกฤษ
+  const thaiChars = (cleaned.match(/[\u0E00-\u0E7F]/g) || []).length;
+  const eng = (cleaned.match(/[a-zA-Z]+/g) || []).length;
+  return Math.round(thaiChars / 3.5) + eng;
 }
 
 export default function ChapterEditor({ chapter, novelId, onBack }) {
