@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Plus, BookOpen, Feather, Sparkles, Pencil, LogOut, Trash2, Share2 } from "lucide-react";
+import { Plus, BookOpen, Feather, Pencil, LogOut, Trash2, Share2 } from "lucide-react";
 import DeleteNovelDialog from "@/components/novel/DeleteNovelDialog";
 import ShareNovelDialog from "@/components/novel/ShareNovelDialog";
 import { toast } from "sonner";
@@ -356,7 +356,7 @@ export default function Dashboard() {
             <h2 className="text-xl font-heading font-semibold mb-2">ยังไม่มีนิยาย</h2>
             <p className="text-muted-foreground mb-6">เริ่มต้นเขียนนิยายเรื่องแรกของคุณเลย!</p>
             <Button onClick={() => setOpen(true)} className="gap-2">
-              <Sparkles className="w-4 h-4" />
+              <Plus className="w-4 h-4" />
               สร้างเรื่องใหม่
             </Button>
           </motion.div>
