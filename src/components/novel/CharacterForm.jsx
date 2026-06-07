@@ -5,10 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { saveVersion } from "@/lib/saveVersion";
 
 const ROLES = ["ตัวเอก", "ตัวรอง", "ตัวร้าย", "ตัวประกอบ"];
 
-export default function CharacterForm({ novelId, character, onDone }) {
+export default function CharacterForm({ novelId, character, onDone, novelIdForVersion }) {
   const [form, setForm] = useState({
     name: character?.name || "",
     role: character?.role || "",
@@ -23,10 +24,20 @@ export default function CharacterForm({ novelId, character, onDone }) {
   const queryClient = useQueryClient();
 
   const mutation = useMutation({
-    mutationFn: (data) =>
-      character
-        ? base44.entities.Character.update(character.id, data)
-        : base44.entities.Character.create({ ...data, novel_id: novelId }),
+    mutationFn: async (data) => {
+      if (character) {
+        await saveVersion({
+          entityType: "character",
+          entityId: character.id,
+          novelId: novelIdForVersion || novelId,
+          data: character,
+          label: `แก้ไขตัวละคร: ${character.name}`,
+        });
+        return base44.entities.Character.update(character.id, data);
+      } else {
+        return base44.entities.Character.create({ ...data, novel_id: novelId });
+      }
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["characters", novelId] });
       onDone();

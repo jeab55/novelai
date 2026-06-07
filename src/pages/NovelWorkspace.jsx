@@ -4,7 +4,9 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Feather, PenTool, Users, Globe, Clock, Sparkles, Bot, Trash2, Share2 } from "lucide-react";
+import { ArrowLeft, Feather, PenTool, Users, Globe, Clock, Sparkles, Bot, Trash2, Share2, History } from "lucide-react";
+import VersionHistoryDialog from "@/components/novel/VersionHistoryDialog";
+import { saveVersion } from "@/lib/saveVersion";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import DeleteNovelDialog from "@/components/novel/DeleteNovelDialog";
@@ -23,6 +25,7 @@ export default function NovelWorkspace() {
   const [activeTab, setActiveTab] = useState("writing");
   const [deleteDialog, setDeleteDialog] = useState(false);
   const [shareDialog, setShareDialog] = useState(false);
+  const [novelVersionOpen, setNovelVersionOpen] = useState(false);
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
   const navigate = useNavigate();

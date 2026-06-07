@@ -7,7 +7,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, Globe, Trash2, Edit2, MapPin, Crown, Scroll, Package, Settings, HelpCircle, Loader2 } from "lucide-react";
+import { Plus, Globe, Trash2, Edit2, MapPin, Crown, Scroll, Package, Settings, HelpCircle, Loader2, History } from "lucide-react";
+import VersionHistoryDialog from "./VersionHistoryDialog";
+import { saveVersion } from "@/lib/saveVersion";
 import { motion, AnimatePresence } from "framer-motion";
 
 const CATEGORIES = ["สถานที่", "ขนบธรรมเนียม", "ยุคสมัย", "สิ่งของ", "ระบบ", "อื่นๆ"];
@@ -35,6 +37,7 @@ export default function WorldBible({ novelId }) {
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({ title: "", category: "", description: "" });
   const [filterCat, setFilterCat] = useState("ทั้งหมด");
+  const [versionEntry, setVersionEntry] = useState(null);
   const queryClient = useQueryClient();
 
   const { data: entries = [], isLoading } = useQuery({
@@ -43,10 +46,20 @@ export default function WorldBible({ novelId }) {
   });
 
   const saveMutation = useMutation({
-    mutationFn: (data) =>
-      editing
-        ? base44.entities.WorldEntry.update(editing.id, data)
-        : base44.entities.WorldEntry.create({ ...data, novel_id: novelId }),
+    mutationFn: async (data) => {
+      if (editing) {
+        await saveVersion({
+          entityType: "world_entry",
+          entityId: editing.id,
+          novelId,
+          data: editing,
+          label: `แก้ไขโลก/ฉาก: ${editing.title}`,
+        });
+        return base44.entities.WorldEntry.update(editing.id, data);
+      } else {
+        return base44.entities.WorldEntry.create({ ...data, novel_id: novelId });
+      }
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["worldEntries", novelId] });
       setDialogOpen(false);
@@ -70,6 +83,18 @@ export default function WorldBible({ novelId }) {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-6">
+      {versionEntry && (
+        <VersionHistoryDialog
+          open={!!versionEntry}
+          onClose={() => setVersionEntry(null)}
+          entityType="world_entry"
+          entityId={versionEntry.id}
+          novelId={novelId}
+          currentData={versionEntry}
+          currentLabel={versionEntry.title}
+          onRestored={() => queryClient.invalidateQueries({ queryKey: ["worldEntries", novelId] })}
+        />
+      )}
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="font-heading text-lg font-semibold">โลกและฉาก</h2>
@@ -160,6 +185,9 @@ export default function WorldBible({ novelId }) {
                       )}
                     </div>
                     <div className="flex gap-1 shrink-0">
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" title="ประวัติเวอร์ชัน" onClick={() => setVersionEntry(entry)}>
+                        <History className="w-3 h-3" />
+                      </Button>
                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(entry)}>
                         <Edit2 className="w-3 h-3" />
                       </Button>

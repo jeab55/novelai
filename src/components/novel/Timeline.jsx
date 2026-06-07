@@ -7,7 +7,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, Clock, Trash2, Edit2, BookOpen, Landmark, Loader2, Sparkles } from "lucide-react";
+import { Plus, Clock, Trash2, Edit2, BookOpen, Landmark, Loader2, Sparkles, History } from "lucide-react";
+import VersionHistoryDialog from "./VersionHistoryDialog";
+import { saveVersion } from "@/lib/saveVersion";
 import { motion, AnimatePresence } from "framer-motion";
 import AiPlotDialog from "./AiPlotDialog";
 
@@ -16,6 +18,7 @@ export default function Timeline({ novelId, novel }) {
   const [aiDialogOpen, setAiDialogOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({ title: "", description: "", order: 0, time_period: "", characters_involved: "", is_historical: false });
+  const [versionEvent, setVersionEvent] = useState(null);
   const queryClient = useQueryClient();
 
   const { data: events = [], isLoading } = useQuery({
@@ -24,10 +27,20 @@ export default function Timeline({ novelId, novel }) {
   });
 
   const saveMutation = useMutation({
-    mutationFn: (data) =>
-      editing
-        ? base44.entities.PlotEvent.update(editing.id, data)
-        : base44.entities.PlotEvent.create({ ...data, novel_id: novelId }),
+    mutationFn: async (data) => {
+      if (editing) {
+        await saveVersion({
+          entityType: "plot_event",
+          entityId: editing.id,
+          novelId,
+          data: editing,
+          label: `แก้ไขเหตุการณ์: ${editing.title}`,
+        });
+        return base44.entities.PlotEvent.update(editing.id, data);
+      } else {
+        return base44.entities.PlotEvent.create({ ...data, novel_id: novelId });
+      }
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["plotEvents", novelId] });
       closeDialog();
@@ -123,6 +136,18 @@ export default function Timeline({ novelId, novel }) {
         novel={novel}
         novelId={novelId}
       />
+      {versionEvent && (
+        <VersionHistoryDialog
+          open={!!versionEvent}
+          onClose={() => setVersionEvent(null)}
+          entityType="plot_event"
+          entityId={versionEvent.id}
+          novelId={novelId}
+          currentData={versionEvent}
+          currentLabel={versionEvent.title}
+          onRestored={() => queryClient.invalidateQueries({ queryKey: ["plotEvents", novelId] })}
+        />
+      )}
 
       {isLoading ? (
         <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
@@ -170,6 +195,9 @@ export default function Timeline({ novelId, novel }) {
                       )}
                     </div>
                     <div className="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" title="ประวัติเวอร์ชัน" onClick={() => setVersionEvent(ev)}>
+                        <History className="w-3 h-3" />
+                      </Button>
                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(ev)}>
                         <Edit2 className="w-3 h-3" />
                       </Button>

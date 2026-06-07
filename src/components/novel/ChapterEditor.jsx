@@ -3,10 +3,12 @@ import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Save, Loader2, Download, Copy, MoreHorizontal, Maximize2, Minimize2, Sparkles, Clock, X, RefreshCw, Volume2 } from "lucide-react";
+import { ArrowLeft, Save, Loader2, Download, Copy, MoreHorizontal, Maximize2, Minimize2, Sparkles, Clock, X, RefreshCw, Volume2, History } from "lucide-react";
 import AiDraftDialog from "./AiDraftDialog";
 import EditorReviewPanel from "./EditorReviewPanel";
 import TextToSpeechPanel from "./TextToSpeechPanel";
+import VersionHistoryDialog from "./VersionHistoryDialog";
+import { saveVersion } from "@/lib/saveVersion";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
@@ -38,6 +40,7 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
   const [focusMode, setFocusMode] = useState(false);
   const [ttsOpen, setTtsOpen] = useState(false);
   const [draftOpen, setDraftOpen] = useState(false);
+  const [versionOpen, setVersionOpen] = useState(false);
   const [changeEventOpen, setChangeEventOpen] = useState(false);
   const [selectedPlotEventId, setSelectedPlotEventId] = useState("");
   // local state for plot event binding (synced from chapter prop)
@@ -66,7 +69,17 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
   }, [focusMode]);
 
   const saveMutation = useMutation({
-    mutationFn: (data) => base44.entities.Chapter.update(chapter.id, data),
+    mutationFn: async (data) => {
+      // snapshot ก่อนบันทึก
+      await saveVersion({
+        entityType: "chapter",
+        entityId: chapter.id,
+        novelId,
+        data: { ...chapter, title, content, status, word_count: wordCount },
+        label: `บันทึกตอน: ${title || chapter.title}`,
+      });
+      return base44.entities.Chapter.update(chapter.id, data);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["chapters", novelId] });
       toast.success("บันทึกแล้ว");
@@ -151,6 +164,18 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
         >
           <Volume2 className="w-3.5 h-3.5" />
           ฟังเสียง
+        </Button>
+
+        {/* Version History button */}
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-1.5 h-8 text-xs border-border text-muted-foreground hover:text-foreground"
+          onClick={() => setVersionOpen(true)}
+          title="ประวัติเวอร์ชัน"
+        >
+          <History className="w-3.5 h-3.5" />
+          ประวัติ
         </Button>
 
         {/* AI Draft button */}
@@ -306,6 +331,21 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
 
   return (
     <>
+    <VersionHistoryDialog
+      open={versionOpen}
+      onClose={() => setVersionOpen(false)}
+      entityType="chapter"
+      entityId={chapter.id}
+      novelId={novelId}
+      currentData={{ ...chapter, title, content, status, word_count: wordCount }}
+      currentLabel={title || chapter.title}
+      onRestored={(type, id, data) => {
+        if (data.title) setTitle(data.title);
+        if (data.content !== undefined) setContent(data.content);
+        if (data.status) setStatus(data.status);
+        queryClient.invalidateQueries({ queryKey: ["chapters", novelId] });
+      }}
+    />
     <AiDraftDialog
       open={draftOpen}
       onClose={() => setDraftOpen(false)}

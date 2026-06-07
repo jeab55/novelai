@@ -8,7 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, Users, Trash2, Edit2, User, Loader2 } from "lucide-react";
+import { Plus, Users, Trash2, Edit2, User, Loader2, History } from "lucide-react";
+import VersionHistoryDialog from "./VersionHistoryDialog";
 import { motion, AnimatePresence } from "framer-motion";
 import CharacterForm from "./CharacterForm";
 
@@ -23,6 +24,7 @@ export default function CharacterBible({ novelId }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
+  const [versionChar, setVersionChar] = useState(null);
   const queryClient = useQueryClient();
 
   const { data: characters = [], isLoading } = useQuery({
@@ -42,6 +44,18 @@ export default function CharacterBible({ novelId }) {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-6">
+      {versionChar && (
+        <VersionHistoryDialog
+          open={!!versionChar}
+          onClose={() => setVersionChar(null)}
+          entityType="character"
+          entityId={versionChar.id}
+          novelId={novelId}
+          currentData={versionChar}
+          currentLabel={versionChar.name}
+          onRestored={() => queryClient.invalidateQueries({ queryKey: ["characters", novelId] })}
+        />
+      )}
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="font-heading text-lg font-semibold">คลังตัวละคร</h2>
@@ -61,6 +75,7 @@ export default function CharacterBible({ novelId }) {
             <CharacterForm
               novelId={novelId}
               character={editing}
+              novelIdForVersion={novelId}
               onDone={() => { setDialogOpen(false); setEditing(null); }}
             />
           </DialogContent>
@@ -103,6 +118,9 @@ export default function CharacterBible({ novelId }) {
                   <Badge className={`${roleColors[char.role] || roleColors["ตัวประกอบ"]} text-xs`}>
                     {char.role || "ตัวประกอบ"}
                   </Badge>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" title="ประวัติเวอร์ชัน" onClick={(e) => { e.stopPropagation(); setVersionChar(char); }}>
+                    <History className="w-3.5 h-3.5" />
+                  </Button>
                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleOpenEdit(char); }}>
                     <Edit2 className="w-3.5 h-3.5" />
                   </Button>
