@@ -3,11 +3,12 @@ import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Save, Loader2, Download, Copy, MoreHorizontal, Maximize2, Minimize2, Sparkles, Clock, X, RefreshCw, Volume2, History } from "lucide-react";
+import { ArrowLeft, Save, Loader2, Download, Copy, MoreHorizontal, Maximize2, Minimize2, Sparkles, Clock, X, RefreshCw, Volume2, History, PieChart } from "lucide-react";
 import AiDraftDialog from "./AiDraftDialog";
 import EditorReviewPanel from "./EditorReviewPanel";
 import TextToSpeechPanel from "./TextToSpeechPanel";
 import VersionHistoryDialog from "./VersionHistoryDialog";
+import ChapterBalanceMeter from "./ChapterBalanceMeter";
 import { saveVersion } from "@/lib/saveVersion";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -50,6 +51,7 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
   const [plotEventOrder, setPlotEventOrder] = useState(chapter.plot_event_order || null);
   const [previousContent, setPreviousContent] = useState(chapter.previous_content || "");
   const [editorReview, setEditorReview] = useState(chapter.editor_review || "");
+  const [balanceOpen, setBalanceOpen] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: plotEvents = [] } = useQuery({
@@ -176,6 +178,18 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
         >
           <History className="w-3.5 h-3.5" />
           ประวัติ
+        </Button>
+
+        {/* Balance Meter button */}
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-1.5 h-8 text-xs border-primary/30 text-primary hover:bg-primary/5"
+          onClick={() => setBalanceOpen(true)}
+          title="วัดสมดุลเนื้อหา"
+        >
+          <PieChart className="w-3.5 h-3.5" />
+          สมดุล
         </Button>
 
         {/* AI Draft button */}
@@ -404,6 +418,13 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
           onClose={() => setTtsOpen(false)}
         />
       )}
+      {balanceOpen && (
+        <ChapterBalanceMeter
+          content={content}
+          onClose={() => setBalanceOpen(false)}
+        />
+      )}
+      
       <EditorReviewPanel
         chapter={{ ...chapter, content, editor_review: editorReview, previous_content: previousContent, plot_event_id: plotEventId, plot_event_title: plotEventTitle, plot_event_description: plotEventDescription, plot_event_order: plotEventOrder }}
         novel={novel || { title: "" }}
