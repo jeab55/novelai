@@ -8,8 +8,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Plus, BookOpen, Feather, Sparkles, Pencil } from "lucide-react";
+import { Plus, BookOpen, Feather, Sparkles, Pencil, LogOut } from "lucide-react";
 import { motion } from "framer-motion";
+import { useAuth } from "@/lib/AuthContext";
 
 const GENRES = ["โรแมนติก", "แฟนตาซี", "อิงประวัติศาสตร์", "จีนย้อนยุค", "วาย", "สยองขวัญ", "ลึกลับ", "แอ็คชั่น", "ดราม่า", "อื่นๆ"];
 
@@ -33,10 +34,17 @@ export default function Dashboard() {
   const [editForm, setEditForm] = useState({});
   const [editingId, setEditingId] = useState(null);
   const queryClient = useQueryClient();
+  const { user, logout } = useAuth();
+
+  const isAdmin = user?.role === "admin";
 
   const { data: novels = [], isLoading } = useQuery({
-    queryKey: ["novels"],
-    queryFn: () => base44.entities.Novel.list("-created_date"),
+    queryKey: ["novels", user?.id],
+    queryFn: () =>
+      isAdmin
+        ? base44.entities.Novel.list("-created_date")
+        : base44.entities.Novel.filter({ created_by_id: user?.id }, "-created_date"),
+    enabled: !!user,
   });
 
   const createMutation = useMutation({
@@ -79,7 +87,12 @@ export default function Dashboard() {
               <p className="text-xs text-muted-foreground">ผู้ช่วยแต่งนิยายอัจฉริยะ</p>
             </div>
           </div>
-          <Dialog open={open} onOpenChange={setOpen}>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground hidden sm:block">{user?.full_name || user?.email}</span>
+            <Button variant="ghost" size="icon" onClick={() => logout()} title="ออกจากระบบ" className="text-muted-foreground hover:text-foreground">
+              <LogOut className="w-4 h-4" />
+            </Button>
+            <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button className="gap-2 font-body">
                 <Plus className="w-4 h-4" />
@@ -137,6 +150,7 @@ export default function Dashboard() {
               </div>
             </DialogContent>
           </Dialog>
+          </div>
         </div>
       </header>
 

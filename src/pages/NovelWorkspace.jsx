@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Feather, PenTool, Users, Globe, Clock, Sparkles, Bot } from "lucide-react";
+import { useAuth } from "@/lib/AuthContext";
 import WritingRoom from "@/components/novel/WritingRoom";
 import CharacterBible from "@/components/novel/CharacterBible";
 import WorldBible from "@/components/novel/WorldBible";
@@ -13,9 +14,10 @@ import AiAssistant from "@/components/novel/AiAssistant";
 import WriterManager from "@/components/novel/WriterManager";
 
 export default function NovelWorkspace() {
-  const urlParams = new URLSearchParams(window.location.search);
   const novelId = window.location.pathname.split("/novel/")[1];
   const [activeTab, setActiveTab] = useState("writing");
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
 
   const { data: novel, isLoading } = useQuery({
     queryKey: ["novel", novelId],
@@ -34,10 +36,12 @@ export default function NovelWorkspace() {
     );
   }
 
-  if (!novel) {
+  // ตรวจสิทธิ์: ต้องเป็นเจ้าของหรือ admin
+  if (!novel || (!isAdmin && novel.created_by_id !== user?.id)) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-muted-foreground">ไม่พบนิยายเรื่องนี้</p>
+      <div className="min-h-screen flex items-center justify-center flex-col gap-4">
+        <p className="text-muted-foreground">ไม่พบนิยายเรื่องนี้ หรือคุณไม่มีสิทธิ์เข้าถึง</p>
+        <Link to="/"><Button variant="outline" size="sm"><ArrowLeft className="w-4 h-4 mr-1.5" />กลับหน้าหลัก</Button></Link>
       </div>
     );
   }
