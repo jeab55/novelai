@@ -7,11 +7,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, Clock, Trash2, Edit2, BookOpen, Landmark, Loader2 } from "lucide-react";
+import { Plus, Clock, Trash2, Edit2, BookOpen, Landmark, Loader2, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import AiPlotDialog from "./AiPlotDialog";
 
-export default function Timeline({ novelId }) {
+export default function Timeline({ novelId, novel }) {
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [aiDialogOpen, setAiDialogOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({ title: "", description: "", order: 0, time_period: "", characters_involved: "", is_historical: false });
   const queryClient = useQueryClient();
@@ -63,7 +65,17 @@ export default function Timeline({ novelId }) {
           <h2 className="font-heading text-lg font-semibold">พล็อตและไทม์ไลน์</h2>
           <p className="text-sm text-muted-foreground">{events.length} เหตุการณ์</p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={(v) => { if (!v) closeDialog(); else setDialogOpen(true); }}>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5 text-primary border-primary/30 hover:bg-primary/5"
+            onClick={() => setAiDialogOpen(true)}
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            ให้ AI ช่วยวางพล็อต
+          </Button>
+          <Dialog open={dialogOpen} onOpenChange={(v) => { if (!v) closeDialog(); else setDialogOpen(true); }}>
           <DialogTrigger asChild>
             <Button size="sm" className="gap-1.5" onClick={() => setForm({ ...form, order: events.length + 1 })}>
               <Plus className="w-3.5 h-3.5" />
@@ -102,7 +114,15 @@ export default function Timeline({ novelId }) {
             </div>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
+
+      <AiPlotDialog
+        open={aiDialogOpen}
+        onClose={() => setAiDialogOpen(false)}
+        novel={novel}
+        novelId={novelId}
+      />
 
       {isLoading ? (
         <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>

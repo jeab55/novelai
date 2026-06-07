@@ -191,7 +191,7 @@ export default function NovelWorkspace() {
             <WorldBible novelId={novelId} />
           </TabsContent>
           <TabsContent value="timeline" className="m-0">
-            <Timeline novelId={novelId} />
+            <Timeline novelId={novelId} novel={novel} />
           </TabsContent>
           <TabsContent value="ai" className="m-0 h-full">
             <AiAssistant novelId={novelId} novel={novel} />
