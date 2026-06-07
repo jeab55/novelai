@@ -4,12 +4,13 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Feather, PenTool, Users, Globe, Clock, Sparkles } from "lucide-react";
+import { ArrowLeft, Feather, PenTool, Users, Globe, Clock, Sparkles, Bot } from "lucide-react";
 import WritingRoom from "@/components/novel/WritingRoom";
 import CharacterBible from "@/components/novel/CharacterBible";
 import WorldBible from "@/components/novel/WorldBible";
 import Timeline from "@/components/novel/Timeline";
 import AiAssistant from "@/components/novel/AiAssistant";
+import WriterManager from "@/components/novel/WriterManager";
 
 export default function NovelWorkspace() {
   const urlParams = new URLSearchParams(window.location.search);
@@ -90,6 +91,10 @@ export default function NovelWorkspace() {
                 <Sparkles className="w-3.5 h-3.5" />
                 <span className="text-sm">ผู้ช่วย AI</span>
               </TabsTrigger>
+              <TabsTrigger value="writers" className="gap-1.5 data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-none border-b-2 border-transparent data-[state=active]:border-primary px-4 py-2.5">
+                <Bot className="w-3.5 h-3.5" />
+                <span className="text-sm">นักเขียน AI</span>
+              </TabsTrigger>
             </TabsList>
           </div>
         </div>
@@ -109,6 +114,9 @@ export default function NovelWorkspace() {
           </TabsContent>
           <TabsContent value="ai" className="m-0 h-full">
             <AiAssistant novelId={novelId} novel={novel} />
+          </TabsContent>
+          <TabsContent value="writers" className="m-0">
+            <WriterManager />
           </TabsContent>
         </div>
       </Tabs>

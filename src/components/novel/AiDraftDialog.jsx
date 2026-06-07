@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, Sparkles, RefreshCw, CheckCheck, Wand2, ChevronRight } from "lucide-react";
+import { Loader2, Sparkles, RefreshCw, CheckCheck, Wand2, ChevronRight, Bot } from "lucide-react";
 import { toast } from "sonner";
 
 const WORD_TARGETS = [
@@ -17,10 +17,12 @@ const WORD_TARGETS = [
   { label: "ยาวมาก ~3,000 คำ", value: 3000 },
 ];
 
-// สร้าง system prompt สำหรับร่างตอน (ดึงจาก AiAssistant)
-function buildDraftSystemPrompt(novel, characters, worldEntries, plotEvents, chapters, currentChapter) {
-  let ctx = `[บทบาท]\nคุณคือนักเขียนนิยายภาษาไทยมืออาชีพที่กำลังร่างตอนใหม่ให้ผู้เขียน\n`;
-  ctx += `คุณต้องร่างเนื้อหาตอนที่สมบูรณ์ตามโครงที่ได้รับ รักษาสำนวนและโทนของเรื่อง ใช้ภาษาไทยที่อ่านลื่น\n\n`;
+const DEFAULT_WRITER_PROMPT = `คุณคือนักเขียนนิยายภาษาไทยมืออาชีพที่กำลังร่างตอนใหม่ให้ผู้เขียน
+คุณต้องร่างเนื้อหาตอนที่สมบูรณ์ตามโครงที่ได้รับ รักษาสำนวนและโทนของเรื่อง ใช้ภาษาไทยที่อ่านลื่น`;
+
+// สร้าง system prompt สำหรับร่างตอน
+function buildDraftSystemPrompt(novel, characters, worldEntries, plotEvents, chapters, currentChapter, writerPrompt) {
+  let ctx = `[บทบาท]\n${writerPrompt || DEFAULT_WRITER_PROMPT}\n\n`;
 
   ctx += `[บริบทเรื่อง]\n`;
   ctx += `ชื่อเรื่อง: ${novel.title}\n`;
@@ -102,6 +104,7 @@ export default function AiDraftDialog({ open, onClose, chapter, novel, novelId, 
   const [loading, setLoading] = useState(false);
   const [loadingType, setLoadingType] = useState(""); // "draft" | "polish"
   const [draft, setDraft] = useState("");
+  const [selectedWriterId, setSelectedWriterId] = useState(null);
   const [form, setForm] = useState({
     chapterTitle: chapter?.title || "",
     summary: "",
@@ -109,6 +112,22 @@ export default function AiDraftDialog({ open, onClose, chapter, novel, novelId, 
     tone: "",
     wordTarget: 1200,
   });
+
+  const { data: writers = [] } = useQuery({
+    queryKey: ["writers"],
+    queryFn: () => base44.entities.Writer.list(),
+    enabled: open,
+  });
+  const activeWriters = writers.filter((w) => w.is_active !== false);
+
+  // Auto-select first active writer
+  useEffect(() => {
+    if (activeWriters.length > 0 && !selectedWriterId) {
+      setSelectedWriterId(activeWriters[0].id);
+    }
+  }, [activeWriters.length]);
+
+  const selectedWriter = activeWriters.find((w) => w.id === selectedWriterId) || activeWriters[0];
 
   const { data: characters = [] } = useQuery({
     queryKey: ["characters", novelId],
@@ -132,7 +151,7 @@ export default function AiDraftDialog({ open, onClose, chapter, novel, novelId, 
   });
 
   const getSystemPrompt = () =>
-    buildDraftSystemPrompt(novel, characters, worldEntries, plotEvents, chapters, chapter);
+    buildDraftSystemPrompt(novel, characters, worldEntries, plotEvents, chapters, chapter, selectedWriter?.system_prompt);
 
   const handleDraft = async () => {
     setLoading(true);
@@ -167,6 +186,7 @@ export default function AiDraftDialog({ open, onClose, chapter, novel, novelId, 
     setStep(1);
     setDraft("");
     setForm({ chapterTitle: chapter?.title || "", summary: "", characters: "", tone: "", wordTarget: 1200 });
+    setSelectedWriterId(null);
     onClose();
   };
 
@@ -187,6 +207,34 @@ export default function AiDraftDialog({ open, onClose, chapter, novel, novelId, 
 
         {step === 1 ? (
           <div className="overflow-y-auto flex-1 px-6 py-5 space-y-4">
+            {/* เลือกนักเขียน */}
+            {activeWriters.length > 0 && (
+              <div>
+                <label className="text-sm font-medium mb-1.5 block flex items-center gap-1.5">
+                  <Bot className="w-3.5 h-3.5 text-primary" />
+                  เลือกนักเขียน AI
+                </label>
+                <Select value={selectedWriterId || ""} onValueChange={setSelectedWriterId}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="เลือกนักเขียน" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {activeWriters.map((w) => (
+                      <SelectItem key={w.id} value={w.id}>
+                        <div>
+                          <span className="font-medium">{w.name}</span>
+                          {w.description && <span className="text-muted-foreground ml-1.5 text-xs">— {w.description}</span>}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {selectedWriter?.style && (
+                  <p className="text-xs text-primary/60 mt-1">โทน: {selectedWriter.style}</p>
+                )}
+              </div>
+            )}
+
             {/* ชื่อตอน */}
             <div>
               <label className="text-sm font-medium mb-1.5 block">ชื่อตอน</label>

@@ -3,7 +3,7 @@ import { base44 } from "@/api/base44Client";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Send, Sparkles, Loader2, User, Bot, Lightbulb, BookOpen, Search, AlertTriangle, Wand2, CheckCircle, Upload, Flag } from "lucide-react";
 import ReactMarkdown from "react-markdown";
@@ -21,170 +21,119 @@ const QUICK_PROMPTS = [
   { icon: Upload,        label: "เตรียมลงแพลตฟอร์ม", prompt: "ช่วยแนะนำการเตรียมเรื่องนี้ลงแพลตฟอร์มนิยายไทย เช่น เด็กดี ธัญวลัย ReadAWrite จอยลดา วิธีเขียน blurb ดึงดูด การตั้งชื่อตอน และวินัยลงตอนสม่ำเสมอ" },
 ];
 
+function buildNovelContext(novel, characters, worldEntries, plotEvents, chapters) {
+  let ctx = `[บริบทนิยายที่กำลังเขียน]\n`;
+  ctx += `ชื่อเรื่อง: ${novel.title}\n`;
+  if (novel.genre) ctx += `แนว: ${novel.genre}\n`;
+  if (novel.era) ctx += `ยุคสมัย/ฉากหลัง: ${novel.era}\n`;
+  if (novel.synopsis) ctx += `เรื่องย่อ: ${novel.synopsis}\n`;
+
+  if (characters.length > 0) {
+    ctx += `\n[คลังตัวละคร — ${characters.length} ตัว]\n`;
+    characters.forEach((c) => {
+      ctx += `• ${c.name} (${c.role || "ตัวประกอบ"})${c.age ? ` อายุ ${c.age}` : ""}\n`;
+      if (c.appearance)    ctx += `  ลักษณะ: ${c.appearance}\n`;
+      if (c.personality)   ctx += `  นิสัย: ${c.personality}\n`;
+      if (c.background)    ctx += `  ปูมหลัง: ${c.background}\n`;
+      if (c.desire)        ctx += `  Want: ${c.desire}\n`;
+      if (c.wound)         ctx += `  Wound/Need: ${c.wound}\n`;
+      if (c.relationships) ctx += `  ความสัมพันธ์: ${c.relationships}\n`;
+    });
+  }
+
+  if (worldEntries.length > 0) {
+    ctx += `\n[โลกและฉาก — ${worldEntries.length} รายการ]\n`;
+    worldEntries.forEach((w) => {
+      ctx += `• [${w.category || "อื่นๆ"}] ${w.title}${w.description ? `: ${w.description}` : ""}\n`;
+    });
+  }
+
+  if (plotEvents.length > 0) {
+    ctx += `\n[ไทม์ไลน์พล็อต — ${plotEvents.length} เหตุการณ์]\n`;
+    plotEvents.forEach((e) => {
+      ctx += `• #${e.order} ${e.title}${e.is_historical ? " [ประวัติศาสตร์จริง]" : ""}${e.time_period ? ` (${e.time_period})` : ""}\n`;
+      if (e.description)         ctx += `  ${e.description}\n`;
+      if (e.characters_involved) ctx += `  ตัวละครที่เกี่ยวข้อง: ${e.characters_involved}\n`;
+    });
+  }
+
+  if (chapters.length > 0) {
+    ctx += `\n[ห้องเขียน — ${chapters.length} ตอน]\n`;
+    chapters.forEach((ch) => {
+      ctx += `• ตอนที่ ${ch.order}: "${ch.title}" [${ch.status || "ร่าง"}] (${(ch.word_count || 0).toLocaleString()} คำ)\n`;
+      if (ch.content) {
+        const preview = ch.content.substring(0, 600);
+        ctx += `  เนื้อหา: ${preview}${ch.content.length > 600 ? "…" : ""}\n`;
+      }
+    });
+  }
+
+  ctx += `\n[คำสั่งปฏิบัติการ]\n`;
+  ctx += `- ใช้บริบทนิยายข้างต้นอ้างอิงทุกครั้งที่ตอบ อ้างชื่อตัวละคร ฉาก เหตุการณ์ให้ถูกต้องเสมอ\n`;
+  ctx += `- ถ้าบริบทยังน้อย (ยังไม่มีตัวละครหรือไทม์ไลน์): แนะนำให้ผู้เขียนเพิ่มข้อมูลในแท็บที่เกี่ยวข้องก่อน\n`;
+  ctx += `- ให้ฟีดแบกด้วยความอบอุ่น ชี้จุดแข็งก่อน เสนอตัวเลือกไม่ใช่คำตอบสำเร็จรูป\n`;
+  ctx += `- ตอบเป็นภาษาไทยทุกครั้ง\n`;
+
+  return ctx;
+}
+
+// Default system prompt (fallback เมื่อยังไม่มี writer ใน DB)
+const DEFAULT_SYSTEM_PROMPT = `[บทบาทและจุดยืน]
+คุณคือ "NovelAi" — โค้ชและผู้ช่วยแต่งนิยายภาษาไทยมืออาชีพ
+  • โหมดโค้ช: ตั้งคำถามเพื่อดึงเรื่องราวในหัวผู้เขียนออกมา ไม่ยัดเยียดคำตอบ
+  • โหมดผู้ช่วยเขียน: ร่างฉาก ขัดเกลาภาษา เสนอตัวเลือกพร้อมเหตุผล
+- รักษาลายเซ็นและสำนวนของผู้เขียนไว้เสมอ "เสริม ไม่ใช่กลืน"
+- เสนอเป็นตัวเลือก (2-3 แนวทาง) พร้อมเหตุผล ให้ผู้เขียนตัดสินใจเอง
+- ตอบเป็นภาษาไทยทุกครั้ง`;
+
 export default function AiAssistant({ novelId, novel }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [selectedWriterId, setSelectedWriterId] = useState(null);
   const scrollRef = useRef(null);
+
+  const { data: writers = [] } = useQuery({
+    queryKey: ["writers"],
+    queryFn: () => base44.entities.Writer.list(),
+  });
+
+  const activeWriters = writers.filter((w) => w.is_active !== false);
+
+  // Auto-select first active writer
+  useEffect(() => {
+    if (activeWriters.length > 0 && !selectedWriterId) {
+      setSelectedWriterId(activeWriters[0].id);
+    }
+  }, [activeWriters.length]);
+
+  const selectedWriter = activeWriters.find((w) => w.id === selectedWriterId) || activeWriters[0];
 
   const { data: characters = [] } = useQuery({
     queryKey: ["characters", novelId],
     queryFn: () => base44.entities.Character.filter({ novel_id: novelId }),
   });
-
   const { data: worldEntries = [] } = useQuery({
     queryKey: ["worldEntries", novelId],
     queryFn: () => base44.entities.WorldEntry.filter({ novel_id: novelId }),
   });
-
   const { data: plotEvents = [] } = useQuery({
     queryKey: ["plotEvents", novelId],
     queryFn: () => base44.entities.PlotEvent.filter({ novel_id: novelId }, "order"),
   });
-
   const { data: chapters = [] } = useQuery({
     queryKey: ["chapters", novelId],
     queryFn: () => base44.entities.Chapter.filter({ novel_id: novelId }, "order"),
   });
 
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages]);
 
   const buildContext = () => {
-    let ctx = ``;
-
-    // ════════════════════════════════════════
-    // SYSTEM PROMPT — โค้ชและผู้ช่วยแต่งนิยายไทยมืออาชีพ
-    // ════════════════════════════════════════
-    ctx += `[บทบาทและจุดยืน]\n`;
-    ctx += `คุณคือ "NovelAi" — โค้ชและผู้ช่วยแต่งนิยายภาษาไทยมืออาชีพ คุณมีสองโหมดที่สลับกันตามสถานการณ์:\n`;
-    ctx += `  • โหมดโค้ช: ตั้งคำถามเพื่อดึงเรื่องราวในหัวผู้เขียนออกมา ไม่ยัดเยียดคำตอบ\n`;
-    ctx += `  • โหมดผู้ช่วยเขียน: ร่างฉาก ขัดเกลาภาษา เสนอตัวเลือกพร้อมเหตุผล\n`;
-    ctx += `จุดยืนสำคัญ:\n`;
-    ctx += `  - รักษาลายเซ็นและสำนวนของผู้เขียนไว้เสมอ "เสริม ไม่ใช่กลืน"\n`;
-    ctx += `  - เสนอเป็นตัวเลือก (2-3 แนวทาง) พร้อมเหตุผล ให้ผู้เขียนตัดสินใจเอง\n`;
-    ctx += `  - ห้ามร่างเนื้อหาสำเร็จรูปให้ลอก ยกเว้นผู้เขียนขอชัดเจน\n`;
-    ctx += `  - ตอบเป็นภาษาไทยทุกครั้ง สั้นกระชับเมื่อโค้ช ละเอียดเมื่อช่วยเขียน\n\n`;
-
-    ctx += `[ความสามารถหลัก]\n\n`;
-
-    ctx += `๑) โครงสร้างพล็อต\n`;
-    ctx += `  - วิเคราะห์และแนะนำโครงสร้าง 3 องก์ (setup/confrontation/resolution), Hero's Journey (12 ขั้น), Kishōtenketsu (4 จังหวะ ไม่พึ่ง conflict หลัก)\n`;
-    ctx += `  - เน้น "คำถามของเรื่อง" (central dramatic question) และ conflict 3 ระดับ:\n`;
-    ctx += `      • ภายใน: ความขัดแย้งในจิตใจตัวเอก\n`;
-    ctx += `      • ระหว่างบุคคล: ความสัมพันธ์และแรงเสียดทาน\n`;
-    ctx += `      • กับโลก: สังคม ระบบ ยุคสมัย หรือโชคชะตา\n`;
-    ctx += `  - ตรวจว่าพล็อตมี "ต้นทุน" และ "การเปลี่ยนแปลง" จริงหรือไม่\n\n`;
-
-    ctx += `๒) การสร้างตัวละคร\n`;
-    ctx += `  - กรอบ want vs need: ตัวละครต้องการ (want) อะไร และต้องการจริงๆ (need) คืออะไร — สองสิ่งนี้ขัดแย้งกันอย่างไร\n`;
-    ctx += `  - ปม/บาดแผล (wound): เหตุการณ์อดีตที่หล่อหลอมความกลัว/ความเชื่อผิดๆ ของตัวละคร\n`;
-    ctx += `  - Character arc: เส้นการเปลี่ยนแปลง (positive/negative/flat arc) ต้องสอดคล้องกับพล็อตหลัก\n`;
-    ctx += `  - ตัวละครที่ดี: คาดเดาไม่ได้แต่ "สมเหตุสมผลย้อนหลัง" — ทุกการกระทำต้องมีรากจากตัวละคร\n\n`;
-
-    ctx += `๓) การเปิดเรื่อง (Hook)\n`;
-    ctx += `  - Hook ที่ดีต้องทำ 3 อย่างใน 1-2 ย่อหน้า: สร้างคำถาม, ปูบรรยากาศ/โทนเรื่อง, แนะนำ "เดิมพัน"\n`;
-    ctx += `  - เทคนิค: เริ่มกลางเหตุการณ์ (in medias res), ประโยคแรกที่ก่อปริศนา, ภาพที่ผิดปกติ\n`;
-    ctx += `  - หลีกเลี่ยง: เริ่มด้วยตื่นนอน, อธิบาย backstory ยาว, บรรยากาศอ่อน\n\n`;
-
-    ctx += `๔) เทคนิคการเขียน\n`;
-    ctx += `  - Show don't tell: แสดงผ่านการกระทำ/ประสาทสัมผัส/บทสนทนา ไม่บรรยายสภาวะตรงๆ\n`;
-    ctx += `  - Subtext ในบทสนทนา: ตัวละครพูดอย่างหนึ่งแต่หมายความอีกอย่าง — สิ่งที่ไม่ได้พูดสำคัญกว่า\n`;
-    ctx += `  - จังหวะ (pacing): ฉากแอ็คชั่น/tension = ประโยคสั้น ฉากสะท้อนใจ/โรแมนติก = ประโยคยาว\n`;
-    ctx += `  - การตัดฉาก: ตัดเมื่อ tension พีค ไม่ตัดหลัง resolution\n`;
-    ctx += `  - เบ็ดจบตอน (chapter hook): ทิ้งคำถามค้าง, ข้อมูลใหม่กระแทก, หรือตัวละครตัดสินใจชวนลุ้น\n\n`;
-
-    ctx += `๕) แก้อาการตันและช่วยให้เขียนจบ\n`;
-    ctx += `  - เมื่อผู้เขียนบอกว่าตัน: ถามก่อนเสมอ — "ตันเพราะไม่รู้จะเกิดอะไรต่อ หรือรู้แต่เขียนออกมาไม่ได้ หรือรู้สึกว่าพล็อตมีปัญหา?"\n`;
-    ctx += `  - วินิจฉัยสาเหตุ: พล็อตโฮล, ตัวละครไม่น่าเชื่อถือ, จังหวะช้า, กลัวผลงานไม่ดี, หมดพลังงาน\n`;
-    ctx += `  - แก้ตรงจุด: อย่าเสนอวิธีทั่วไป ต้องอ้างอิงสถานการณ์ของเรื่องนี้\n`;
-    ctx += `  - ช่วยให้เขียนจบ: ตั้งเป้าเล็กสม่ำเสมอ (เช่น "เขียนแค่ฉากนี้ให้จบก่อน"), มีโครงปลายทางชัดเจน, วินัยลงตอน\n\n`;
-
-    // ════════════════════════════════════════
-    // NOVEL CONTEXT
-    // ════════════════════════════════════════
-    ctx += `[บริบทนิยายที่กำลังเขียน]\n`;
-    ctx += `ชื่อเรื่อง: ${novel.title}\n`;
-    if (novel.genre) ctx += `แนว: ${novel.genre}\n`;
-    if (novel.era) ctx += `ยุคสมัย/ฉากหลัง: ${novel.era}\n`;
-    if (novel.synopsis) ctx += `เรื่องย่อ: ${novel.synopsis}\n`;
-
-    if (characters.length > 0) {
-      ctx += `\n[คลังตัวละคร — ${characters.length} ตัว]\n`;
-      characters.forEach((c) => {
-        ctx += `• ${c.name} (${c.role || "ตัวประกอบ"})${c.age ? ` อายุ ${c.age}` : ""}\n`;
-        if (c.appearance)     ctx += `  ลักษณะ: ${c.appearance}\n`;
-        if (c.personality)    ctx += `  นิสัย: ${c.personality}\n`;
-        if (c.background)     ctx += `  ปูมหลัง: ${c.background}\n`;
-        if (c.desire)         ctx += `  Want (ต้องการ): ${c.desire}\n`;
-        if (c.wound)          ctx += `  Wound/Need (ปม): ${c.wound}\n`;
-        if (c.relationships)  ctx += `  ความสัมพันธ์: ${c.relationships}\n`;
-      });
-    }
-
-    if (worldEntries.length > 0) {
-      ctx += `\n[โลกและฉาก — ${worldEntries.length} รายการ]\n`;
-      worldEntries.forEach((w) => {
-        ctx += `• [${w.category || "อื่นๆ"}] ${w.title}${w.description ? `: ${w.description}` : ""}\n`;
-      });
-    }
-
-    if (plotEvents.length > 0) {
-      ctx += `\n[ไทม์ไลน์พล็อต — ${plotEvents.length} เหตุการณ์]\n`;
-      plotEvents.forEach((e) => {
-        ctx += `• #${e.order} ${e.title}${e.is_historical ? " [ประวัติศาสตร์จริง]" : ""}${e.time_period ? ` (${e.time_period})` : ""}\n`;
-        if (e.description)          ctx += `  ${e.description}\n`;
-        if (e.characters_involved)  ctx += `  ตัวละครที่เกี่ยวข้อง: ${e.characters_involved}\n`;
-      });
-    }
-
-    if (chapters.length > 0) {
-      ctx += `\n[ห้องเขียน — ${chapters.length} ตอน]\n`;
-      chapters.forEach((ch) => {
-        ctx += `• ตอนที่ ${ch.order}: "${ch.title}" [${ch.status || "ร่าง"}] (${(ch.word_count || 0).toLocaleString()} คำ)\n`;
-        if (ch.content) {
-          const preview = ch.content.substring(0, 600);
-          ctx += `  เนื้อหา: ${preview}${ch.content.length > 600 ? "…" : ""}\n`;
-        }
-      });
-    }
-
-    ctx += `\n๖) ความเชี่ยวชาญนิยายอิงประวัติศาสตร์\n`;
-    ctx += `  - ข้อเท็จจริงแกนหลัก (ปี เหตุการณ์สำคัญ ผลของศึก ชื่อบุคคลในประวัติศาสตร์) ห้ามเปลี่ยนหรือแต่งขึ้นเองเด็ดขาด\n`;
-    ctx += `  - "ช่องว่าง" ที่ประวัติศาสตร์ไม่ได้บันทึก (ชีวิตประจำวัน ความรู้สึก บทสนทนา) แต่งได้เต็มที่อย่างสร้างสรรค์\n`;
-    ctx += `  - เลี่ยง anachronism 3 ระดับ:\n`;
-    ctx += `      • วัตถุผิดยุค: สิ่งของที่ยังไม่มีในยุคนั้น\n`;
-    ctx += `      • ภาษาผิดยุค: คำทับศัพท์ภาษาอังกฤษ ศัพท์สมัยใหม่ สแลง\n`;
-    ctx += `      • ความคิดผิดยุค: โลกทัศน์สมัยใหม่ที่ขัดกับสังคมยุคนั้น\n`;
-    ctx += `  - น้ำเสียงยุคสมัย: ใช้คำโบราณเป็น "เครื่องปรุง" ให้อ่านลื่น ไม่หนักจนอ่านยาก เลี่ยงคำทับศัพท์สมัยใหม่ทุกชนิด\n`;
-    ctx += `  - เคารพสถาบันพระมหากษัตริย์และพระพุทธศาสนาอย่างสูงสุด ใช้ราชาศัพท์ให้ถูกต้องตามฐานานุศักดิ์\n`;
-    ctx += `  - หากไม่แน่ใจข้อเท็จจริงใด ให้บอกตรงๆ ว่า "ไม่แน่ใจ ควรตรวจสอบเพิ่มเติม" อย่าแต่งข้อเท็จจริงขึ้นเองแม้แต่ครั้งเดียว\n\n`;
-
-    ctx += `๗) แพลตฟอร์มนิยายไทย\n`;
-    ctx += `  - เด็กดี (dek-d.com): ชุมชนดั้งเดิม ฐานอ่านกว้าง เหมาะทุกแนว เน้นการสร้างฐานแฟนระยะยาว\n`;
-    ctx += `  - ธัญวลัย (thaNovel): แพลตฟอร์มพรีเมียม เน้นคุณภาพ มีระบบ Premium Chapter สร้างรายได้\n`;
-    ctx += `  - ReadAWrite (ร้ด): ปลายทางยอดนิยมสำหรับมือใหม่ บรรยากาศสนับสนุน feedback เยอะ\n`;
-    ctx += `  - จอยลดา: รูปแบบ "แชตนิยาย" ตอนสั้น อ่านเร็ว เหมาะนิยายโรแมนติก/วาย ฐานผู้อ่านมือถือ\n`;
-    ctx += `  - วินัยลงตอน: อย่าเว้นช่วงเกิน 2 สัปดาห์ ผู้อ่านจะหาย กำหนดวันลงตายตัวแล้วสื่อสารกับผู้อ่านเสมอ\n`;
-    ctx += `  - เตรียม blurb ดึงดูด: 3-5 ประโยค เปิดด้วยคำถาม/ความขัดแย้ง ปิดด้วยเดิมพันที่น่าลุ้น\n\n`;
-
-    ctx += `๘) การให้ฟีดแบก\n`;
-    ctx += `  - ชี้จุดแข็งก่อนเสมอ เฉพาะเจาะจง (ระบุว่าตรงไหนดีและทำไม) ไม่ใช่คำชมกว้างๆ\n`;
-    ctx += `  - เลือกประเด็นสำคัญที่สุด 1-3 ประเด็น ไม่วิจารณ์ทุกอย่างในครั้งเดียว\n`;
-    ctx += `  - อธิบายเหตุผลของแต่ละประเด็น และเสนอทางแก้ที่เป็นรูปธรรม\n`;
-    ctx += `  - เคารพสไตล์ผู้เขียน: แยกให้ออกระหว่าง "สิ่งที่ผิดจริง" กับ "สิ่งที่เป็นทางเลือกส่วนตัว"\n`;
-    ctx += `  - ใช้ภาษาอบอุ่น ให้กำลังใจ ไม่ตัดสิน การเขียนนิยายต้องใช้ความกล้า ผู้ช่วยต้องเป็นพื้นที่ปลอดภัย\n\n`;
-
-    ctx += `\n[คำสั่งปฏิบัติการ]\n`;
-    ctx += `- ใช้บริบทนิยายข้างต้นอ้างอิงทุกครั้งที่ตอบ อ้างชื่อตัวละคร ฉาก เหตุการณ์ให้ถูกต้องเสมอ\n`;
-    ctx += `- สำหรับนิยายอิงประวัติศาสตร์/จีนย้อนยุค: ตรวจ anachronism 3 ระดับทุกครั้งที่ร่างหรือวิเคราะห์\n`;
-    ctx += `- ถ้าบริบทยังน้อย (ยังไม่มีตัวละครหรือไทม์ไลน์): แนะนำให้ผู้เขียนเพิ่มข้อมูลในแท็บที่เกี่ยวข้องก่อน\n`;
-    ctx += `- ให้ฟีดแบกด้วยความอบอุ่น ชี้จุดแข็งก่อน เสนอตัวเลือกไม่ใช่คำตอบสำเร็จรูป\n`;
-
-    return ctx;
+    const writerPrompt = selectedWriter?.system_prompt || DEFAULT_SYSTEM_PROMPT;
+    const novelCtx = buildNovelContext(novel, characters, worldEntries, plotEvents, chapters);
+    return `${writerPrompt}\n\n${novelCtx}`;
   };
 
   const sendMessage = async (text) => {
@@ -221,18 +170,30 @@ export default function AiAssistant({ novelId, novel }) {
                 <Sparkles className="w-8 h-8 text-primary/40" />
               </div>
               <h3 className="font-heading text-lg font-semibold mb-2">ผู้ช่วย AI พร้อมช่วยคุณเขียน</h3>
-              <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
+              <p className="text-sm text-muted-foreground mb-2 max-w-md mx-auto">
                 AI จะอ้างอิงข้อมูลตัวละคร โลก และไทม์ไลน์ของเรื่อง "{novel.title}" ในการตอบ
               </p>
+              {/* Writer selector */}
+              {activeWriters.length > 0 && (
+                <div className="flex items-center justify-center gap-2 mb-6">
+                  <span className="text-xs text-muted-foreground">นักเขียน:</span>
+                  <Select value={selectedWriterId || ""} onValueChange={setSelectedWriterId}>
+                    <SelectTrigger className="w-44 h-8 text-xs">
+                      <SelectValue placeholder="เลือกนักเขียน" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {activeWriters.map((w) => (
+                        <SelectItem key={w.id} value={w.id} className="text-xs">
+                          {w.name}{w.description ? ` — ${w.description}` : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <div className="flex flex-wrap gap-2 justify-center">
                 {QUICK_PROMPTS.map((qp) => (
-                  <Button
-                    key={qp.label}
-                    variant="outline"
-                    size="sm"
-                    className="gap-1.5 text-xs"
-                    onClick={() => sendMessage(qp.prompt)}
-                  >
+                  <Button key={qp.label} variant="outline" size="sm" className="gap-1.5 text-xs" onClick={() => sendMessage(qp.prompt)}>
                     <qp.icon className="w-3.5 h-3.5" />
                     {qp.label}
                   </Button>
@@ -280,7 +241,7 @@ export default function AiAssistant({ novelId, novel }) {
               <div className="bg-card border border-border/60 rounded-2xl px-4 py-3">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  กำลังคิด...
+                  {selectedWriter ? `${selectedWriter.name} กำลังคิด...` : "กำลังคิด..."}
                 </div>
               </div>
             </motion.div>
@@ -290,7 +251,20 @@ export default function AiAssistant({ novelId, novel }) {
 
       {/* Input */}
       <div className="border-t border-border/60 bg-card/30 p-4">
-        <div className="max-w-3xl mx-auto flex gap-2">
+        <div className="max-w-3xl mx-auto flex gap-2 items-end">
+          {/* Writer selector inline */}
+          {activeWriters.length > 1 && (
+            <Select value={selectedWriterId || ""} onValueChange={setSelectedWriterId}>
+              <SelectTrigger className="w-36 h-9 text-xs shrink-0">
+                <SelectValue placeholder="นักเขียน" />
+              </SelectTrigger>
+              <SelectContent>
+                {activeWriters.map((w) => (
+                  <SelectItem key={w.id} value={w.id} className="text-xs">{w.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
           <Textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -298,32 +272,17 @@ export default function AiAssistant({ novelId, novel }) {
             rows={2}
             className="resize-none flex-1"
             onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                sendMessage(input);
-              }
+              if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(input); }
             }}
           />
-          <Button
-            size="icon"
-            className="shrink-0 h-auto"
-            onClick={() => sendMessage(input)}
-            disabled={!input.trim() || loading}
-          >
+          <Button size="icon" className="shrink-0 h-auto" onClick={() => sendMessage(input)} disabled={!input.trim() || loading}>
             <Send className="w-4 h-4" />
           </Button>
         </div>
         {messages.length > 0 && (
           <div className="max-w-3xl mx-auto mt-2 flex gap-2 flex-wrap">
             {QUICK_PROMPTS.map((qp) => (
-              <Button
-                key={qp.label}
-                variant="ghost"
-                size="sm"
-                className="text-xs h-7 gap-1"
-                onClick={() => sendMessage(qp.prompt)}
-                disabled={loading}
-              >
+              <Button key={qp.label} variant="ghost" size="sm" className="text-xs h-7 gap-1" onClick={() => sendMessage(qp.prompt)} disabled={loading}>
                 <qp.icon className="w-3 h-3" />
                 {qp.label}
               </Button>
