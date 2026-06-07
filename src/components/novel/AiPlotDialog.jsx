@@ -13,7 +13,7 @@ import {
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
   AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Loader2, Sparkles, Plus, Trash2, RefreshCw } from "lucide-react";
+import { Loader2, Sparkles, Plus, Trash2, RefreshCw, FileText, CheckCircle2 } from "lucide-react";
 
 function stripCodeFence(text) {
   if (typeof text !== "string") return text;
@@ -66,6 +66,69 @@ ${charList}
 สร้างโครงเรื่องให้ครบ ${targetChapters} ตอน ครอบคลุมทั้งสามองก์ ปรับให้เหมาะกับแนว "${novel.genre || "ทั่วไป"}" ตอบเป็นภาษาไทยทั้งหมด ตอบด้วย JSON ล้วนเท่านั้น`;
 }
 
+const DEFAULT_WRITER_PROMPT = `คุณคือนักเขียนนิยายภาษาไทยมืออาชีพที่กำลังร่างตอนใหม่ให้ผู้เขียน
+คุณต้องร่างเนื้อหาตอนที่สมบูรณ์ตามโครงที่ได้รับ รักษาสำนวนและโทนของเรื่อง ใช้ภาษาไทยที่อ่านลื่น`;
+
+async function generateChapterDraft({ novel, writer, characters, worldEntries, plotEvents, chapters, event, linkedPlotEvent }) {
+  const writerPrompt = writer?.system_prompt || DEFAULT_WRITER_PROMPT;
+  const charList = characters.map((c) => c.name).join(", ");
+
+  let sysPrompt = `[บทบาท]\n${writerPrompt}\n\n`;
+  sysPrompt += `[บริบทเรื่อง]\nชื่อเรื่อง: ${novel.title}\n`;
+  if (novel.genre) sysPrompt += `แนว: ${novel.genre}\n`;
+  if (novel.era) sysPrompt += `ยุคสมัย/ฉากหลัง: ${novel.era}\n`;
+  if (novel.synopsis) sysPrompt += `เรื่องย่อ: ${novel.synopsis}\n`;
+
+  if (characters.length > 0) {
+    sysPrompt += `\n[ตัวละคร]\n`;
+    characters.forEach((c) => {
+      sysPrompt += `• ${c.name} (${c.role || "ตัวประกอบ"})${c.personality ? ` — ${c.personality}` : ""}\n`;
+    });
+  }
+
+  if (worldEntries.length > 0) {
+    sysPrompt += `\n[โลกและฉาก]\n`;
+    worldEntries.forEach((w) => {
+      sysPrompt += `• [${w.category || "อื่นๆ"}] ${w.title}${w.description ? `: ${w.description}` : ""}\n`;
+    });
+  }
+
+  if (plotEvents.length > 0) {
+    sysPrompt += `\n[ไทม์ไลน์]\n`;
+    plotEvents.forEach((e) => {
+      sysPrompt += `• #${e.order} ${e.title}${e.description ? ` — ${e.description}` : ""}\n`;
+    });
+  }
+
+  const prevChapters = chapters.filter((ch) => ch.content).slice(-2);
+  if (prevChapters.length > 0) {
+    sysPrompt += `\n[ตอนก่อนหน้า — รักษาความต่อเนื่อง]\n`;
+    prevChapters.forEach((ch) => {
+      const preview = ch.content.substring(0, 1000);
+      sysPrompt += `\n— ตอนที่ ${ch.order}: "${ch.title}" —\n${preview}${ch.content.length > 1000 ? "\n…(ต่อ)" : ""}\n`;
+    });
+  }
+
+  if (linkedPlotEvent) {
+    sysPrompt += `\n[เหตุการณ์หลักที่ตอนนี้ต้องบรรยาย — สำคัญมาก]\n`;
+    sysPrompt += `ลำดับ ${linkedPlotEvent.order}: ${linkedPlotEvent.title}\n`;
+    if (linkedPlotEvent.description) sysPrompt += `รายละเอียด: ${linkedPlotEvent.description}\n`;
+    sysPrompt += `→ ตอนนี้ต้องเล่าเหตุการณ์นี้ให้ครบ ใช้เป็นแกนกลางของพล็อต\n`;
+  }
+
+  sysPrompt += `\n[คำสั่งสำคัญ]\n- ร่างเนื้อหาตอนนี้ให้ครบประมาณ 1,200 คำ อย่าตัดจบกลางคัน\n`;
+  sysPrompt += `- ใช้ "Show don't tell" แสดงผ่านการกระทำและบทสนทนา\n`;
+  sysPrompt += `- จบตอนด้วย chapter hook ที่ดึงให้อยากอ่านต่อ\n`;
+  sysPrompt += `- ใช้ภาษาไทยที่อ่านลื่น เหมาะกับยุคสมัยของเรื่อง\n`;
+  if (charList) sysPrompt += `- ใช้ชื่อตัวละครตรงตามคลังตัวละครเสมอ: ${charList}\n`;
+  sysPrompt += `- ผลลัพธ์: เฉพาะเนื้อหาตอน ไม่ต้องมีคำนำหรืออธิบาย\n`;
+
+  const prompt = `${sysPrompt}\n\n[โจทย์ตอนที่ต้องร่าง]\nชื่อตอน: ${event.title}\nสิ่งที่ต้องเกิดในตอนนี้:\n${event.description || ""}\n\nร่างตอนนี้ให้ครบ 1,200 คำ:`;
+
+  const result = await base44.integrations.Core.InvokeLLM({ prompt, model: "claude_sonnet_4_6" });
+  return typeof result === "string" ? result : result?.text || "";
+}
+
 export default function AiPlotDialog({ open, onClose, novel, novelId }) {
   const queryClient = useQueryClient();
   const [step, setStep] = useState("idle"); // idle | generating | review | error
@@ -73,6 +136,8 @@ export default function AiPlotDialog({ open, onClose, novel, novelId }) {
   const [events, setEvents] = useState([]);
   const [replaceConfirm, setReplaceConfirm] = useState(false);
   const [parseError, setParseError] = useState("");
+  // draftStatus: map of event index -> "drafting" | "done" | ""
+  const [draftStatus, setDraftStatus] = useState({});
 
   const { data: writer } = useQuery({
     queryKey: ["writer", novel?.writer_id],
@@ -84,6 +149,18 @@ export default function AiPlotDialog({ open, onClose, novel, novelId }) {
   const { data: characters = [] } = useQuery({
     queryKey: ["characters", novelId],
     queryFn: () => base44.entities.Character.filter({ novel_id: novelId }),
+    enabled: !!novelId,
+  });
+
+  const { data: worldEntries = [] } = useQuery({
+    queryKey: ["worldEntries", novelId],
+    queryFn: () => base44.entities.WorldEntry.filter({ novel_id: novelId }),
+    enabled: !!novelId,
+  });
+
+  const { data: existingChapters = [] } = useQuery({
+    queryKey: ["chapters", novelId],
+    queryFn: () => base44.entities.Chapter.filter({ novel_id: novelId }, "order"),
     enabled: !!novelId,
   });
 
@@ -198,11 +275,54 @@ export default function AiPlotDialog({ open, onClose, novel, novelId }) {
     return "ไม่ระบุ";
   };
 
+  const handleDraftChapter = async (idx) => {
+    const ev = events[idx];
+    if (!ev?.title) return;
+
+    setDraftStatus((prev) => ({ ...prev, [idx]: "drafting" }));
+
+    // Find linked plot event from savedEvents (by order match) or existingEvents
+    const linkedPlotEvent = existingEvents.find((pe) => pe.order === ev.order) || null;
+
+    const draftContent = await generateChapterDraft({
+      novel,
+      writer,
+      characters,
+      worldEntries,
+      plotEvents: existingEvents,
+      chapters: existingChapters,
+      event: ev,
+      linkedPlotEvent,
+    });
+
+    // Find existing chapter with matching order
+    const existingChapter = existingChapters.find((ch) => ch.order === ev.order);
+
+    if (existingChapter) {
+      await base44.entities.Chapter.update(existingChapter.id, {
+        content: draftContent,
+        status: "ร่าง",
+      });
+    } else {
+      await base44.entities.Chapter.create({
+        novel_id: novelId,
+        title: ev.title,
+        order: ev.order,
+        content: draftContent,
+        status: "ร่าง",
+      });
+    }
+
+    queryClient.invalidateQueries({ queryKey: ["chapters", novelId] });
+    setDraftStatus((prev) => ({ ...prev, [idx]: "done" }));
+  };
+
   const handleClose = () => {
     onClose();
     setStep("idle");
     setOutline("");
     setEvents([]);
+    setDraftStatus({});
   };
 
   return (
@@ -270,42 +390,74 @@ export default function AiPlotDialog({ open, onClose, novel, novelId }) {
                   </Button>
                 </div>
                 <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
-                  {events.map((ev, idx) => (
-                    <div key={idx} className="border border-border/60 rounded-lg p-3 bg-muted/30 space-y-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-mono text-muted-foreground w-5 shrink-0">#{idx + 1}</span>
-                        <Input
-                          value={ev.title}
-                          onChange={(e) => updateEvent(idx, "title", e.target.value)}
-                          placeholder="ชื่อตอน"
-                          className="h-7 text-sm flex-1"
+                  {events.map((ev, idx) => {
+                    const status = draftStatus[idx];
+                    return (
+                      <div key={idx} className="border border-border/60 rounded-lg p-3 bg-muted/30 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-mono text-muted-foreground w-5 shrink-0">#{idx + 1}</span>
+                          <Input
+                            value={ev.title}
+                            onChange={(e) => updateEvent(idx, "title", e.target.value)}
+                            placeholder="ชื่อตอน"
+                            className="h-7 text-sm flex-1"
+                          />
+                          <Select value={ev.act || 1} onValueChange={(v) => updateEvent(idx, "act", Number(v))}>
+                            <SelectTrigger className="h-7 w-28 text-xs"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="1">องก์ 1</SelectItem>
+                              <SelectItem value="2">องก์ 2</SelectItem>
+                              <SelectItem value="3">องก์ 3</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
+                            onClick={() => removeEvent(idx)}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </div>
+                        <Textarea
+                          value={ev.description}
+                          onChange={(e) => updateEvent(idx, "description", e.target.value)}
+                          placeholder="สรุปเหตุการณ์สำคัญในตอน..."
+                          rows={2}
+                          className="text-xs leading-relaxed"
                         />
-                        <Select value={ev.act || 1} onValueChange={(v) => updateEvent(idx, "act", Number(v))}>
-                          <SelectTrigger className="h-7 w-28 text-xs"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="1">องก์ 1</SelectItem>
-                            <SelectItem value="2">องก์ 2</SelectItem>
-                            <SelectItem value="3">องก์ 3</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
-                          onClick={() => removeEvent(idx)}
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </Button>
+                        <div className="flex items-center justify-between pt-0.5">
+                          {status === "done" ? (
+                            <span className="flex items-center gap-1 text-xs text-green-600 font-medium">
+                              <CheckCircle2 className="w-3 h-3" />
+                              ร่างเสร็จแล้ว
+                            </span>
+                          ) : status === "drafting" ? (
+                            <span className="flex items-center gap-1 text-xs text-primary">
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                              กำลังร่าง...
+                            </span>
+                          ) : (
+                            <span />
+                          )}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-6 text-xs gap-1 px-2"
+                            disabled={status === "drafting" || !ev.title}
+                            onClick={() => handleDraftChapter(idx)}
+                          >
+                            {status === "drafting" ? (
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                            ) : (
+                              <FileText className="w-3 h-3" />
+                            )}
+                            สร้างร่างตอน
+                          </Button>
+                        </div>
                       </div>
-                      <Textarea
-                        value={ev.description}
-                        onChange={(e) => updateEvent(idx, "description", e.target.value)}
-                        placeholder="สรุปเหตุการณ์สำคัญในตอน..."
-                        rows={2}
-                        className="text-xs leading-relaxed"
-                      />
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 
