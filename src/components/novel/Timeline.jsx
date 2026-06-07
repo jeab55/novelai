@@ -15,7 +15,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import AiPlotDialog from "./AiPlotDialog";
 import CharacterRelationshipDiagram from "./CharacterRelationshipDiagram";
 
-export default function Timeline({ novelId, novel }) {
+export default function Timeline({ novelId, novel, onOpenChapter }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [aiDialogOpen, setAiDialogOpen] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -137,6 +137,7 @@ export default function Timeline({ novelId, novel }) {
         onClose={() => setAiDialogOpen(false)}
         novel={novel}
         novelId={novelId}
+        onOpenChapter={onOpenChapter}
       />
       <CharacterRelationshipDiagram
         novelId={novelId}

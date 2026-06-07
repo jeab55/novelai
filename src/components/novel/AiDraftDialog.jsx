@@ -221,13 +221,11 @@ export default function AiDraftDialog({ open, onClose, chapter, novel, novelId, 
   };
 
   const handleInsert = async () => {
-    // Insert to editor UI immediately
-    onInsert(draft);
-
-    // Also save reliably to Chapter entity
     setSaveError("");
     setLoading(true);
     setLoadingType("saving");
+
+    // Save to DB first
     const result = await saveChapterContent({
       novelId,
       chapterId: chapter?.id,
@@ -236,16 +234,18 @@ export default function AiDraftDialog({ open, onClose, chapter, novel, novelId, 
       content: draft,
       status: "ร่าง",
     });
+
     setLoading(false);
     setLoadingType("");
 
     if (result.success) {
       queryClient.invalidateQueries({ queryKey: ["chapters", novelId] });
-      toast.success("ใส่ร่างลง editor และบันทึกสำเร็จแล้ว");
-      handleClose();
+      toast.success("บันทึกสำเร็จ เปิด editor แล้ว");
+      // Navigate to chapter editor — onInsert handles closing the dialog + navigation
+      onInsert(draft);
     } else {
       setSaveError(result.error || "บันทึกไม่สำเร็จ กรุณากดบันทึกอีกครั้ง");
-      toast.error("ร่างลง editor แล้ว แต่บันทึกลงฐานข้อมูลไม่สำเร็จ");
+      toast.error("บันทึกไม่สำเร็จ กรุณาลองใหม่");
     }
   };
 

@@ -23,6 +23,7 @@ import WriterManager from "@/components/novel/WriterManager";
 export default function NovelWorkspace() {
   const novelId = window.location.pathname.split("/novel/")[1];
   const [activeTab, setActiveTab] = useState("writing");
+  const [pendingOpenChapter, setPendingOpenChapter] = useState(null);
   const [deleteDialog, setDeleteDialog] = useState(false);
   const [shareDialog, setShareDialog] = useState(false);
   const [novelVersionOpen, setNovelVersionOpen] = useState(false);
@@ -218,7 +219,7 @@ export default function NovelWorkspace() {
 
         <div className="flex-1">
           <TabsContent value="writing" className="m-0 h-full">
-            <WritingRoom novelId={novelId} novel={novel} />
+            <WritingRoom novelId={novelId} novel={novel} pendingOpenChapter={pendingOpenChapter} onPendingOpenChapterConsumed={() => setPendingOpenChapter(null)} />
           </TabsContent>
           <TabsContent value="characters" className="m-0">
             <CharacterBible novelId={novelId} />
@@ -227,7 +228,7 @@ export default function NovelWorkspace() {
             <WorldBible novelId={novelId} />
           </TabsContent>
           <TabsContent value="timeline" className="m-0">
-            <Timeline novelId={novelId} novel={novel} />
+            <Timeline novelId={novelId} novel={novel} onOpenChapter={(ch) => { setPendingOpenChapter(ch); setActiveTab("writing"); }} />
           </TabsContent>
           <TabsContent value="ai" className="m-0 h-full">
             <AiAssistant novelId={novelId} novel={novel} />

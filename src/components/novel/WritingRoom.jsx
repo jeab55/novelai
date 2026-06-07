@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, FileText, Loader2, Trash2, Download, Copy, MoreHorizontal, Clock, Sparkles, Scan } from "lucide-react";
+import { Plus, FileText, Loader2, Trash2, Download, Copy, MoreHorizontal, Clock, Sparkles } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { motion, AnimatePresence } from "framer-motion";
 import ChapterEditor from "./ChapterEditor";
@@ -23,7 +23,7 @@ const statusColors = {
   "เผยแพร่": "bg-sky-50 text-sky-700 border border-sky-200",
 };
 
-export default function WritingRoom({ novelId, novel }) {
+export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPendingOpenChapterConsumed }) {
   const [selectedChapter, setSelectedChapter] = useState(null);
   const [newChapterOpen, setNewChapterOpen] = useState(false);
   const [newTitle, setNewTitle] = useState("");
@@ -34,9 +34,18 @@ export default function WritingRoom({ novelId, novel }) {
   const [draftChapter, setDraftChapter] = useState(null);
   const queryClient = useQueryClient();
 
+  // Handle chapter navigation from other tabs (e.g. AiPlotDialog draft)
+  useEffect(() => {
+    if (pendingOpenChapter) {
+      setSelectedChapter(pendingOpenChapter);
+      onPendingOpenChapterConsumed?.();
+    }
+  }, [pendingOpenChapter]);
+
   const { data: chapters = [], isLoading } = useQuery({
     queryKey: ["chapters", novelId],
     queryFn: () => base44.entities.Chapter.filter({ novel_id: novelId }, "order"),
+    staleTime: 10000, // Don't re-fetch within 10s to prevent jank during rapid drafting
   });
 
   const { data: plotEvents = [] } = useQuery({
@@ -84,17 +93,19 @@ export default function WritingRoom({ novelId, novel }) {
     {draftChapter && (
       <AiDraftDialog
         open={aiDraftOpen}
-        onClose={() => {
-          setAiDraftOpen(false);
-          setDraftChapter(null);
-        }}
+        onClose={() => { setAiDraftOpen(false); setDraftChapter(null); }}
         chapter={draftChapter}
         novel={novel}
         novelId={novelId}
         onInsert={(content) => {
-          // Update chapter content via mutation
-          base44.entities.Chapter.update(draftChapter.id, { content });
-          toast.success("ใส่ร่างแล้ว - เปิดตอนเพื่อแก้ไขต่อ");
+          const chapterToOpen = { ...draftChapter, content };
+          // Close dialog first, then navigate — prevents state updates on unmounted component
+          setAiDraftOpen(false);
+          setTimeout(() => {
+            setDraftChapter(null);
+            setSelectedChapter(chapterToOpen);
+          }, 0);
+          toast.success("เปิด editor พร้อมร่างที่ AI สร้างแล้ว");
         }}
       />
     )}
@@ -218,9 +229,7 @@ export default function WritingRoom({ novelId, novel }) {
             {chapters.map((ch, i) => (
               <motion.div
                 key={ch.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.03 }}
+                layout
                 className="group flex items-center gap-4 px-5 py-4 rounded-2xl border border-border/50 bg-card/60 hover:border-primary/30 hover:bg-card hover:shadow-sm cursor-pointer transition-all duration-200"
                 onClick={() => setSelectedChapter(ch)}
               >

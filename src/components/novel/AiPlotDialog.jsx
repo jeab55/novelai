@@ -133,7 +133,7 @@ async function generateChapterDraft({ novel, writer, characters, worldEntries, p
   return text;
 }
 
-export default function AiPlotDialog({ open, onClose, novel, novelId }) {
+export default function AiPlotDialog({ open, onClose, novel, novelId, onOpenChapter }) {
   const queryClient = useQueryClient();
   const [step, setStep] = useState("idle"); // idle | generating | review | error
   const [outline, setOutline] = useState("");
@@ -166,6 +166,7 @@ export default function AiPlotDialog({ open, onClose, novel, novelId }) {
     queryKey: ["chapters", novelId],
     queryFn: () => base44.entities.Chapter.filter({ novel_id: novelId }, "order"),
     enabled: !!novelId,
+    staleTime: 30000, // Cache for 30s — prevents re-fetching on every draft invalidation
   });
 
   const { data: existingEvents = [] } = useQuery({
@@ -310,9 +311,8 @@ export default function AiPlotDialog({ open, onClose, novel, novelId }) {
       return;
     }
 
-    // Find existing chapter by novel_id + order using list() to avoid id filter issues
-    const allChapters = await base44.entities.Chapter.list();
-    const existingChapter = allChapters.find(
+    // Use cached existingChapters (already fetched by useQuery above) — no extra list() call
+    const existingChapter = existingChapters.find(
       (ch) => ch.novel_id === novelId && ch.order === ev.order
     );
 
@@ -326,8 +326,14 @@ export default function AiPlotDialog({ open, onClose, novel, novelId }) {
     });
 
     if (result.success) {
-      queryClient.invalidateQueries({ queryKey: ["chapters", novelId] });
-      setDraftStatus((prev) => ({ ...prev, [idx]: "done" }));
+      // Invalidate and re-fetch to get the real chapter id (especially for newly created chapters)
+      await queryClient.invalidateQueries({ queryKey: ["chapters", novelId] });
+      const freshChapters = await base44.entities.Chapter.filter({ novel_id: novelId }, "order");
+      const savedChapter = freshChapters.find((ch) => ch.order === ev.order) || existingChapter;
+      const chapterToOpen = savedChapter
+        ? { ...savedChapter, content: draftContent }
+        : { novel_id: novelId, title: ev.title, order: ev.order, content: draftContent, status: "ร่าง" };
+      setDraftStatus((prev) => ({ ...prev, [idx]: { state: "done", chapter: chapterToOpen } }));
     } else {
       setDraftStatus((prev) => ({ ...prev, [idx]: `error:${result.error}` }));
     }
@@ -442,18 +448,30 @@ export default function AiPlotDialog({ open, onClose, novel, novelId }) {
                           rows={2}
                           className="text-xs leading-relaxed"
                         />
-                        <div className="flex items-center justify-between pt-0.5">
-                          {status === "done" ? (
-                            <span className="flex items-center gap-1 text-xs text-green-600 font-medium">
-                              <CheckCircle2 className="w-3 h-3" />
-                              ร่างเสร็จแล้ว
-                            </span>
+                        <div className="flex items-center justify-between pt-0.5 gap-2 flex-wrap">
+                          {status?.state === "done" ? (
+                            <div className="flex items-center gap-2">
+                              <span className="flex items-center gap-1 text-xs text-green-600 font-medium">
+                                <CheckCircle2 className="w-3 h-3" />
+                                ร่างเสร็จแล้ว
+                              </span>
+                              {onOpenChapter && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 text-xs gap-1 px-2 text-primary underline underline-offset-2"
+                                  onClick={() => { handleClose(); onOpenChapter(status.chapter); }}
+                                >
+                                  เปิด editor →
+                                </Button>
+                              )}
+                            </div>
                           ) : status === "drafting" ? (
                             <span className="flex items-center gap-1 text-xs text-primary">
                               <Loader2 className="w-3 h-3 animate-spin" />
                               กำลังร่าง...
                             </span>
-                          ) : status?.startsWith("error:") ? (
+                          ) : typeof status === "string" && status.startsWith("error:") ? (
                             <span className="flex items-center gap-1 text-xs text-destructive">
                               <AlertCircle className="w-3 h-3" />
                               {status.replace("error:", "")}
@@ -464,7 +482,7 @@ export default function AiPlotDialog({ open, onClose, novel, novelId }) {
                           <Button
                             variant="outline"
                             size="sm"
-                            className="h-6 text-xs gap-1 px-2"
+                            className="h-6 text-xs gap-1 px-2 shrink-0"
                             disabled={status === "drafting" || !ev.title}
                             onClick={() => { setDraftStatus((p) => ({ ...p, [idx]: "" })); handleDraftChapter(idx); }}
                           >
@@ -473,7 +491,7 @@ export default function AiPlotDialog({ open, onClose, novel, novelId }) {
                             ) : (
                               <FileText className="w-3 h-3" />
                             )}
-                            สร้างร่างตอน
+                            {status?.state === "done" ? "ร่างใหม่" : "สร้างร่างตอน"}
                           </Button>
                         </div>
                       </div>
