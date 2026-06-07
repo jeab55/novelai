@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, FileText, Loader2, Trash2, Download, Copy, MoreHorizontal, Clock, Sparkles } from "lucide-react";
+import { Plus, FileText, Loader2, Trash2, Download, Copy, MoreHorizontal, Clock, Sparkles, Scan } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { motion, AnimatePresence } from "framer-motion";
 import ChapterEditor from "./ChapterEditor";
@@ -15,6 +15,7 @@ import { downloadChapterTxt, downloadChapterMd, copyChapterToClipboard, download
 import { toast } from "sonner";
 import AiChapterGeneratorDialog from "./AiChapterGeneratorDialog";
 import AiDraftDialog from "./AiDraftDialog";
+import ContinuityChecker from "./ContinuityChecker";
 
 const statusColors = {
   "ร่าง": "bg-amber-50 text-amber-700 border border-amber-200",
@@ -296,6 +297,14 @@ export default function WritingRoom({ novelId, novel }) {
             ))}
           </AnimatePresence>
         </div>
+      )}
+    </div>
+    <div className="fixed bottom-4 right-4 z-50">
+      {selectedChapter && (
+        <ContinuityChecker
+          novelId={novelId}
+          chapter={selectedChapter}
+        />
       )}
     </div>
     </>
