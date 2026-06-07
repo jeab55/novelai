@@ -104,7 +104,7 @@ export default function EditorReviewPanel({ chapter, novel, novelId, onContentUp
       queryClient.invalidateQueries({ queryKey: ["reviews", chapter.id] });
       setForm({ reviewer_name: "", reviewer_type: "บรรณาธิการ AI", content: "" });
       setShowForm(false);
-      toast.success("เพิ่มความคิดเห็นแล้ว");
+      toast.success("เพิ่มรีวิวแล้ว");
     },
   });
 
@@ -151,7 +151,7 @@ export default function EditorReviewPanel({ chapter, novel, novelId, onContentUp
 
   const handleImprove = async () => {
     const toUse = reviews.filter((r) => selectedReviewIds.size === 0 || selectedReviewIds.has(r.id));
-    if (toUse.length === 0) { toast.error("ไม่มีความคิดเห็นที่จะส่งให้ AI"); return; }
+    if (toUse.length === 0) { toast.error("ไม่มีรีวิวที่จะส่งให้ AI"); return; }
     if (!chapter.content?.trim()) { toast.error("ไม่มีเนื้อหาตอนให้ปรับปรุง"); return; }
 
     setImproving(true);
@@ -186,10 +186,10 @@ export default function EditorReviewPanel({ chapter, novel, novelId, onContentUp
         className="w-full flex items-center gap-2 px-4 py-2 text-xs hover:bg-muted/30 transition-colors"
       >
         <BookOpen className="w-3.5 h-3.5 text-primary/60" />
-        <span className="font-medium text-foreground/70">บันทึกบรรณาธิการ</span>
+        <span className="font-medium text-foreground/70">รีวิวจากนักอ่าน</span>
         {reviews.length > 0 && (
           <span className="px-1.5 py-0.5 rounded-full bg-primary/10 text-primary/70 text-[10px] font-medium">
-            {reviews.length} ความคิดเห็น
+            {reviews.length} รีวิว
           </span>
         )}
         {chapter.previous_content && (
@@ -202,7 +202,7 @@ export default function EditorReviewPanel({ chapter, novel, novelId, onContentUp
         <div className="px-4 pb-4 space-y-3">
           {/* Review thread */}
           {reviews.length === 0 ? (
-            <p className="text-xs text-muted-foreground/60 italic py-1">ยังไม่มีความคิดเห็น</p>
+            <p className="text-xs text-muted-foreground/60 italic py-1">ยังไม่มีรีวิวจากนักอ่าน</p>
           ) : (
             <div className="space-y-2">
               {/* Select all */}
@@ -214,7 +214,7 @@ export default function EditorReviewPanel({ chapter, novel, novelId, onContentUp
                   {selectedReviewIds.size === reviews.length ? "ยกเลิกเลือกทั้งหมด" : "เลือกทั้งหมด"}
                 </button>
                 {selectedReviewIds.size > 0 && (
-                  <span className="text-[11px] text-muted-foreground">เลือกแล้ว {selectedReviewIds.size} รายการ</span>
+                  <span className="text-[11px] text-muted-foreground">เลือกแล้ว {selectedReviewIds.size} รีวิว</span>
                 )}
               </div>
 
@@ -308,13 +308,13 @@ export default function EditorReviewPanel({ chapter, novel, novelId, onContentUp
                 rows={3}
                 value={form.content}
                 onChange={(e) => setForm((f) => ({ ...f, content: e.target.value }))}
-                placeholder="เขียนความคิดเห็น / คำแนะนำสำหรับตอนนี้..."
+                placeholder="เขียนรีวิว / คำแนะนำสำหรับตอนนี้..."
                 className="text-xs resize-none bg-background"
               />
               <div className="flex gap-2">
                 <Button size="sm" className="h-7 text-xs gap-1" onClick={handleAddReview} disabled={addMutation.isPending}>
                   {addMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
-                  เพิ่มความคิดเห็น
+                  เพิ่มรีวิว
                 </Button>
                 <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setShowForm(false)}>ยกเลิก</Button>
               </div>
@@ -325,7 +325,7 @@ export default function EditorReviewPanel({ chapter, novel, novelId, onContentUp
               className="flex items-center gap-1.5 text-xs text-primary/70 hover:text-primary transition-colors"
             >
               <Plus className="w-3.5 h-3.5" />
-              เพิ่มความคิดเห็นใหม่
+              เพิ่มรีวิวใหม่
             </button>
           )}
 
@@ -357,7 +357,7 @@ export default function EditorReviewPanel({ chapter, novel, novelId, onContentUp
                 disabled={improving || reviews.length === 0}
               >
                 {improving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />}
-                {improving ? "กำลังปรับปรุง..." : selectedReviewIds.size > 0 ? `ปรับตาม ${selectedReviewIds.size} รีวิวที่เลือก` : "ปรับปรุงตามรีวิวทั้งหมด"}
+                {improving ? "กำลังปรับปรุง..." : selectedReviewIds.size > 0 ? `ปรับปรุงตาม ${selectedReviewIds.size} รีวิว` : "ปรับปรุงตามรีวิวทั้งหมด"}
               </Button>
 
               {chapter.previous_content && (
