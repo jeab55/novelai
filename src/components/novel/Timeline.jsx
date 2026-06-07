@@ -13,7 +13,7 @@ import VersionHistoryDialog from "./VersionHistoryDialog";
 import { saveVersion } from "@/lib/saveVersion";
 import { motion, AnimatePresence } from "framer-motion";
 import AiPlotDialog from "./AiPlotDialog";
-import CharacterRelationshipMap from "./CharacterRelationshipMap";
+import CharacterRelationshipDiagram from "./CharacterRelationshipDiagram";
 
 export default function Timeline({ novelId, novel }) {
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -21,7 +21,6 @@ export default function Timeline({ novelId, novel }) {
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({ title: "", description: "", order: 0, time_period: "", characters_involved: "", is_historical: false });
   const [versionEvent, setVersionEvent] = useState(null);
-  const [relationshipMapOpen, setRelationshipMapOpen] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: events = [], isLoading } = useQuery({
@@ -85,16 +84,6 @@ export default function Timeline({ novelId, novel }) {
           <Button
             variant="outline"
             size="sm"
-            className="gap-1.5 text-muted-foreground hover:text-primary border-border/60 hover:border-primary/30"
-            onClick={() => setRelationshipMapOpen(true)}
-            disabled={events.length === 0}
-          >
-            <Users className="w-3.5 h-3.5" />
-            ความสัมพันธ์ตัวละคร
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
             className="gap-1.5 text-primary border-primary/30 hover:bg-primary/5"
             onClick={() => setAiDialogOpen(true)}
           >
@@ -149,9 +138,7 @@ export default function Timeline({ novelId, novel }) {
         novel={novel}
         novelId={novelId}
       />
-      <CharacterRelationshipMap
-        open={relationshipMapOpen}
-        onClose={() => setRelationshipMapOpen(false)}
+      <CharacterRelationshipDiagram
         novelId={novelId}
       />
       {versionEvent && (
