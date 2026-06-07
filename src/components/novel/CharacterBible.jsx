@@ -82,6 +82,51 @@ export default function CharacterBible({ novelId }) {
         </Dialog>
       </div>
 
+      {/* สรุปบทบาทตัวละคร */}
+      {characters.length > 0 && (
+        <div className="mb-8 bg-gradient-to-br from-primary/5 via-secondary/30 to-primary/5 border border-primary/15 rounded-2xl p-5 shadow-sm">
+          <div className="flex items-center gap-2 mb-4">
+            <Users className="w-5 h-5 text-primary" />
+            <h3 className="font-heading font-semibold text-primary">สรุปบทบาทตัวละคร</h3>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {characters.map((char) => (
+              <div
+                key={char.id}
+                className="bg-card/80 backdrop-blur-sm rounded-xl p-4 border border-border/60 hover:border-primary/30 transition-all"
+              >
+                <div className="flex items-center gap-2 mb-3">
+                  <Badge className={`${roleColors[char.role] || roleColors["ตัวประกอบ"]} text-xs font-medium`}>
+                    {char.role}
+                  </Badge>
+                  <span className="font-semibold text-foreground">{char.name}</span>
+                </div>
+                <div className="space-y-2 text-sm">
+                  {char.desire && (
+                    <div className="flex items-start gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-primary mt-1.5 shrink-0" />
+                      <div>
+                        <span className="text-muted-foreground font-medium">เป้าหมาย: </span>
+                        <span className="text-foreground/90">{char.desire}</span>
+                      </div>
+                    </div>
+                  )}
+                  {char.relationships && (
+                    <div className="flex items-start gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-accent mt-1.5 shrink-0" />
+                      <div>
+                        <span className="text-muted-foreground font-medium">ความสัมพันธ์: </span>
+                        <span className="text-foreground/90">{char.relationships}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {isLoading ? (
         <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
       ) : characters.length === 0 ? (
