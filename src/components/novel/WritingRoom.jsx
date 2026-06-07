@@ -15,9 +15,9 @@ import { downloadChapterTxt, downloadChapterMd, copyChapterToClipboard, download
 import { toast } from "sonner";
 
 const statusColors = {
-  "ร่าง": "bg-yellow-100 text-yellow-700",
-  "เขียนเสร็จ": "bg-green-100 text-green-700",
-  "เผยแพร่": "bg-blue-100 text-blue-700",
+  "ร่าง": "bg-amber-50 text-amber-700 border border-amber-200",
+  "เขียนเสร็จ": "bg-emerald-50 text-emerald-700 border border-emerald-200",
+  "เผยแพร่": "bg-sky-50 text-sky-700 border border-sky-200",
 };
 
 export default function WritingRoom({ novelId, novel }) {
@@ -138,19 +138,21 @@ export default function WritingRoom({ novelId, novel }) {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.03 }}
-                className="group flex items-center gap-3 p-4 rounded-xl border border-border/60 hover:border-primary/20 hover:bg-card cursor-pointer transition-all"
+                className="group flex items-center gap-4 px-5 py-4 rounded-2xl border border-border/50 bg-card/60 hover:border-primary/30 hover:bg-card hover:shadow-sm cursor-pointer transition-all duration-200"
                 onClick={() => setSelectedChapter(ch)}
               >
-                <div className="w-8 h-8 rounded-lg bg-primary/5 flex items-center justify-center text-sm font-medium text-primary shrink-0">
+                {/* ลำดับตอน */}
+                <div className="w-9 h-9 rounded-xl bg-primary/8 flex items-center justify-center text-sm font-semibold text-primary shrink-0">
                   {ch.order || i + 1}
                 </div>
+                {/* ชื่อ + คำ */}
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium truncate">{ch.title}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {(ch.word_count || 0).toLocaleString()} คำ
+                  <p className="font-semibold text-[15px] truncate text-foreground">{ch.title}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    <span className="font-medium text-primary/70">{(ch.word_count || 0).toLocaleString()}</span> คำ
                   </p>
                 </div>
-                <Badge className={`${statusColors[ch.status] || statusColors["ร่าง"]} text-xs`}>
+                <Badge className={`${statusColors[ch.status] || statusColors["ร่าง"]} text-xs font-medium px-2.5 py-0.5 rounded-full`}>
                   {ch.status || "ร่าง"}
                 </Badge>
                 <DropdownMenu>
