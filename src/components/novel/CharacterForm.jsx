@@ -58,30 +58,37 @@ export default function CharacterForm({ novelId, character, onDone, novelIdForVe
     { key: "relationships", label: "ความสัมพันธ์", type: "textarea", placeholder: "ความสัมพันธ์กับตัวละครอื่น..." },
   ];
 
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    mutation.mutate(form);
+  };
+
   return (
-    <div className="space-y-4 mt-2">
-      {fields.map((f) => (
-        <div key={f.key}>
-          <label className="text-sm font-medium mb-1.5 block">{f.label}</label>
-          {f.type === "input" && (
-            <Input value={form[f.key]} onChange={(e) => set(f.key, e.target.value)} placeholder={f.placeholder} />
-          )}
-          {f.type === "select" && (
-            <Select value={form[f.key]} onValueChange={(v) => set(f.key, v)}>
-              <SelectTrigger><SelectValue placeholder="เลือก" /></SelectTrigger>
-              <SelectContent>
-                {f.options.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          )}
-          {f.type === "textarea" && (
-            <Textarea value={form[f.key]} onChange={(e) => set(f.key, e.target.value)} placeholder={f.placeholder} rows={2} />
-          )}
-        </div>
-      ))}
-      <Button className="w-full" onClick={() => mutation.mutate(form)} disabled={!form.name || mutation.isPending}>
-        {mutation.isPending ? "กำลังบันทึก..." : character ? "อัปเดต" : "เพิ่มตัวละคร"}
-      </Button>
-    </div>
+    <form onSubmit={handleSubmit}>
+      <div className="space-y-4 mt-2">
+        {fields.map((f) => (
+          <div key={f.key}>
+            <label className="text-sm font-medium mb-1.5 block">{f.label}</label>
+            {f.type === "input" && (
+              <Input value={form[f.key]} onChange={(e) => set(f.key, e.target.value)} placeholder={f.placeholder} />
+            )}
+            {f.type === "select" && (
+              <Select value={form[f.key]} onValueChange={(v) => set(f.key, v)}>
+                <SelectTrigger><SelectValue placeholder="เลือก" /></SelectTrigger>
+                <SelectContent>
+                  {f.options.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )}
+            {f.type === "textarea" && (
+              <Textarea value={form[f.key]} onChange={(e) => set(f.key, e.target.value)} placeholder={f.placeholder} rows={2} />
+            )}
+          </div>
+        ))}
+        <Button type="submit" className="w-full" disabled={!form.name || mutation.isPending}>
+          {mutation.isPending ? "กำลังบันทึก..." : character ? "อัปเดต" : "เพิ่มตัวละคร"}
+        </Button>
+      </div>
+    </form>
   );
 }
