@@ -108,7 +108,7 @@ function buildPolishPrompt(draft, systemPrompt) {
 }
 
 // Step 1: form, Step 2: review draft
-export default function AiDraftDialog({ open, onClose, chapter, novel, novelId, onInsert }) {
+export default function AiDraftDialog({ open, onClose, chapter, novel, novelId, onInsert, prefillSummary }) {
   const [step, setStep] = useState(1); // 1=form, 2=review
   const [loading, setLoading] = useState(false);
   const [loadingType, setLoadingType] = useState(""); // "draft" | "polish"
@@ -116,7 +116,7 @@ export default function AiDraftDialog({ open, onClose, chapter, novel, novelId, 
   const [linkedPlotEventId, setLinkedPlotEventId] = useState(chapter?.plot_event_id || "");
   const [form, setForm] = useState({
     chapterTitle: chapter?.title || "",
-    summary: chapter?.plot_event_description || "",
+    summary: prefillSummary || chapter?.plot_event_description || "",
     characters: "",
     tone: "",
     wordTarget: 1200,
@@ -130,17 +130,35 @@ export default function AiDraftDialog({ open, onClose, chapter, novel, novelId, 
     select: (data) => data.find((w) => String(w.id) === String(novel?.writer_id)),
   });
 
-  // Sync plot event when chapter changes (e.g. when dialog opens)
+  // Sync plot event and auto-fill summary when dialog opens
   useEffect(() => {
-    if (open) {
-      setLinkedPlotEventId(chapter?.plot_event_id || "");
+    if (open && chapter) {
+      const plotEventId = chapter?.plot_event_id || "";
+      setLinkedPlotEventId(plotEventId);
+      
+      // Priority 1: prefillSummary prop (from WritingRoom quick button)
+      // Priority 2: linked plot event description
+      // Priority 3: chapter's stored plot_event_description
+      let autoSummary = prefillSummary || "";
+      
+      if (!autoSummary && plotEventId && plotEvents.length > 0) {
+        const linkedEv = plotEvents.find((e) => e.id === plotEventId);
+        if (linkedEv?.description) {
+          autoSummary = linkedEv.description;
+        }
+      }
+      
+      if (!autoSummary && chapter?.plot_event_description) {
+        autoSummary = chapter.plot_event_description;
+      }
+      
       setForm((f) => ({
         ...f,
         chapterTitle: chapter?.title || "",
-        summary: chapter?.plot_event_description || f.summary || "",
+        summary: autoSummary || f.summary || "",
       }));
     }
-  }, [open]);
+  }, [open, chapter, plotEvents, prefillSummary]);
 
   const selectedWriter = novelWriter;
 
@@ -212,6 +230,9 @@ export default function AiDraftDialog({ open, onClose, chapter, novel, novelId, 
     const ev = plotEvents.find((e) => e.id === evId);
     if (ev?.description) {
       setForm((f) => ({ ...f, summary: ev.description }));
+    } else if (evId === null || evId === "") {
+      // Clear summary when deselecting
+      setForm((f) => ({ ...f, summary: "" }));
     }
   };
 

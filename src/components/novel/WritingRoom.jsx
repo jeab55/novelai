@@ -14,6 +14,7 @@ import ChapterEditor from "./ChapterEditor";
 import { downloadChapterTxt, downloadChapterMd, copyChapterToClipboard, downloadAllChaptersMd } from "@/utils/exportChapter";
 import { toast } from "sonner";
 import AiChapterGeneratorDialog from "./AiChapterGeneratorDialog";
+import AiDraftDialog from "./AiDraftDialog";
 
 const statusColors = {
   "ร่าง": "bg-amber-50 text-amber-700 border border-amber-200",
@@ -28,6 +29,8 @@ export default function WritingRoom({ novelId, novel }) {
   const [selectedPlotEventId, setSelectedPlotEventId] = useState("");
   const [aiGenerateOpen, setAiGenerateOpen] = useState(false);
   const [aiChapterGeneratorOpen, setAiChapterGeneratorOpen] = useState(false);
+  const [aiDraftOpen, setAiDraftOpen] = useState(false);
+  const [draftChapter, setDraftChapter] = useState(null);
   const queryClient = useQueryClient();
 
   const { data: chapters = [], isLoading } = useQuery({
@@ -77,6 +80,23 @@ export default function WritingRoom({ novelId, novel }) {
       novel={novel}
       novelId={novelId}
     />
+    {draftChapter && (
+      <AiDraftDialog
+        open={aiDraftOpen}
+        onClose={() => {
+          setAiDraftOpen(false);
+          setDraftChapter(null);
+        }}
+        chapter={draftChapter}
+        novel={novel}
+        novelId={novelId}
+        onInsert={(content) => {
+          // Update chapter content via mutation
+          base44.entities.Chapter.update(draftChapter.id, { content });
+          toast.success("ใส่ร่างแล้ว - เปิดตอนเพื่อแก้ไขต่อ");
+        }}
+      />
+    )}
     <div className="max-w-4xl mx-auto px-4 py-6">
       <div className="flex items-center justify-between mb-6">
         <div>
@@ -217,45 +237,61 @@ export default function WritingRoom({ novelId, novel }) {
                 <Badge className={`${statusColors[ch.status] || statusColors["ร่าง"]} text-xs font-medium px-2.5 py-0.5 rounded-full`}>
                   {ch.status || "ร่าง"}
                 </Badge>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="opacity-0 group-hover:opacity-100 h-8 w-8 shrink-0 text-muted-foreground"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <MoreHorizontal className="w-4 h-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-52" onClick={(e) => e.stopPropagation()}>
-                    <DropdownMenuItem onClick={() => downloadChapterTxt(ch.title, ch.content)}>
-                      <Download className="w-3.5 h-3.5 mr-2" />
-                      ดาวน์โหลดเป็น .txt
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => downloadChapterMd(ch.title, ch.content)}>
-                      <Download className="w-3.5 h-3.5 mr-2" />
-                      ดาวน์โหลดเป็น .md
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={async () => {
-                        await copyChapterToClipboard(ch.title, ch.content);
-                        toast.success("คัดลอกแล้ว");
-                      }}
-                    >
-                      <Copy className="w-3.5 h-3.5 mr-2" />
-                      คัดลอกทั้งตอน
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      className="text-destructive focus:text-destructive"
-                      onClick={() => deleteChapter.mutate(ch.id)}
-                    >
-                      <Trash2 className="w-3.5 h-3.5 mr-2" />
-                      ลบตอนนี้
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-all shrink-0">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5 h-8 text-primary/70 border-primary/20 hover:bg-primary/5"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDraftChapter(ch);
+                      setAiDraftOpen(true);
+                    }}
+                    title="ร่างด้วย AI"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    ร่างด้วย AI
+                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 shrink-0 text-muted-foreground hover:bg-secondary/60"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <MoreHorizontal className="w-4 h-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-52" onClick={(e) => e.stopPropagation()}>
+                      <DropdownMenuItem onClick={() => downloadChapterTxt(ch.title, ch.content)}>
+                        <Download className="w-3.5 h-3.5 mr-2" />
+                        ดาวน์โหลดเป็น .txt
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => downloadChapterMd(ch.title, ch.content)}>
+                        <Download className="w-3.5 h-3.5 mr-2" />
+                        ดาวน์โหลดเป็น .md
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={async () => {
+                          await copyChapterToClipboard(ch.title, ch.content);
+                          toast.success("คัดลอกแล้ว");
+                        }}
+                      >
+                        <Copy className="w-3.5 h-3.5 mr-2" />
+                        คัดลอกทั้งตอน
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        className="text-destructive focus:text-destructive"
+                        onClick={() => deleteChapter.mutate(ch.id)}
+                      >
+                        <Trash2 className="w-3.5 h-3.5 mr-2" />
+                        ลบตอนนี้
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               </motion.div>
             ))}
           </AnimatePresence>
