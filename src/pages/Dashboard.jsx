@@ -29,14 +29,20 @@ const genreColors = {
 
 export default function Dashboard() {
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ title: "", genre: "", synopsis: "", era: "" });
+  const [form, setForm] = useState({ title: "", genre: "", synopsis: "", era: "", writer_id: "" });
   const [editOpen, setEditOpen] = useState(false);
   const [editForm, setEditForm] = useState({});
   const [editingId, setEditingId] = useState(null);
   const queryClient = useQueryClient();
   const { user, logout } = useAuth();
-
   const isAdmin = user?.role === "admin";
+
+  const { data: writers = [] } = useQuery({
+    queryKey: ["writers"],
+    queryFn: () => base44.entities.Writer.list(),
+    staleTime: 0,
+  });
+  const activeWriters = writers.filter((w) => w.is_active !== false);
 
   const { data: novels = [], isLoading } = useQuery({
     queryKey: ["novels", user?.id],
@@ -52,7 +58,7 @@ export default function Dashboard() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["novels"] });
       setOpen(false);
-      setForm({ title: "", genre: "", synopsis: "", era: "" });
+      setForm({ title: "", genre: "", synopsis: "", era: "", writer_id: "" });
     },
   });
 
@@ -69,8 +75,13 @@ export default function Dashboard() {
     e.preventDefault();
     e.stopPropagation();
     setEditingId(novel.id);
-    setEditForm({ title: novel.title, genre: novel.genre || "", synopsis: novel.synopsis || "", era: novel.era || "", status: novel.status || "กำลังเขียน" });
+    setEditForm({ title: novel.title, genre: novel.genre || "", synopsis: novel.synopsis || "", era: novel.era || "", status: novel.status || "กำลังเขียน", writer_id: novel.writer_id || "" });
     setEditOpen(true);
+  };
+
+  const getWriterName = (writerId) => {
+    if (!writerId) return null;
+    return activeWriters.find((w) => w.id === writerId)?.name || null;
   };
 
   return (
@@ -140,10 +151,31 @@ export default function Dashboard() {
                     onChange={(e) => setForm({ ...form, synopsis: e.target.value })}
                   />
                 </div>
+                <div>
+                  <label className="text-sm font-medium mb-1.5 block">
+                    นักเขียน AI ประจำเรื่อง <span className="text-destructive">*</span>
+                  </label>
+                  <Select value={form.writer_id} onValueChange={(v) => setForm({ ...form, writer_id: v })}>
+                    <SelectTrigger><SelectValue placeholder="เลือกนักเขียน AI" /></SelectTrigger>
+                    <SelectContent>
+                      {activeWriters.map((w) => (
+                        <SelectItem key={w.id} value={w.id}>
+                          <span className="font-medium">{w.name}</span>
+                          {w.description && <span className="text-muted-foreground ml-1.5 text-xs">— {w.description}</span>}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {form.writer_id && (
+                    <p className="text-xs text-primary/60 mt-1">
+                      โทน: {activeWriters.find((w) => w.id === form.writer_id)?.style || "-"}
+                    </p>
+                  )}
+                </div>
                 <Button
                   className="w-full"
                   onClick={() => createMutation.mutate(form)}
-                  disabled={!form.title || createMutation.isPending}
+                  disabled={!form.title || !form.writer_id || createMutation.isPending}
                 >
                   {createMutation.isPending ? "กำลังสร้าง..." : "สร้างนิยาย"}
                 </Button>
@@ -204,6 +236,25 @@ export default function Dashboard() {
                   <SelectItem value="พักไว้ก่อน">พักไว้ก่อน</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">นักเขียน AI ประจำเรื่อง</label>
+              <Select value={editForm.writer_id || ""} onValueChange={(v) => setEditForm({ ...editForm, writer_id: v })}>
+                <SelectTrigger><SelectValue placeholder="เลือกนักเขียน AI" /></SelectTrigger>
+                <SelectContent>
+                  {activeWriters.map((w) => (
+                    <SelectItem key={w.id} value={w.id}>
+                      <span className="font-medium">{w.name}</span>
+                      {w.description && <span className="text-muted-foreground ml-1.5 text-xs">— {w.description}</span>}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {editForm.writer_id && (
+                <p className="text-xs text-primary/60 mt-1">
+                  โทน: {activeWriters.find((w) => w.id === editForm.writer_id)?.style || "-"}
+                </p>
+              )}
             </div>
             <Button
               className="w-full"
@@ -278,9 +329,16 @@ export default function Dashboard() {
                       <Badge variant="outline" className="text-xs">
                         {novel.status || "กำลังเขียน"}
                       </Badge>
-                      <span className="text-xs text-muted-foreground">
-                        {new Date(novel.created_date).toLocaleDateString("th-TH")}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        {getWriterName(novel.writer_id) && (
+                          <span className="text-[11px] text-primary/60 font-medium bg-primary/5 px-2 py-0.5 rounded-full">
+                            ✍️ {getWriterName(novel.writer_id)}
+                          </span>
+                        )}
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(novel.created_date).toLocaleDateString("th-TH")}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </Link>

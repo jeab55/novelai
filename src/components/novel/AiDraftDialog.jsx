@@ -113,7 +113,6 @@ export default function AiDraftDialog({ open, onClose, chapter, novel, novelId, 
   const [loading, setLoading] = useState(false);
   const [loadingType, setLoadingType] = useState(""); // "draft" | "polish"
   const [draft, setDraft] = useState("");
-  const [selectedWriterId, setSelectedWriterId] = useState(null);
   const [linkedPlotEventId, setLinkedPlotEventId] = useState(chapter?.plot_event_id || "");
   const [form, setForm] = useState({
     chapterTitle: chapter?.title || "",
@@ -123,20 +122,13 @@ export default function AiDraftDialog({ open, onClose, chapter, novel, novelId, 
     wordTarget: 1200,
   });
 
-  const { data: writers = [] } = useQuery({
-    queryKey: ["writers"],
-    queryFn: () => base44.entities.Writer.list(),
-    enabled: open,
-    staleTime: 0,
+  // ดึงนักเขียนประจำเรื่องจาก novel.writer_id
+  const { data: novelWriter } = useQuery({
+    queryKey: ["writer", novel?.writer_id],
+    queryFn: () => base44.entities.Writer.filter({ id: novel.writer_id }),
+    enabled: open && !!novel?.writer_id,
+    select: (data) => data[0],
   });
-  const activeWriters = writers.filter((w) => w.is_active !== false);
-
-  // Auto-select first active writer
-  useEffect(() => {
-    if (activeWriters.length > 0 && !selectedWriterId) {
-      setSelectedWriterId(activeWriters[0].id);
-    }
-  }, [activeWriters.length]);
 
   // Sync plot event when chapter changes (e.g. when dialog opens)
   useEffect(() => {
@@ -150,7 +142,7 @@ export default function AiDraftDialog({ open, onClose, chapter, novel, novelId, 
     }
   }, [open]);
 
-  const selectedWriter = activeWriters.find((w) => w.id === selectedWriterId) || activeWriters[0];
+  const selectedWriter = novelWriter;
 
   const { data: characters = [] } = useQuery({
     queryKey: ["characters", novelId],
@@ -210,7 +202,6 @@ export default function AiDraftDialog({ open, onClose, chapter, novel, novelId, 
     setDraft("");
     setLinkedPlotEventId("");
     setForm({ chapterTitle: chapter?.title || "", summary: "", characters: "", tone: "", wordTarget: 1200 });
-    setSelectedWriterId(null);
     onClose();
   };
 
@@ -241,33 +232,22 @@ export default function AiDraftDialog({ open, onClose, chapter, novel, novelId, 
 
         {step === 1 ? (
           <div className="overflow-y-auto flex-1 px-6 py-5 space-y-4">
-            {/* เลือกนักเขียน */}
-            {activeWriters.length > 0 && (
-              <div>
-                <label className="text-sm font-medium mb-1.5 block flex items-center gap-1.5">
-                  <Bot className="w-3.5 h-3.5 text-primary" />
-                  เลือกนักเขียน AI
-                </label>
-                <Select value={selectedWriterId || ""} onValueChange={setSelectedWriterId}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="เลือกนักเขียน" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {activeWriters.map((w) => (
-                      <SelectItem key={w.id} value={w.id}>
-                        <div>
-                          <span className="font-medium">{w.name}</span>
-                          {w.description && <span className="text-muted-foreground ml-1.5 text-xs">— {w.description}</span>}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {selectedWriter?.style && (
-                  <p className="text-xs text-primary/60 mt-1">โทน: {selectedWriter.style}</p>
+            {/* นักเขียนประจำเรื่อง (ล็อกไว้) */}
+            <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-primary/5 border border-primary/15">
+              <Bot className="w-4 h-4 text-primary shrink-0" />
+              <div className="flex-1 min-w-0">
+                <span className="text-xs text-muted-foreground">นักเขียน AI ประจำเรื่อง</span>
+                {selectedWriter ? (
+                  <div>
+                    <span className="text-sm font-semibold text-primary block">{selectedWriter.name}</span>
+                    {selectedWriter.style && <span className="text-xs text-muted-foreground">{selectedWriter.style}</span>}
+                  </div>
+                ) : (
+                  <span className="text-sm text-muted-foreground italic block">ยังไม่ได้ตั้งนักเขียนประจำเรื่อง</span>
                 )}
               </div>
-            )}
+              <span className="text-[10px] text-primary/50 bg-primary/8 border border-primary/15 px-2 py-0.5 rounded-full shrink-0">ประจำเรื่อง</span>
+            </div>
 
             {/* เลือกเหตุการณ์ไทม์ไลน์ */}
             {plotEvents.length > 0 && (

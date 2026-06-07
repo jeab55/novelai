@@ -64,7 +64,6 @@ function buildReviewPrompt(novel, characters, worldEntries, currentChapter, sele
 export default function EditorReviewPanel({ chapter, novel, novelId, onContentUpdate, onPreviousContentRestore }) {
   const [open, setOpen] = useState(false);
   const [improving, setImproving] = useState(false);
-  const [selectedWriterId, setSelectedWriterId] = useState("");
   const [selectedReviewIds, setSelectedReviewIds] = useState(new Set());
   const [editingId, setEditingId] = useState(null);
   const [editContent, setEditContent] = useState("");
@@ -79,11 +78,14 @@ export default function EditorReviewPanel({ chapter, novel, novelId, onContentUp
     enabled: open,
   });
 
-  const { data: writers = [] } = useQuery({
-    queryKey: ["writers"],
-    queryFn: () => base44.entities.Writer.list(),
-    enabled: open,
+  // ดึงนักเขียนประจำเรื่องจาก novel.writer_id
+  const { data: novelWriter } = useQuery({
+    queryKey: ["writer", novel?.writer_id],
+    queryFn: () => base44.entities.Writer.filter({ id: novel.writer_id }),
+    enabled: open && !!novel?.writer_id,
+    select: (data) => data[0],
   });
+
   const { data: characters = [] } = useQuery({
     queryKey: ["characters", novelId],
     queryFn: () => base44.entities.Character.filter({ novel_id: novelId }),
@@ -95,8 +97,7 @@ export default function EditorReviewPanel({ chapter, novel, novelId, onContentUp
     enabled: open,
   });
 
-  const activeWriters = writers.filter((w) => w.is_active !== false);
-  const selectedWriter = activeWriters.find((w) => w.id === selectedWriterId) || activeWriters[0];
+  const selectedWriter = novelWriter;
 
   const addMutation = useMutation({
     mutationFn: (data) => base44.entities.Review.create(data),
@@ -331,21 +332,10 @@ export default function EditorReviewPanel({ chapter, novel, novelId, onContentUp
 
           {/* Improve actions */}
           <div className="border-t border-border/40 pt-3 space-y-2">
-            {activeWriters.length > 0 && (
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground shrink-0">นักเขียน AI:</span>
-                <Select value={selectedWriterId || (activeWriters[0]?.id ?? "")} onValueChange={setSelectedWriterId}>
-                  <SelectTrigger className="h-7 text-xs flex-1">
-                    <SelectValue placeholder="เลือกนักเขียน" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {activeWriters.map((w) => (
-                      <SelectItem key={w.id} value={w.id} className="text-xs">
-                        {w.name}{w.description ? ` — ${w.description}` : ""}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            {selectedWriter && (
+              <div className="flex items-center gap-1.5 text-[11px] text-primary/60">
+                <span className="text-muted-foreground">นักเขียน AI:</span>
+                <span className="font-medium text-primary/80 bg-primary/5 border border-primary/15 px-2 py-0.5 rounded-full">{selectedWriter.name}</span>
               </div>
             )}
 

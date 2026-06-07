@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Feather, PenTool, Users, Globe, Clock, Sparkles, Bot } from "lucide-react";
+import { ArrowLeft, Feather, PenTool, Users, Globe, Clock, Sparkles, Bot, User } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import WritingRoom from "@/components/novel/WritingRoom";
 import CharacterBible from "@/components/novel/CharacterBible";
@@ -26,6 +26,13 @@ export default function NovelWorkspace() {
       return novels[0];
     },
     enabled: !!novelId,
+  });
+
+  const { data: novelWriter } = useQuery({
+    queryKey: ["writer", novel?.writer_id],
+    queryFn: () => base44.entities.Writer.filter({ id: novel.writer_id }),
+    enabled: !!novel?.writer_id,
+    select: (data) => data[0],
   });
 
   if (isLoading) {
@@ -62,9 +69,17 @@ export default function NovelWorkspace() {
             </div>
             <div className="min-w-0">
               <h1 className="font-heading font-semibold text-base truncate">{novel.title}</h1>
-              <p className="text-xs text-muted-foreground truncate">
-                {novel.genre}{novel.era ? ` · ${novel.era}` : ""}
-              </p>
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className="text-xs text-muted-foreground truncate">
+                  {novel.genre}{novel.era ? ` · ${novel.era}` : ""}
+                </p>
+                {novelWriter && (
+                  <span className="inline-flex items-center gap-1 text-[11px] text-primary/70 font-medium bg-primary/8 border border-primary/15 px-2 py-0.5 rounded-full shrink-0">
+                    <Bot className="w-2.5 h-2.5" />
+                    {novelWriter.name}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         </div>
