@@ -4,7 +4,8 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Save, Loader2, Download, Copy, MoreHorizontal, Maximize2, Minimize2 } from "lucide-react";
+import { ArrowLeft, Save, Loader2, Download, Copy, MoreHorizontal, Maximize2, Minimize2, Sparkles } from "lucide-react";
+import AiDraftDialog from "./AiDraftDialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { debounce } from "lodash";
@@ -26,12 +27,13 @@ function countWords(text) {
   return Math.round(thaiChars / 3.5) + eng;
 }
 
-export default function ChapterEditor({ chapter, novelId, onBack }) {
+export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
   const [title, setTitle] = useState(chapter.title);
   const [content, setContent] = useState(chapter.content || "");
   const [status, setStatus] = useState(chapter.status || "ร่าง");
   const [saving, setSaving] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
+  const [draftOpen, setDraftOpen] = useState(false);
   const queryClient = useQueryClient();
 
   const wordCount = countWords(content);
@@ -86,6 +88,17 @@ export default function ChapterEditor({ chapter, novelId, onBack }) {
         <span className="text-xs text-muted-foreground tabular-nums">
           {wordCount.toLocaleString()} คำ
         </span>
+
+        {/* AI Draft button */}
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-1.5 h-8 text-xs border-primary/30 text-primary hover:bg-primary/5"
+          onClick={() => setDraftOpen(true)}
+        >
+          <Sparkles className="w-3.5 h-3.5" />
+          ให้ AI ร่าง
+        </Button>
 
         {/* Focus mode toggle */}
         <Button
@@ -180,6 +193,18 @@ export default function ChapterEditor({ chapter, novelId, onBack }) {
   }
 
   return (
+    <>
+    <AiDraftDialog
+      open={draftOpen}
+      onClose={() => setDraftOpen(false)}
+      chapter={chapter}
+      novel={novel || { title: "" }}
+      novelId={novelId}
+      onInsert={(draft) => {
+        setContent((prev) => (prev ? prev + "\n\n" + draft : draft));
+        debouncedAutoSave(content + "\n\n" + draft);
+      }}
+    />
     <div className="flex flex-col h-[calc(100vh-7rem)]">
       {toolbar}
       <div className="flex-1 overflow-auto bg-background">
@@ -202,5 +227,6 @@ export default function ChapterEditor({ chapter, novelId, onBack }) {
         </div>
       </div>
     </div>
+    </>
   );
 }

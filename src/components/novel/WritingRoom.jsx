@@ -53,6 +53,7 @@ export default function WritingRoom({ novelId, novel }) {
       <ChapterEditor
         chapter={selectedChapter}
         novelId={novelId}
+        novel={novel}
         onBack={() => setSelectedChapter(null)}
       />
     );
