@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, Sparkles, RefreshCw, CheckCheck, Wand2, ChevronRight, Bot, Clock } from "lucide-react";
+import { Loader2, Sparkles, RefreshCw, CheckCheck, Wand2, ChevronRight, Bot, Clock, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
+import { saveChapterContent } from "@/lib/saveChapterContent";
 
 const WORD_TARGETS = [
   { label: "สั้น ~800 คำ", value: 800 },
@@ -113,8 +114,10 @@ function buildPolishPrompt(draft, systemPrompt) {
 export default function AiDraftDialog({ open, onClose, chapter, novel, novelId, onInsert, prefillSummary }) {
   const [step, setStep] = useState(1); // 1=form, 2=review
   const [loading, setLoading] = useState(false);
-  const [loadingType, setLoadingType] = useState(""); // "draft" | "polish"
+  const [loadingType, setLoadingType] = useState(""); // "draft" | "polish" | "saving"
   const [draft, setDraft] = useState("");
+  const [saveError, setSaveError] = useState("");
+  const queryClient = useQueryClient();
   const [linkedPlotEventId, setLinkedPlotEventId] = useState(chapter?.plot_event_id || "");
   const [form, setForm] = useState({
     chapterTitle: chapter?.title || "",
@@ -191,10 +194,14 @@ export default function AiDraftDialog({ open, onClose, chapter, novel, novelId, 
   const handleDraft = async () => {
     setLoading(true);
     setLoadingType("draft");
+    setSaveError("");
     const sysPrompt = getSystemPrompt();
     const prompt = buildDraftPrompt(form, sysPrompt, form.wordTarget);
     const result = await base44.integrations.Core.InvokeLLM({ prompt, model: "claude_sonnet_4_6" });
-    setDraft(typeof result === "string" ? result : result?.text || "");
+    // Strip code fences before using result
+    let text = typeof result === "string" ? result : (result?.text || "");
+    text = text.replace(/^```[\w]*\n?/m, "").replace(/\n?```$/m, "").trim();
+    setDraft(text);
     setStep(2);
     setLoading(false);
     setLoadingType("");
@@ -206,15 +213,63 @@ export default function AiDraftDialog({ open, onClose, chapter, novel, novelId, 
     const sysPrompt = getSystemPrompt();
     const prompt = buildPolishPrompt(draft, sysPrompt);
     const result = await base44.integrations.Core.InvokeLLM({ prompt, model: "claude_sonnet_4_6" });
-    setDraft(typeof result === "string" ? result : result?.text || "");
+    let text = typeof result === "string" ? result : (result?.text || "");
+    text = text.replace(/^```[\w]*\n?/m, "").replace(/\n?```$/m, "").trim();
+    setDraft(text);
     setLoading(false);
     setLoadingType("");
   };
 
-  const handleInsert = () => {
+  const handleInsert = async () => {
+    // Insert to editor UI immediately
     onInsert(draft);
-    toast.success("ใส่ร่างลง editor แล้ว");
-    handleClose();
+
+    // Also save reliably to Chapter entity
+    setSaveError("");
+    setLoading(true);
+    setLoadingType("saving");
+    const result = await saveChapterContent({
+      novelId,
+      chapterId: chapter?.id,
+      title: form.chapterTitle || chapter?.title,
+      order: chapter?.order,
+      content: draft,
+      status: "ร่าง",
+    });
+    setLoading(false);
+    setLoadingType("");
+
+    if (result.success) {
+      queryClient.invalidateQueries({ queryKey: ["chapters", novelId] });
+      toast.success("ใส่ร่างลง editor และบันทึกสำเร็จแล้ว");
+      handleClose();
+    } else {
+      setSaveError(result.error || "บันทึกไม่สำเร็จ กรุณากดบันทึกอีกครั้ง");
+      toast.error("ร่างลง editor แล้ว แต่บันทึกลงฐานข้อมูลไม่สำเร็จ");
+    }
+  };
+
+  const handleRetrySave = async () => {
+    setSaveError("");
+    setLoading(true);
+    setLoadingType("saving");
+    const result = await saveChapterContent({
+      novelId,
+      chapterId: chapter?.id,
+      title: form.chapterTitle || chapter?.title,
+      order: chapter?.order,
+      content: draft,
+      status: "ร่าง",
+    });
+    setLoading(false);
+    setLoadingType("");
+    if (result.success) {
+      queryClient.invalidateQueries({ queryKey: ["chapters", novelId] });
+      toast.success("บันทึกสำเร็จแล้ว");
+      handleClose();
+    } else {
+      setSaveError(result.error || "บันทึกไม่สำเร็จ กรุณาลองอีกครั้ง");
+    }
   };
 
   const handleClose = () => {
@@ -445,44 +500,59 @@ export default function AiDraftDialog({ open, onClose, chapter, novel, novelId, 
               >
                 ← ปรับโจทย์
               </Button>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5"
-                  onClick={handleDraft}
-                  disabled={loading}
-                >
-                  {loading && loadingType === "draft" ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <RefreshCw className="w-3.5 h-3.5" />
-                  )}
-                  ร่างใหม่
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5"
-                  onClick={handlePolish}
-                  disabled={loading || !draft}
-                >
-                  {loading && loadingType === "polish" ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <Wand2 className="w-3.5 h-3.5" />
-                  )}
-                  ขัดเกลาสำนวน
-                </Button>
-                <Button
-                  size="sm"
-                  className="gap-1.5"
-                  onClick={handleInsert}
-                  disabled={loading || !draft}
-                >
-                  <CheckCheck className="w-3.5 h-3.5" />
-                  ใส่ลง editor
-                </Button>
+              <div className="flex flex-col items-end gap-2">
+                {saveError && (
+                  <div className="flex items-center gap-2 text-xs text-destructive bg-destructive/5 border border-destructive/20 rounded-lg px-3 py-1.5 max-w-xs text-right">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    <span>{saveError}</span>
+                    <Button size="sm" variant="destructive" className="h-6 text-xs px-2 ml-1" onClick={handleRetrySave} disabled={loading}>
+                      ลองใหม่
+                    </Button>
+                  </div>
+                )}
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5"
+                    onClick={handleDraft}
+                    disabled={loading}
+                  >
+                    {loading && loadingType === "draft" ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <RefreshCw className="w-3.5 h-3.5" />
+                    )}
+                    ร่างใหม่
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5"
+                    onClick={handlePolish}
+                    disabled={loading || !draft}
+                  >
+                    {loading && loadingType === "polish" ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Wand2 className="w-3.5 h-3.5" />
+                    )}
+                    ขัดเกลาสำนวน
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="gap-1.5"
+                    onClick={handleInsert}
+                    disabled={loading || !draft}
+                  >
+                    {loading && loadingType === "saving" ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <CheckCheck className="w-3.5 h-3.5" />
+                    )}
+                    {loading && loadingType === "saving" ? "กำลังบันทึก..." : "ใส่ลง editor"}
+                  </Button>
+                </div>
               </div>
             </>
           )}

@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { saveChapterContent } from "@/lib/saveChapterContent";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -13,7 +14,7 @@ import {
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
   AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Loader2, Sparkles, Plus, Trash2, RefreshCw, FileText, CheckCircle2 } from "lucide-react";
+import { Loader2, Sparkles, Plus, Trash2, RefreshCw, FileText, CheckCircle2, AlertCircle } from "lucide-react";
 
 function stripCodeFence(text) {
   if (typeof text !== "string") return text;
@@ -126,7 +127,10 @@ async function generateChapterDraft({ novel, writer, characters, worldEntries, p
   const prompt = `${sysPrompt}\n\n[โจทย์ตอนที่ต้องร่าง]\nชื่อตอน: ${event.title}\nสิ่งที่ต้องเกิดในตอนนี้:\n${event.description || ""}\n\nร่างตอนนี้ให้ครบ 1,200 คำ:`;
 
   const result = await base44.integrations.Core.InvokeLLM({ prompt, model: "claude_sonnet_4_6" });
-  return typeof result === "string" ? result : result?.text || "";
+  let text = typeof result === "string" ? result : (result?.text || "");
+  // Strip code fences
+  text = text.replace(/^```[\w]*\n?/m, "").replace(/\n?```$/m, "").trim();
+  return text;
 }
 
 export default function AiPlotDialog({ open, onClose, novel, novelId }) {
@@ -281,40 +285,52 @@ export default function AiPlotDialog({ open, onClose, novel, novelId }) {
 
     setDraftStatus((prev) => ({ ...prev, [idx]: "drafting" }));
 
-    // Find linked plot event from savedEvents (by order match) or existingEvents
+    // Find linked plot event from existingEvents by order match
     const linkedPlotEvent = existingEvents.find((pe) => pe.order === ev.order) || null;
 
-    const draftContent = await generateChapterDraft({
-      novel,
-      writer,
-      characters,
-      worldEntries,
-      plotEvents: existingEvents,
-      chapters: existingChapters,
-      event: ev,
-      linkedPlotEvent,
-    });
-
-    // Find existing chapter with matching order
-    const existingChapter = existingChapters.find((ch) => ch.order === ev.order);
-
-    if (existingChapter) {
-      await base44.entities.Chapter.update(existingChapter.id, {
-        content: draftContent,
-        status: "ร่าง",
+    let draftContent = "";
+    try {
+      draftContent = await generateChapterDraft({
+        novel,
+        writer,
+        characters,
+        worldEntries,
+        plotEvents: existingEvents,
+        chapters: existingChapters,
+        event: ev,
+        linkedPlotEvent,
       });
-    } else {
-      await base44.entities.Chapter.create({
-        novel_id: novelId,
-        title: ev.title,
-        order: ev.order,
-        content: draftContent,
-        status: "ร่าง",
-      });
+    } catch (err) {
+      setDraftStatus((prev) => ({ ...prev, [idx]: `error:ร่างไม่สำเร็จ: ${err.message}` }));
+      return;
     }
 
-    queryClient.invalidateQueries({ queryKey: ["chapters", novelId] });
-    setDraftStatus((prev) => ({ ...prev, [idx]: "done" }));
+    if (!draftContent) {
+      setDraftStatus((prev) => ({ ...prev, [idx]: "error:AI ไม่ส่งเนื้อหากลับมา กรุณาลองใหม่" }));
+      return;
+    }
+
+    // Find existing chapter by novel_id + order using list() to avoid id filter issues
+    const allChapters = await base44.entities.Chapter.list();
+    const existingChapter = allChapters.find(
+      (ch) => ch.novel_id === novelId && ch.order === ev.order
+    );
+
+    const result = await saveChapterContent({
+      novelId,
+      chapterId: existingChapter?.id || null,
+      title: ev.title,
+      order: ev.order,
+      content: draftContent,
+      status: "ร่าง",
+    });
+
+    if (result.success) {
+      queryClient.invalidateQueries({ queryKey: ["chapters", novelId] });
+      setDraftStatus((prev) => ({ ...prev, [idx]: "done" }));
+    } else {
+      setDraftStatus((prev) => ({ ...prev, [idx]: `error:${result.error}` }));
+    }
   };
 
   const handleClose = () => {
@@ -437,6 +453,11 @@ export default function AiPlotDialog({ open, onClose, novel, novelId }) {
                               <Loader2 className="w-3 h-3 animate-spin" />
                               กำลังร่าง...
                             </span>
+                          ) : status?.startsWith("error:") ? (
+                            <span className="flex items-center gap-1 text-xs text-destructive">
+                              <AlertCircle className="w-3 h-3" />
+                              {status.replace("error:", "")}
+                            </span>
                           ) : (
                             <span />
                           )}
@@ -445,7 +466,7 @@ export default function AiPlotDialog({ open, onClose, novel, novelId }) {
                             size="sm"
                             className="h-6 text-xs gap-1 px-2"
                             disabled={status === "drafting" || !ev.title}
-                            onClick={() => handleDraftChapter(idx)}
+                            onClick={() => { setDraftStatus((p) => ({ ...p, [idx]: "" })); handleDraftChapter(idx); }}
                           >
                             {status === "drafting" ? (
                               <Loader2 className="w-3 h-3 animate-spin" />
