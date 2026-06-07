@@ -136,7 +136,7 @@ export default function NovelWorkspace() {
               <h1 className="font-heading font-semibold text-base truncate">{novel.title}</h1>
               <div className="flex items-center gap-2 flex-wrap">
                 <p className="text-xs text-muted-foreground truncate">
-                  {novel.genre}{novel.era ? ` · ${novel.era}` : ""}
+                  {novel.genre}{novel.era ? ` · ${novel.era}` : ""}{novel.target_chapters ? ` · ${novel.target_chapters} ตอน` : ""}
                 </p>
                 {novelWriter && (
                   <span className="inline-flex items-center gap-1 text-[11px] text-primary/70 font-medium bg-primary/8 border border-primary/15 px-2 py-0.5 rounded-full shrink-0">

@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -38,6 +39,7 @@ function parseAiResult(raw) {
 function buildPrompt(novel, writer, characters) {
   const charList = characters.map((c) => `- ${c.name} (${c.role || "ตัวละคร"}): ${c.personality || ""}`).join("\n") || "ยังไม่มีตัวละคร";
   const writerContext = writer?.system_prompt ? `\nสไตล์การเขียน: ${writer.system_prompt}\n` : "";
+  const targetChapters = novel.target_chapters || 10;
 
   return `${writerContext}
 คุณคือบรรณาธิการที่ช่วยวางโครงเรื่องนิยาย ตอบเป็น JSON เท่านั้น ห้ามมีข้อความอื่นนอก JSON
@@ -47,14 +49,21 @@ function buildPrompt(novel, writer, characters) {
 - แนว: ${novel.genre || "ไม่ระบุ"}
 - เรื่องย่อ: ${novel.synopsis || "ไม่มีเรื่องย่อ"}
 - ยุคสมัย/ฉากหลัง: ${novel.era || "ไม่ระบุ"}
+- จำนวนตอนที่ต้องการ: ${targetChapters} ตอน
 
 ตัวละคร:
 ${charList}
 
-ตอบด้วย JSON โครงสร้างนี้เท่านั้น (ไม่มี markdown, ไม่มี backtick):
-{"plot_outline":"สรุปโครงเรื่อง 3 องก์ แก่น/ธีม คำถามหลักของเรื่อง จุดหักเห (เขียนเป็นภาษาไทย)","events":[{"order":1,"title":"ชื่อเหตุการณ์","description":"คำอธิบายย่อ"},{"order":2,"title":"...","description":"..."}]}
+จงแบ่งโครงเรื่อง 3 องก์ออกเป็น ${targetChapters} ตอนเท่าๆ กัน โดยแต่ละตอนต้องมี:
+- order: เลขลำดับตอน (1-${targetChapters})
+- title: ชื่อตอน
+- description: สรุปเหตุการณ์สำคัญในตอน (2-3 บรรทัด)
+- act: องก์ที่สังกัด (1=ต้นเรื่อง, 2=กลางเรื่อง, 3=จุด Climax และบทสรุป)
 
-สร้างไทม์ไลน์ 10-12 เหตุการณ์หลักครอบคลุมทั้งสามองก์ ปรับให้เหมาะกับแนว "${novel.genre || "ทั่วไป"}" ตอบเป็นภาษาไทยทั้งหมด ตอบด้วย JSON ล้วนเท่านั้น`;
+ตอบด้วย JSON โครงสร้างนี้เท่านั้น (ไม่มี markdown, ไม่มี backtick):
+{"plot_outline":"สรุปโครงเรื่อง 3 องก์ แก่น/ธีม คำถามหลักของเรื่อง จุดหักเห (เขียนเป็นภาษาไทย)","events":[{"order":1,"title":"ชื่อตอน","description":"สรุปเหตุการณ์","act":1},{"order":2,"title":"...","description":"...","act":1}]}
+
+สร้างโครงเรื่องให้ครบ ${targetChapters} ตอน ครอบคลุมทั้งสามองก์ ปรับให้เหมาะกับแนว "${novel.genre || "ทั่วไป"}" ตอบเป็นภาษาไทยทั้งหมด ตอบด้วย JSON ล้วนเท่านั้น`;
 }
 
 export default function AiPlotDialog({ open, onClose, novel, novelId }) {
@@ -182,6 +191,13 @@ export default function AiPlotDialog({ open, onClose, novel, novelId }) {
     setEvents((prev) => prev.map((e, i) => i === idx ? { ...e, [field]: value } : e));
   };
 
+  const getActLabel = (act) => {
+    if (act === 1) return "องก์ 1 (ต้นเรื่อง)";
+    if (act === 2) return "องก์ 2 (กลางเรื่อง)";
+    if (act === 3) return "องก์ 3 (Climax)";
+    return "ไม่ระบุ";
+  };
+
   const handleClose = () => {
     onClose();
     setStep("idle");
@@ -261,9 +277,17 @@ export default function AiPlotDialog({ open, onClose, novel, novelId }) {
                         <Input
                           value={ev.title}
                           onChange={(e) => updateEvent(idx, "title", e.target.value)}
-                          placeholder="ชื่อเหตุการณ์"
+                          placeholder="ชื่อตอน"
                           className="h-7 text-sm flex-1"
                         />
+                        <Select value={ev.act || 1} onValueChange={(v) => updateEvent(idx, "act", Number(v))}>
+                          <SelectTrigger className="h-7 w-28 text-xs"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="1">องก์ 1</SelectItem>
+                            <SelectItem value="2">องก์ 2</SelectItem>
+                            <SelectItem value="3">องก์ 3</SelectItem>
+                          </SelectContent>
+                        </Select>
                         <Button
                           variant="ghost"
                           size="icon"
@@ -276,7 +300,7 @@ export default function AiPlotDialog({ open, onClose, novel, novelId }) {
                       <Textarea
                         value={ev.description}
                         onChange={(e) => updateEvent(idx, "description", e.target.value)}
-                        placeholder="คำอธิบาย..."
+                        placeholder="สรุปเหตุการณ์สำคัญในตอน..."
                         rows={2}
                         className="text-xs leading-relaxed"
                       />

@@ -32,7 +32,7 @@ const genreColors = {
 
 export default function Dashboard() {
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ title: "", genre: "", synopsis: "", era: "", writer_id: "" });
+  const [form, setForm] = useState({ title: "", genre: "", synopsis: "", era: "", writer_id: "", target_chapters: 10 });
   const [editOpen, setEditOpen] = useState(false);
   const [editForm, setEditForm] = useState({});
   const [editingId, setEditingId] = useState(null);
@@ -95,7 +95,15 @@ export default function Dashboard() {
     e.preventDefault();
     e.stopPropagation();
     setEditingId(novel.id);
-    setEditForm({ title: novel.title, genre: novel.genre || "", synopsis: novel.synopsis || "", era: novel.era || "", status: novel.status || "กำลังเขียน", writer_id: novel.writer_id || "" });
+    setEditForm({ 
+      title: novel.title, 
+      genre: novel.genre || "", 
+      synopsis: novel.synopsis || "", 
+      era: novel.era || "", 
+      status: novel.status || "กำลังเขียน", 
+      writer_id: novel.writer_id || "",
+      target_chapters: novel.target_chapters || 10
+    });
     setEditOpen(true);
   };
 
@@ -180,6 +188,18 @@ export default function Dashboard() {
                     value={form.era}
                     onChange={(e) => setForm({ ...form, era: e.target.value })}
                   />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1.5 block">จำนวนตอนที่ต้องการ</label>
+                  <Select value={form.target_chapters} onValueChange={(v) => setForm({ ...form, target_chapters: Number(v) })}>
+                    <SelectTrigger><SelectValue placeholder="เลือกจำนวนตอน" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="10">10 ตอน</SelectItem>
+                      <SelectItem value="20">20 ตอน</SelectItem>
+                      <SelectItem value="30">30 ตอน</SelectItem>
+                      <SelectItem value="40">40 ตอน</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div>
                   <label className="text-sm font-medium mb-1.5 block">เรื่องย่อ</label>
@@ -294,6 +314,18 @@ export default function Dashboard() {
                   โทน: {activeWriters.find((w) => w.id === editForm.writer_id)?.style || "-"}
                 </p>
               )}
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">จำนวนตอนที่ต้องการ</label>
+              <Select value={editForm.target_chapters || 10} onValueChange={(v) => setEditForm({ ...editForm, target_chapters: Number(v) })}>
+                <SelectTrigger><SelectValue placeholder="เลือกจำนวนตอน" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="10">10 ตอน</SelectItem>
+                  <SelectItem value="20">20 ตอน</SelectItem>
+                  <SelectItem value="30">30 ตอน</SelectItem>
+                  <SelectItem value="40">40 ตอน</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <Button
               className="w-full"

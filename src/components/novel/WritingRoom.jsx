@@ -7,12 +7,13 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, FileText, Loader2, Trash2, Download, Copy, MoreHorizontal, Clock } from "lucide-react";
+import { Plus, FileText, Loader2, Trash2, Download, Copy, MoreHorizontal, Clock, Sparkles } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { motion, AnimatePresence } from "framer-motion";
 import ChapterEditor from "./ChapterEditor";
 import { downloadChapterTxt, downloadChapterMd, copyChapterToClipboard, downloadAllChaptersMd } from "@/utils/exportChapter";
 import { toast } from "sonner";
+import AiChapterGeneratorDialog from "./AiChapterGeneratorDialog";
 
 const statusColors = {
   "ร่าง": "bg-amber-50 text-amber-700 border border-amber-200",
@@ -25,6 +26,7 @@ export default function WritingRoom({ novelId, novel }) {
   const [newChapterOpen, setNewChapterOpen] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [selectedPlotEventId, setSelectedPlotEventId] = useState("");
+  const [aiGenerateOpen, setAiGenerateOpen] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: chapters = [], isLoading } = useQuery({
@@ -67,6 +69,13 @@ export default function WritingRoom({ novelId, novel }) {
   }
 
   return (
+    <>
+    <AiChapterGeneratorDialog
+      open={aiChapterGeneratorOpen}
+      onClose={() => setAiChapterGeneratorOpen(false)}
+      novel={novel}
+      novelId={novelId}
+    />
     <div className="max-w-4xl mx-auto px-4 py-6">
       <div className="flex items-center justify-between mb-6">
         <div>
@@ -76,6 +85,15 @@ export default function WritingRoom({ novelId, novel }) {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5 text-primary/70 border-primary/20"
+            onClick={() => setAiChapterGeneratorOpen(true)}
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            AI สร้างตอน
+          </Button>
           {chapters.length > 0 && (
             <Button
               variant="outline"
@@ -243,5 +261,6 @@ export default function WritingRoom({ novelId, novel }) {
         </div>
       )}
     </div>
+    </>
   );
 }
