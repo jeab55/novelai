@@ -1,15 +1,16 @@
 import React, { useState, useCallback, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Save, Loader2, Download, Copy, MoreHorizontal, Maximize2, Minimize2, Sparkles } from "lucide-react";
+import { ArrowLeft, Save, Loader2, Download, Copy, MoreHorizontal, Maximize2, Minimize2, Sparkles, Clock, X, RefreshCw } from "lucide-react";
 import AiDraftDialog from "./AiDraftDialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { debounce } from "lodash";
 import { downloadChapterTxt, downloadChapterMd, copyChapterToClipboard } from "@/utils/exportChapter";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 function countWords(text) {
   if (!text) return 0;
@@ -34,7 +35,19 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
   const [saving, setSaving] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
   const [draftOpen, setDraftOpen] = useState(false);
+  const [changeEventOpen, setChangeEventOpen] = useState(false);
+  const [selectedPlotEventId, setSelectedPlotEventId] = useState("");
+  // local state for plot event binding (synced from chapter prop)
+  const [plotEventId, setPlotEventId] = useState(chapter.plot_event_id || "");
+  const [plotEventTitle, setPlotEventTitle] = useState(chapter.plot_event_title || "");
+  const [plotEventDescription, setPlotEventDescription] = useState(chapter.plot_event_description || "");
+  const [plotEventOrder, setPlotEventOrder] = useState(chapter.plot_event_order || null);
   const queryClient = useQueryClient();
+
+  const { data: plotEvents = [] } = useQuery({
+    queryKey: ["plotEvents", novelId],
+    queryFn: () => base44.entities.PlotEvent.filter({ novel_id: novelId }, "order"),
+  });
 
   const wordCount = countWords(content);
 
@@ -59,7 +72,41 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
 
   const handleSave = () => {
     setSaving(true);
-    saveMutation.mutate({ title, content, status, word_count: wordCount });
+    saveMutation.mutate({ title, content, status, word_count: wordCount, plot_event_id: plotEventId, plot_event_title: plotEventTitle, plot_event_description: plotEventDescription, plot_event_order: plotEventOrder });
+  };
+
+  const handleBindEvent = () => {
+    const ev = plotEvents.find((e) => e.id === selectedPlotEventId);
+    if (!ev) return;
+    setPlotEventId(ev.id);
+    setPlotEventTitle(ev.title);
+    setPlotEventDescription(ev.description || "");
+    setPlotEventOrder(ev.order || null);
+    base44.entities.Chapter.update(chapter.id, {
+      plot_event_id: ev.id,
+      plot_event_title: ev.title,
+      plot_event_description: ev.description || "",
+      plot_event_order: ev.order || null,
+    });
+    queryClient.invalidateQueries({ queryKey: ["chapters", novelId] });
+    setChangeEventOpen(false);
+    setSelectedPlotEventId("");
+    toast.success("ผูกเหตุการณ์แล้ว");
+  };
+
+  const handleUnbindEvent = () => {
+    setPlotEventId("");
+    setPlotEventTitle("");
+    setPlotEventDescription("");
+    setPlotEventOrder(null);
+    base44.entities.Chapter.update(chapter.id, {
+      plot_event_id: "",
+      plot_event_title: "",
+      plot_event_description: "",
+      plot_event_order: null,
+    });
+    queryClient.invalidateQueries({ queryKey: ["chapters", novelId] });
+    toast.success("ปลดการผูกแล้ว");
   };
 
   const debouncedAutoSave = useCallback(
@@ -160,6 +207,44 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
     </div>
   );
 
+  // แถบแสดงเหตุการณ์ไทม์ไลน์
+  const timelineBanner = plotEventId ? (
+    <div className="flex items-center gap-2 px-4 py-2 bg-amber-50/70 border-b border-amber-200/60 text-xs">
+      <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+      <span className="text-amber-700 font-medium">อิงไทม์ไลน์:</span>
+      <span className="text-amber-800">
+        ลำดับ {plotEventOrder} — {plotEventTitle}
+      </span>
+      <div className="ml-auto flex items-center gap-1">
+        <button
+          onClick={() => { setSelectedPlotEventId(plotEventId); setChangeEventOpen(true); }}
+          className="flex items-center gap-1 px-2 py-0.5 rounded-md hover:bg-amber-200/60 text-amber-700 transition-colors"
+        >
+          <RefreshCw className="w-3 h-3" />
+          เปลี่ยน
+        </button>
+        <button
+          onClick={handleUnbindEvent}
+          className="flex items-center gap-1 px-2 py-0.5 rounded-md hover:bg-amber-200/60 text-amber-700 transition-colors"
+        >
+          <X className="w-3 h-3" />
+          ปลด
+        </button>
+      </div>
+    </div>
+  ) : plotEvents.length > 0 ? (
+    <div className="flex items-center gap-2 px-4 py-1.5 bg-muted/30 border-b border-border/40 text-xs">
+      <Clock className="w-3.5 h-3.5 text-muted-foreground/60 shrink-0" />
+      <span className="text-muted-foreground/70">ยังไม่ผูกกับเหตุการณ์ไทม์ไลน์</span>
+      <button
+        onClick={() => setChangeEventOpen(true)}
+        className="ml-auto px-2 py-0.5 rounded-md hover:bg-muted/60 text-muted-foreground hover:text-foreground transition-colors"
+      >
+        + ผูกเหตุการณ์
+      </button>
+    </div>
+  ) : null;
+
   // โหมดโฟกัส: fullscreen overlay
   if (focusMode) {
     return (
@@ -192,12 +277,22 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
     );
   }
 
+  // chapter object ที่ส่งไป AiDraftDialog พร้อม plot event ปัจจุบัน
+  const chapterWithEvent = {
+    ...chapter,
+    title,
+    plot_event_id: plotEventId,
+    plot_event_title: plotEventTitle,
+    plot_event_description: plotEventDescription,
+    plot_event_order: plotEventOrder,
+  };
+
   return (
     <>
     <AiDraftDialog
       open={draftOpen}
       onClose={() => setDraftOpen(false)}
-      chapter={chapter}
+      chapter={chapterWithEvent}
       novel={novel || { title: "" }}
       novelId={novelId}
       onInsert={(draft) => {
@@ -205,8 +300,47 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
         debouncedAutoSave(content + "\n\n" + draft);
       }}
     />
+
+    {/* Dialog เปลี่ยน/ผูกเหตุการณ์ */}
+    <Dialog open={changeEventOpen} onOpenChange={setChangeEventOpen}>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="font-heading flex items-center gap-2">
+            <Clock className="w-4 h-4 text-primary" />
+            ผูกเหตุการณ์ไทม์ไลน์
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 mt-1">
+          <Select value={selectedPlotEventId} onValueChange={setSelectedPlotEventId}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="เลือกเหตุการณ์" />
+            </SelectTrigger>
+            <SelectContent>
+              {plotEvents.map((ev) => (
+                <SelectItem key={ev.id} value={ev.id}>
+                  <span className="font-medium text-primary/70 mr-1.5">#{ev.order}</span>
+                  {ev.title}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {selectedPlotEventId && (() => {
+            const ev = plotEvents.find((e) => e.id === selectedPlotEventId);
+            return ev?.description ? (
+              <p className="text-xs text-muted-foreground bg-muted/40 rounded-lg px-3 py-2 leading-relaxed">{ev.description}</p>
+            ) : null;
+          })()}
+          <div className="flex gap-2">
+            <Button variant="ghost" className="flex-1" onClick={() => setChangeEventOpen(false)}>ยกเลิก</Button>
+            <Button className="flex-1" onClick={handleBindEvent} disabled={!selectedPlotEventId}>บันทึก</Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+
     <div className="flex flex-col h-[calc(100vh-7rem)]">
       {toolbar}
+      {timelineBanner}
       <div className="flex-1 overflow-auto bg-background">
         <div className="mx-auto px-8 py-10" style={{ maxWidth: "720px" }}>
           <textarea

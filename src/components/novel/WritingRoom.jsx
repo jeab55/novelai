@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, FileText, Loader2, Trash2, Download, Copy, MoreHorizontal } from "lucide-react";
+import { Plus, FileText, Loader2, Trash2, Download, Copy, MoreHorizontal, Clock } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { motion, AnimatePresence } from "framer-motion";
 import ChapterEditor from "./ChapterEditor";
@@ -24,11 +24,17 @@ export default function WritingRoom({ novelId, novel }) {
   const [selectedChapter, setSelectedChapter] = useState(null);
   const [newChapterOpen, setNewChapterOpen] = useState(false);
   const [newTitle, setNewTitle] = useState("");
+  const [selectedPlotEventId, setSelectedPlotEventId] = useState("");
   const queryClient = useQueryClient();
 
   const { data: chapters = [], isLoading } = useQuery({
     queryKey: ["chapters", novelId],
     queryFn: () => base44.entities.Chapter.filter({ novel_id: novelId }, "order"),
+  });
+
+  const { data: plotEvents = [] } = useQuery({
+    queryKey: ["plotEvents", novelId],
+    queryFn: () => base44.entities.PlotEvent.filter({ novel_id: novelId }, "order"),
   });
 
   const createChapter = useMutation({
@@ -37,6 +43,7 @@ export default function WritingRoom({ novelId, novel }) {
       queryClient.invalidateQueries({ queryKey: ["chapters", novelId] });
       setNewChapterOpen(false);
       setNewTitle("");
+      setSelectedPlotEventId("");
     },
   });
 
@@ -97,16 +104,51 @@ export default function WritingRoom({ novelId, novel }) {
                 value={newTitle}
                 onChange={(e) => setNewTitle(e.target.value)}
               />
+              {plotEvents.length > 0 && (
+                <div>
+                  <label className="text-sm font-medium mb-1.5 block flex items-center gap-1.5 text-muted-foreground">
+                    <Clock className="w-3.5 h-3.5" />
+                    อิงเหตุการณ์จากไทม์ไลน์ (ไม่บังคับ)
+                  </label>
+                  <Select value={selectedPlotEventId} onValueChange={setSelectedPlotEventId}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="— ไม่ผูกกับเหตุการณ์ —" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={null}>— ไม่ผูกกับเหตุการณ์ —</SelectItem>
+                      {plotEvents.map((ev) => (
+                        <SelectItem key={ev.id} value={ev.id}>
+                          <span className="font-medium text-primary/70 mr-1.5">#{ev.order}</span>
+                          {ev.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {selectedPlotEventId && (() => {
+                    const ev = plotEvents.find((e) => e.id === selectedPlotEventId);
+                    return ev?.description ? (
+                      <p className="text-xs text-muted-foreground mt-1.5 line-clamp-2 bg-muted/40 rounded-lg px-3 py-2">{ev.description}</p>
+                    ) : null;
+                  })()}
+                </div>
+              )}
               <Button
                 className="w-full"
-                onClick={() => createChapter.mutate({
-                  novel_id: novelId,
-                  title: newTitle,
-                  order: chapters.length + 1,
-                  status: "ร่าง",
-                  content: "",
-                  word_count: 0,
-                })}
+                onClick={() => {
+                  const ev = plotEvents.find((e) => e.id === selectedPlotEventId);
+                  createChapter.mutate({
+                    novel_id: novelId,
+                    title: newTitle,
+                    order: chapters.length + 1,
+                    status: "ร่าง",
+                    content: "",
+                    word_count: 0,
+                    plot_event_id: ev?.id || "",
+                    plot_event_title: ev?.title || "",
+                    plot_event_description: ev?.description || "",
+                    plot_event_order: ev?.order || null,
+                  });
+                }}
                 disabled={!newTitle || createChapter.isPending}
               >
                 สร้างตอน

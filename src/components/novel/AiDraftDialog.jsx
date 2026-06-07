@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, Sparkles, RefreshCw, CheckCheck, Wand2, ChevronRight, Bot } from "lucide-react";
+import { Loader2, Sparkles, RefreshCw, CheckCheck, Wand2, ChevronRight, Bot, Clock } from "lucide-react";
 import { toast } from "sonner";
 
 const WORD_TARGETS = [
@@ -21,7 +21,7 @@ const DEFAULT_WRITER_PROMPT = `คุณคือนักเขียนนิ�
 คุณต้องร่างเนื้อหาตอนที่สมบูรณ์ตามโครงที่ได้รับ รักษาสำนวนและโทนของเรื่อง ใช้ภาษาไทยที่อ่านลื่น`;
 
 // สร้าง system prompt สำหรับร่างตอน
-function buildDraftSystemPrompt(novel, characters, worldEntries, plotEvents, chapters, currentChapter, writerPrompt) {
+function buildDraftSystemPrompt(novel, characters, worldEntries, plotEvents, chapters, currentChapter, writerPrompt, linkedEvent) {
   let ctx = `[บทบาท]\n${writerPrompt || DEFAULT_WRITER_PROMPT}\n\n`;
 
   ctx += `[บริบทเรื่อง]\n`;
@@ -71,6 +71,15 @@ function buildDraftSystemPrompt(novel, characters, worldEntries, plotEvents, cha
     });
   }
 
+  if (linkedEvent) {
+    ctx += `\n[เหตุการณ์หลักที่ตอนนี้ต้องบรรยาย — สำคัญมาก]\n`;
+    ctx += `ลำดับ ${linkedEvent.order}: ${linkedEvent.title}\n`;
+    if (linkedEvent.description) ctx += `รายละเอียด: ${linkedEvent.description}\n`;
+    if (linkedEvent.time_period) ctx += `ช่วงเวลา: ${linkedEvent.time_period}\n`;
+    if (linkedEvent.characters_involved) ctx += `ตัวละครที่เกี่ยวข้อง: ${linkedEvent.characters_involved}\n`;
+    ctx += `→ ตอนนี้ต้องเล่าเหตุการณ์นี้ให้ครบ ใช้เป็นแกนกลางของพล็อต\n`;
+  }
+
   ctx += `\n[คำสั่งสำคัญ]\n`;
   ctx += `- ร่างเนื้อหาตอนนี้ให้ครบตามความยาวที่กำหนด อย่าตัดจบกลางคัน\n`;
   ctx += `- ใช้ "Show don't tell" แสดงผ่านการกระทำและบทสนทนา ไม่บรรยายอารมณ์ตรงๆ\n`;
@@ -105,9 +114,10 @@ export default function AiDraftDialog({ open, onClose, chapter, novel, novelId, 
   const [loadingType, setLoadingType] = useState(""); // "draft" | "polish"
   const [draft, setDraft] = useState("");
   const [selectedWriterId, setSelectedWriterId] = useState(null);
+  const [linkedPlotEventId, setLinkedPlotEventId] = useState(chapter?.plot_event_id || "");
   const [form, setForm] = useState({
     chapterTitle: chapter?.title || "",
-    summary: "",
+    summary: chapter?.plot_event_description || "",
     characters: "",
     tone: "",
     wordTarget: 1200,
@@ -126,6 +136,18 @@ export default function AiDraftDialog({ open, onClose, chapter, novel, novelId, 
       setSelectedWriterId(activeWriters[0].id);
     }
   }, [activeWriters.length]);
+
+  // Sync plot event when chapter changes (e.g. when dialog opens)
+  useEffect(() => {
+    if (open) {
+      setLinkedPlotEventId(chapter?.plot_event_id || "");
+      setForm((f) => ({
+        ...f,
+        chapterTitle: chapter?.title || "",
+        summary: chapter?.plot_event_description || f.summary || "",
+      }));
+    }
+  }, [open]);
 
   const selectedWriter = activeWriters.find((w) => w.id === selectedWriterId) || activeWriters[0];
 
@@ -151,7 +173,7 @@ export default function AiDraftDialog({ open, onClose, chapter, novel, novelId, 
   });
 
   const getSystemPrompt = () =>
-    buildDraftSystemPrompt(novel, characters, worldEntries, plotEvents, chapters, chapter, selectedWriter?.system_prompt);
+    buildDraftSystemPrompt(novel, characters, worldEntries, plotEvents, chapters, chapter, selectedWriter?.system_prompt, linkedEvent);
 
   const handleDraft = async () => {
     setLoading(true);
@@ -185,9 +207,20 @@ export default function AiDraftDialog({ open, onClose, chapter, novel, novelId, 
   const handleClose = () => {
     setStep(1);
     setDraft("");
+    setLinkedPlotEventId("");
     setForm({ chapterTitle: chapter?.title || "", summary: "", characters: "", tone: "", wordTarget: 1200 });
     setSelectedWriterId(null);
     onClose();
+  };
+
+  const linkedEvent = plotEvents.find((e) => e.id === linkedPlotEventId);
+
+  const handleSelectPlotEvent = (evId) => {
+    setLinkedPlotEventId(evId);
+    const ev = plotEvents.find((e) => e.id === evId);
+    if (ev?.description) {
+      setForm((f) => ({ ...f, summary: ev.description }));
+    }
   };
 
   return (
@@ -231,6 +264,36 @@ export default function AiDraftDialog({ open, onClose, chapter, novel, novelId, 
                 </Select>
                 {selectedWriter?.style && (
                   <p className="text-xs text-primary/60 mt-1">โทน: {selectedWriter.style}</p>
+                )}
+              </div>
+            )}
+
+            {/* เลือกเหตุการณ์ไทม์ไลน์ */}
+            {plotEvents.length > 0 && (
+              <div>
+                <label className="text-sm font-medium mb-1.5 block flex items-center gap-1.5 text-muted-foreground">
+                  <Clock className="w-3.5 h-3.5" />
+                  อิงเหตุการณ์ไทม์ไลน์
+                </label>
+                <Select value={linkedPlotEventId || ""} onValueChange={handleSelectPlotEvent}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="— ไม่ผูกกับเหตุการณ์ —" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={null}>— ไม่ผูกกับเหตุการณ์ —</SelectItem>
+                    {plotEvents.map((ev) => (
+                      <SelectItem key={ev.id} value={ev.id}>
+                        <span className="font-medium text-primary/70 mr-1.5">#{ev.order}</span>
+                        {ev.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {linkedEvent && (
+                  <p className="text-xs text-amber-700/80 bg-amber-50/60 rounded-lg px-3 py-1.5 mt-1.5 leading-relaxed">
+                    <span className="font-medium">ลำดับ {linkedEvent.order} — {linkedEvent.title}</span>
+                    {linkedEvent.description && <><br />{linkedEvent.description}</>}
+                  </p>
                 )}
               </div>
             )}
