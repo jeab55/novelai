@@ -29,6 +29,9 @@ const genreColors = {
 export default function Dashboard() {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ title: "", genre: "", synopsis: "", era: "" });
+  const [editOpen, setEditOpen] = useState(false);
+  const [editForm, setEditForm] = useState({});
+  const [editingId, setEditingId] = useState(null);
   const queryClient = useQueryClient();
 
   const { data: novels = [], isLoading } = useQuery({
@@ -44,6 +47,23 @@ export default function Dashboard() {
       setForm({ title: "", genre: "", synopsis: "", era: "" });
     },
   });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }) => base44.entities.Novel.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["novels"] });
+      setEditOpen(false);
+      setEditingId(null);
+    },
+  });
+
+  const openEdit = (e, novel) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setEditingId(novel.id);
+    setEditForm({ title: novel.title, genre: novel.genre || "", synopsis: novel.synopsis || "", era: novel.era || "", status: novel.status || "กำลังเขียน" });
+    setEditOpen(true);
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -120,6 +140,68 @@ export default function Dashboard() {
         </div>
       </header>
 
+      {/* Edit Dialog */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="font-heading text-lg">แก้ไขข้อมูลเรื่อง</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-2">
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">ชื่อเรื่อง</label>
+              <Input
+                value={editForm.title || ""}
+                onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">แนวนิยาย</label>
+              <Select value={editForm.genre || ""} onValueChange={(v) => setEditForm({ ...editForm, genre: v })}>
+                <SelectTrigger><SelectValue placeholder="เลือกแนว" /></SelectTrigger>
+                <SelectContent>
+                  {GENRES.map((g) => (
+                    <SelectItem key={g} value={g}>{g}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">ยุคสมัยและฉากหลัง</label>
+              <Input
+                value={editForm.era || ""}
+                onChange={(e) => setEditForm({ ...editForm, era: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">คำโปรย / เรื่องย่อ</label>
+              <Textarea
+                rows={4}
+                value={editForm.synopsis || ""}
+                onChange={(e) => setEditForm({ ...editForm, synopsis: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">สถานะ</label>
+              <Select value={editForm.status || "กำลังเขียน"} onValueChange={(v) => setEditForm({ ...editForm, status: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="กำลังเขียน">กำลังเขียน</SelectItem>
+                  <SelectItem value="เขียนเสร็จ">เขียนเสร็จ</SelectItem>
+                  <SelectItem value="พักไว้ก่อน">พักไว้ก่อน</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button
+              className="w-full"
+              onClick={() => updateMutation.mutate({ id: editingId, data: editForm })}
+              disabled={!editForm.title || updateMutation.isPending}
+            >
+              {updateMutation.isPending ? "กำลังบันทึก..." : "บันทึกการเปลี่ยนแปลง"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Content */}
       <main className="max-w-6xl mx-auto px-6 py-8">
         {isLoading ? (
@@ -154,15 +236,22 @@ export default function Dashboard() {
                 <Link to={`/novel/${novel.id}`}>
                   <div className="group relative bg-card border border-border/60 rounded-2xl p-6 hover:shadow-lg hover:border-primary/20 transition-all duration-300 cursor-pointer h-full">
                     <div className="flex items-start justify-between mb-3">
-                      <h3 className="font-heading font-semibold text-lg leading-tight group-hover:text-primary transition-colors">
+                      <h3 className="font-heading font-semibold text-lg leading-tight group-hover:text-primary transition-colors pr-8">
                         {novel.title}
                       </h3>
-                      {novel.genre && (
-                        <Badge className={`${genreColors[novel.genre] || "bg-gray-100 text-gray-700"} text-xs shrink-0 ml-2`}>
-                          {novel.genre}
-                        </Badge>
-                      )}
+                      <button
+                        onClick={(e) => openEdit(e, novel)}
+                        className="absolute top-4 right-4 w-7 h-7 rounded-lg bg-secondary/60 hover:bg-primary/10 hover:text-primary flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all"
+                        title="แก้ไขข้อมูลเรื่อง"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
                     </div>
+                    {novel.genre && (
+                      <Badge className={`${genreColors[novel.genre] || "bg-gray-100 text-gray-700"} text-xs mb-2`}>
+                        {novel.genre}
+                      </Badge>
+                    )}
                     {novel.era && (
                       <p className="text-xs text-primary/70 mb-2 font-medium">{novel.era}</p>
                     )}
