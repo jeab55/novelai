@@ -5,9 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Save, Loader2 } from "lucide-react";
+import { ArrowLeft, Save, Loader2, Download, Copy, MoreHorizontal } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { debounce } from "lodash";
+import { downloadChapterTxt, downloadChapterMd, copyChapterToClipboard } from "@/utils/exportChapter";
 
 function countWords(text) {
   if (!text) return 0;
@@ -74,6 +76,36 @@ export default function ChapterEditor({ chapter, novelId, onBack }) {
         />
         <div className="flex items-center gap-2 ml-auto">
           <span className="text-xs text-muted-foreground">{wordCount.toLocaleString()} คำ</span>
+
+          {/* Export menu */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
+                <MoreHorizontal className="w-4 h-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuItem onClick={() => downloadChapterTxt(title, content)}>
+                <Download className="w-3.5 h-3.5 mr-2" />
+                ดาวน์โหลดเป็น .txt
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => downloadChapterMd(title, content)}>
+                <Download className="w-3.5 h-3.5 mr-2" />
+                ดาวน์โหลดเป็น .md
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={async () => {
+                  await copyChapterToClipboard(title, content);
+                  toast.success("คัดลอกแล้ว");
+                }}
+              >
+                <Copy className="w-3.5 h-3.5 mr-2" />
+                คัดลอกทั้งตอน
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
           <Select value={status} onValueChange={setStatus}>
             <SelectTrigger className="w-28 h-8 text-xs">
               <SelectValue />

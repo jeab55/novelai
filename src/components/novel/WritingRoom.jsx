@@ -7,9 +7,12 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, FileText, Save, Loader2, Trash2 } from "lucide-react";
+import { Plus, FileText, Loader2, Trash2, Download, Copy, MoreHorizontal } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { motion, AnimatePresence } from "framer-motion";
 import ChapterEditor from "./ChapterEditor";
+import { downloadChapterTxt, downloadChapterMd, copyChapterToClipboard, downloadAllChaptersMd } from "@/utils/exportChapter";
+import { toast } from "sonner";
 
 const statusColors = {
   "ร่าง": "bg-yellow-100 text-yellow-700",
@@ -64,7 +67,19 @@ export default function WritingRoom({ novelId, novel }) {
             {chapters.length} ตอน · {chapters.reduce((acc, c) => acc + (c.word_count || 0), 0).toLocaleString()} คำ
           </p>
         </div>
-        <Dialog open={newChapterOpen} onOpenChange={setNewChapterOpen}>
+        <div className="flex items-center gap-2">
+          {chapters.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5 text-muted-foreground"
+              onClick={() => downloadAllChaptersMd(novel?.title || "novel", chapters)}
+            >
+              <Download className="w-3.5 h-3.5" />
+              ส่งออกทั้งเรื่อง
+            </Button>
+          )}
+          <Dialog open={newChapterOpen} onOpenChange={setNewChapterOpen}>
           <DialogTrigger asChild>
             <Button size="sm" className="gap-1.5">
               <Plus className="w-3.5 h-3.5" />
@@ -98,6 +113,7 @@ export default function WritingRoom({ novelId, novel }) {
             </div>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       {isLoading ? (
@@ -137,17 +153,45 @@ export default function WritingRoom({ novelId, novel }) {
                 <Badge className={`${statusColors[ch.status] || statusColors["ร่าง"]} text-xs`}>
                   {ch.status || "ร่าง"}
                 </Badge>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="opacity-0 group-hover:opacity-100 h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    deleteChapter.mutate(ch.id);
-                  }}
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="opacity-0 group-hover:opacity-100 h-8 w-8 shrink-0 text-muted-foreground"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <MoreHorizontal className="w-4 h-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-52" onClick={(e) => e.stopPropagation()}>
+                    <DropdownMenuItem onClick={() => downloadChapterTxt(ch.title, ch.content)}>
+                      <Download className="w-3.5 h-3.5 mr-2" />
+                      ดาวน์โหลดเป็น .txt
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => downloadChapterMd(ch.title, ch.content)}>
+                      <Download className="w-3.5 h-3.5 mr-2" />
+                      ดาวน์โหลดเป็น .md
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={async () => {
+                        await copyChapterToClipboard(ch.title, ch.content);
+                        toast.success("คัดลอกแล้ว");
+                      }}
+                    >
+                      <Copy className="w-3.5 h-3.5 mr-2" />
+                      คัดลอกทั้งตอน
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      className="text-destructive focus:text-destructive"
+                      onClick={() => deleteChapter.mutate(ch.id)}
+                    >
+                      <Trash2 className="w-3.5 h-3.5 mr-2" />
+                      ลบตอนนี้
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </motion.div>
             ))}
           </AnimatePresence>
