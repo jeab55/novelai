@@ -11,6 +11,7 @@ import VersionHistoryDialog from "./VersionHistoryDialog";
 import ChapterBalanceMeter from "./ChapterBalanceMeter";
 import SceneTemplateDialog from "./SceneTemplateDialog";
 import QuickNotesPanel from "./QuickNotesPanel";
+import AiEditorReviewPanel from "./AiEditorReviewPanel";
 import { saveVersion } from "@/lib/saveVersion";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -480,6 +481,11 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
           setPreviousContent("");
           queryClient.invalidateQueries({ queryKey: ["chapters", novelId] });
         }}
+      />
+      <AiEditorReviewPanel
+        chapter={{ ...chapter, title, content, plot_event_id: plotEventId, plot_event_title: plotEventTitle, plot_event_description: plotEventDescription, plot_event_order: plotEventOrder }}
+        novel={novel || { title: "" }}
+        novelId={novelId}
       />
       <div className="flex flex-1 overflow-hidden">
         <div className="flex-1 overflow-auto bg-background">
