@@ -32,7 +32,7 @@ const genreColors = {
 
 export default function Dashboard() {
   const [open, setOpen] = useState(false);
-   const [form, setForm] = useState({ title: "", genre: "", synopsis: "", era: "", writer_id: "", target_chapters: "10" });
+   const [form, setForm] = useState({ title: "", genre: "", synopsis: "", era: "", writer_id: "", target_chapters: "10", main_character_count: "3" });
   const [editOpen, setEditOpen] = useState(false);
   const [editForm, setEditForm] = useState({});
   const [editingId, setEditingId] = useState(null);
@@ -78,7 +78,7 @@ export default function Dashboard() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["novels"] });
       setOpen(false);
-      setForm({ title: "", genre: "", synopsis: "", era: "", writer_id: "", target_chapters: "10" });
+      setForm({ title: "", genre: "", synopsis: "", era: "", writer_id: "", target_chapters: "10", main_character_count: "3" });
     },
   });
 
@@ -102,7 +102,8 @@ export default function Dashboard() {
       era: novel.era || "", 
       status: novel.status || "กำลังเขียน", 
       writer_id: novel.writer_id || "",
-      target_chapters: novel.target_chapters || 10
+      target_chapters: novel.target_chapters || 10,
+      main_character_count: novel.main_character_count || 3
     });
     setEditOpen(true);
   };
@@ -198,6 +199,20 @@ export default function Dashboard() {
                       <SelectItem value="20">20 ตอน</SelectItem>
                       <SelectItem value="30">30 ตอน</SelectItem>
                       <SelectItem value="40">40 ตอน</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1.5 block">จำนวนตัวละครหลัก</label>
+                  <Select value={form.main_character_count.toString()} onValueChange={(v) => setForm({ ...form, main_character_count: v })}>
+                    <SelectTrigger><SelectValue placeholder="เลือกจำนวนตัวละคร" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">1 คน</SelectItem>
+                      <SelectItem value="2">2 คน</SelectItem>
+                      <SelectItem value="3">3 คน</SelectItem>
+                      <SelectItem value="4">4 คน</SelectItem>
+                      <SelectItem value="5">5 คน</SelectItem>
+                      <SelectItem value="6">6 คน</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -324,6 +339,20 @@ export default function Dashboard() {
                   <SelectItem value="20">20 ตอน</SelectItem>
                   <SelectItem value="30">30 ตอน</SelectItem>
                   <SelectItem value="40">40 ตอน</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">จำนวนตัวละครหลัก</label>
+              <Select value={(editForm.main_character_count || 3).toString()} onValueChange={(v) => setEditForm({ ...editForm, main_character_count: v })}>
+                <SelectTrigger><SelectValue placeholder="เลือกจำนวนตัวละคร" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">1 คน</SelectItem>
+                  <SelectItem value="2">2 คน</SelectItem>
+                  <SelectItem value="3">3 คน</SelectItem>
+                  <SelectItem value="4">4 คน</SelectItem>
+                  <SelectItem value="5">5 คน</SelectItem>
+                  <SelectItem value="6">6 คน</SelectItem>
                 </SelectContent>
               </Select>
             </div>

@@ -45,6 +45,7 @@ function buildPrompt(novel, writer, characters) {
   const charList = characters.map((c) => `- ${c.name} (${c.role || "ตัวละคร"}): ${c.personality || ""}`).join("\n") || "ยังไม่มีตัวละคร";
   const writerContext = writer?.system_prompt ? `\nสไตล์การเขียน: ${writer.system_prompt}\n` : "";
   const targetChapters = novel.target_chapters || 10;
+  const mainCharCount = novel.main_character_count || 3;
 
   return `${writerContext}
 คุณคือบรรณาธิการที่ช่วยวางโครงเรื่องนิยาย ตอบเป็น JSON เท่านั้น ห้ามมีข้อความอื่นนอก JSON
@@ -55,13 +56,14 @@ function buildPrompt(novel, writer, characters) {
 - เรื่องย่อ: ${novel.synopsis || "ไม่มีเรื่องย่อ"}
 - ยุคสมัย/ฉากหลัง: ${novel.era || "ไม่ระบุ"}
 - จำนวนตอนที่ต้องการ: ${targetChapters} ตอน
+- จำนวนตัวละครหลักที่ต้องการ: ${mainCharCount} คน
 
 ตัวละครที่มีอยู่แล้ว (ห้ามสร้างซ้ำชื่อเหล่านี้):
 ${charList}
 
 งานที่ต้องทำ 2 ส่วน:
 
-[ส่วนที่ 1] สร้างตัวละครหลักของเรื่อง (2-5 คน ตามความเหมาะสม) โดยแต่ละตัวต้องมีฟิลด์:
+[ส่วนที่ 1] สร้างตัวละครหลักของเรื่อง จำนวน ${mainCharCount} คนพอดี (ไม่มากกว่า ไม่น้อยกว่า) โดยแต่ละตัวต้องมีฟิลด์:
 - name: ชื่อตัวละคร
 - role: บทบาท (ตัวเอก / ตัวรอง / ตัวร้าย / ตัวประกอบ)
 - age: อายุ (ข้อความ เช่น "25 ปี")
