@@ -486,6 +486,10 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
         chapter={{ ...chapter, title, content, plot_event_id: plotEventId, plot_event_title: plotEventTitle, plot_event_description: plotEventDescription, plot_event_order: plotEventOrder }}
         novel={novel || { title: "" }}
         novelId={novelId}
+        onContentUpdate={(revised) => {
+          setContent(revised);
+          queryClient.invalidateQueries({ queryKey: ["chapters", novelId] });
+        }}
       />
       <div className="flex flex-1 overflow-hidden">
         <div className="flex-1 overflow-auto bg-background">
