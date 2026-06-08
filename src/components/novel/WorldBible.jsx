@@ -7,10 +7,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, Globe, Trash2, Edit2, MapPin, Crown, Scroll, Package, Settings, HelpCircle, Loader2, History } from "lucide-react";
+import { Plus, Globe, Trash2, Edit2, MapPin, Crown, Scroll, Package, Settings, HelpCircle, Loader2, History, BookOpen, ChevronDown, ChevronUp, CheckCircle2 } from "lucide-react";
 import VersionHistoryDialog from "./VersionHistoryDialog";
 import { saveVersion } from "@/lib/saveVersion";
 import { motion, AnimatePresence } from "framer-motion";
+import { ERA_TEMPLATES } from "./EraTemplates";
 
 const CATEGORIES = ["สถานที่", "ขนบธรรมเนียม", "ยุคสมัย", "สิ่งของ", "ระบบ", "อื่นๆ"];
 
@@ -38,6 +39,10 @@ export default function WorldBible({ novelId }) {
   const [form, setForm] = useState({ title: "", category: "", description: "" });
   const [filterCat, setFilterCat] = useState("ทั้งหมด");
   const [versionEntry, setVersionEntry] = useState(null);
+  const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
+  const [selectedEra, setSelectedEra] = useState(null);
+  const [importingEra, setImportingEra] = useState(false);
+  const [importDone, setImportDone] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: entries = [], isLoading } = useQuery({
@@ -81,6 +86,27 @@ export default function WorldBible({ novelId }) {
 
   const filtered = filterCat === "ทั้งหมด" ? entries : entries.filter((e) => e.category === filterCat);
 
+  const handleImportEra = async () => {
+    if (!selectedEra) return;
+    setImportingEra(true);
+    const era = ERA_TEMPLATES.find((t) => t.label === selectedEra);
+    if (era) {
+      await Promise.all(
+        era.entries.map((entry) =>
+          base44.entities.WorldEntry.create({ ...entry, novel_id: novelId })
+        )
+      );
+      queryClient.invalidateQueries({ queryKey: ["worldEntries", novelId] });
+    }
+    setImportingEra(false);
+    setImportDone(true);
+    setTimeout(() => {
+      setImportDone(false);
+      setTemplatePickerOpen(false);
+      setSelectedEra(null);
+    }, 1500);
+  };
+
   return (
     <div className="max-w-4xl mx-auto px-4 py-6">
       {versionEntry && (
@@ -100,6 +126,12 @@ export default function WorldBible({ novelId }) {
           <h2 className="font-heading text-lg font-semibold">โลกและฉาก</h2>
           <p className="text-sm text-muted-foreground">{entries.length} รายการ</p>
         </div>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" className="gap-1.5 border-amber-300 text-amber-700 hover:bg-amber-50" onClick={() => { setTemplatePickerOpen((v) => !v); setImportDone(false); setSelectedEra(null); }}>
+            <BookOpen className="w-3.5 h-3.5" />
+            เทมเพลตยุคสมัย
+            {templatePickerOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+          </Button>
         <Dialog open={dialogOpen} onOpenChange={(v) => { setDialogOpen(v); if (!v) { setEditing(null); setForm({ title: "", category: "", description: "" }); } }}>
           <DialogTrigger asChild>
             <Button size="sm" className="gap-1.5"><Plus className="w-3.5 h-3.5" />เพิ่มข้อมูล</Button>
@@ -132,7 +164,49 @@ export default function WorldBible({ novelId }) {
             </div>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
+
+      {/* Era Template Picker */}
+      {templatePickerOpen && (
+        <div className="mb-5 border border-amber-200 rounded-xl p-4 bg-amber-50/60">
+          <p className="text-sm font-semibold text-amber-900 mb-3">เลือกยุคสมัยที่ต้องการเติมข้อมูลพื้นหลัง</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-4">
+            {ERA_TEMPLATES.map((era) => (
+              <button
+                key={era.label}
+                onClick={() => setSelectedEra(era.label)}
+                className={`text-left px-3 py-2 rounded-lg border text-sm transition-all ${selectedEra === era.label ? "border-amber-500 bg-amber-100 text-amber-900 font-medium" : "border-amber-200 bg-white text-foreground hover:border-amber-400 hover:bg-amber-50"}`}
+              >
+                {era.label}
+                <span className="block text-xs text-muted-foreground mt-0.5">{era.entries.length} รายการ</span>
+              </button>
+            ))}
+          </div>
+          {selectedEra && (
+            <div className="mb-3 bg-white/70 rounded-lg border border-amber-200 p-3">
+              <p className="text-xs font-medium text-amber-800 mb-1.5">รายการที่จะเพิ่ม:</p>
+              <ul className="space-y-0.5">
+                {ERA_TEMPLATES.find((t) => t.label === selectedEra)?.entries.map((e, i) => (
+                  <li key={i} className="text-xs text-muted-foreground flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+                    <span className="font-medium">[{e.category}]</span> {e.title}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <Button
+            size="sm"
+            className="gap-1.5 bg-amber-600 hover:bg-amber-700 text-white"
+            disabled={!selectedEra || importingEra || importDone}
+            onClick={handleImportEra}
+          >
+            {importingEra ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : importDone ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+            {importDone ? "เพิ่มสำเร็จแล้ว!" : importingEra ? "กำลังเพิ่ม..." : "เพิ่มข้อมูลยุคสมัยนี้"}
+          </Button>
+        </div>
+      )}
 
       {/* Filter */}
       <div className="flex gap-2 mb-4 flex-wrap">
