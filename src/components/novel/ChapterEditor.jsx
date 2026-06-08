@@ -3,13 +3,14 @@ import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Save, Loader2, Download, Copy, MoreHorizontal, Maximize2, Minimize2, Sparkles, Clock, X, RefreshCw, Volume2, History, PieChart, FileText } from "lucide-react";
+import { ArrowLeft, Save, Loader2, Download, Copy, MoreHorizontal, Maximize2, Minimize2, Sparkles, Clock, X, RefreshCw, Volume2, History, PieChart, FileText, StickyNote } from "lucide-react";
 import AiDraftDialog from "./AiDraftDialog";
 import EditorReviewPanel from "./EditorReviewPanel";
 import TextToSpeechPanel from "./TextToSpeechPanel";
 import VersionHistoryDialog from "./VersionHistoryDialog";
 import ChapterBalanceMeter from "./ChapterBalanceMeter";
 import SceneTemplateDialog from "./SceneTemplateDialog";
+import QuickNotesPanel from "./QuickNotesPanel";
 import { saveVersion } from "@/lib/saveVersion";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -54,6 +55,7 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
   const [editorReview, setEditorReview] = useState(chapter.editor_review || "");
   const [balanceOpen, setBalanceOpen] = useState(false);
   const [templateOpen, setTemplateOpen] = useState(false);
+  const [notesOpen, setNotesOpen] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: plotEvents = [] } = useQuery({
@@ -204,6 +206,18 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
         >
           <FileText className="w-3.5 h-3.5" />
           เทมเพลต
+        </Button>
+
+        {/* Quick Notes button */}
+        <Button
+          variant="outline"
+          size="sm"
+          className={`gap-1.5 h-8 text-xs border-amber-300 hover:bg-amber-50 ${notesOpen ? "bg-amber-100 text-amber-800" : "text-amber-700"}`}
+          onClick={() => setNotesOpen((v) => !v)}
+          title="บันทึกย่อ"
+        >
+          <StickyNote className="w-3.5 h-3.5" />
+          โน้ต
         </Button>
 
         {/* AI Draft button */}
@@ -467,24 +481,29 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
           queryClient.invalidateQueries({ queryKey: ["chapters", novelId] });
         }}
       />
-      <div className="flex-1 overflow-auto bg-background">
-        <div className="mx-auto px-8 py-10" style={{ maxWidth: "720px" }}>
-          <textarea
-            value={content}
-            onChange={(e) => {
-              setContent(e.target.value);
-              debouncedAutoSave(e.target.value);
-            }}
-            placeholder="เริ่มเขียนเรื่องราวของคุณที่นี่..."
-            className="w-full min-h-[65vh] bg-transparent border-none outline-none resize-none placeholder:text-muted-foreground/40"
-            style={{
-              fontFamily: "'Sarabun', 'Noto Sans Thai', sans-serif",
-              fontSize: "19px",
-              lineHeight: "1.9",
-              color: "hsl(25, 20%, 15%)",
-            }}
-          />
+      <div className="flex flex-1 overflow-hidden">
+        <div className="flex-1 overflow-auto bg-background">
+          <div className="mx-auto px-8 py-10" style={{ maxWidth: "720px" }}>
+            <textarea
+              value={content}
+              onChange={(e) => {
+                setContent(e.target.value);
+                debouncedAutoSave(e.target.value);
+              }}
+              placeholder="เริ่มเขียนเรื่องราวของคุณที่นี่..."
+              className="w-full min-h-[65vh] bg-transparent border-none outline-none resize-none placeholder:text-muted-foreground/40"
+              style={{
+                fontFamily: "'Sarabun', 'Noto Sans Thai', sans-serif",
+                fontSize: "19px",
+                lineHeight: "1.9",
+                color: "hsl(25, 20%, 15%)",
+              }}
+            />
+          </div>
         </div>
+        {notesOpen && (
+          <QuickNotesPanel novelId={novelId} onClose={() => setNotesOpen(false)} />
+        )}
       </div>
     </div>
     </>
