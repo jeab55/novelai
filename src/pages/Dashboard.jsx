@@ -32,7 +32,7 @@ const genreColors = {
 
 export default function Dashboard() {
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ title: "", genre: "", synopsis: "", era: "", writer_id: "", target_chapters: 10 });
+   const [form, setForm] = useState({ title: "", genre: "", synopsis: "", era: "", writer_id: "", target_chapters: "10" });
   const [editOpen, setEditOpen] = useState(false);
   const [editForm, setEditForm] = useState({});
   const [editingId, setEditingId] = useState(null);
@@ -78,7 +78,7 @@ export default function Dashboard() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["novels"] });
       setOpen(false);
-      setForm({ title: "", genre: "", synopsis: "", era: "", writer_id: "" });
+      setForm({ title: "", genre: "", synopsis: "", era: "", writer_id: "", target_chapters: "10" });
     },
   });
 
@@ -191,7 +191,7 @@ export default function Dashboard() {
                 </div>
                 <div>
                   <label className="text-sm font-medium mb-1.5 block">จำนวนตอนที่ต้องการ</label>
-                  <Select value={form.target_chapters} onValueChange={(v) => setForm({ ...form, target_chapters: Number(v) })}>
+                  <Select value={form.target_chapters.toString()} onValueChange={(v) => setForm({ ...form, target_chapters: v })}>
                     <SelectTrigger><SelectValue placeholder="เลือกจำนวนตอน" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="10">10 ตอน</SelectItem>
@@ -317,7 +317,7 @@ export default function Dashboard() {
             </div>
             <div>
               <label className="text-sm font-medium mb-1.5 block">จำนวนตอนที่ต้องการ</label>
-              <Select value={editForm.target_chapters || 10} onValueChange={(v) => setEditForm({ ...editForm, target_chapters: Number(v) })}>
+              <Select value={(editForm.target_chapters || 10).toString()} onValueChange={(v) => setEditForm({ ...editForm, target_chapters: v })}>
                 <SelectTrigger><SelectValue placeholder="เลือกจำนวนตอน" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="10">10 ตอน</SelectItem>
