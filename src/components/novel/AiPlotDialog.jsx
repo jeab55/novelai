@@ -51,7 +51,21 @@ function buildPrompt(novel, writer, characters) {
 
   const preEnteredSection = preEnteredChars.length > 0
     ? `ตัวละครที่ผู้ใช้กำหนดไว้แล้ว (ต้องใช้ตามนี้ ห้ามตัดหรือเปลี่ยนชื่อ — เติมรายละเอียดที่ขาดให้ครบ):
-${preEnteredChars.map((c) => `- ${c.name} (${c.role || "ตัวละคร"})${c.age ? ` อายุ ${c.age} [คงไว้]` : ""}${c.occupation ? ` อาชีพ: ${c.occupation} [คงไว้]` : ""}${c.personality ? ` อุปนิสัย: ${c.personality} [คงไว้]` : ""} — เติมที่ขาด: ${[!c.age && "อายุ", !c.occupation && "อาชีพ", !c.personality && "อุปนิสัย", "ลักษณะภายนอก ปูมหลัง want need ปม"].filter(Boolean).join(", ")}`).join("\n")}`
+${preEnteredChars.map((c) => {
+      const fixed = [
+        c.age ? `อายุ ${c.age}` : null,
+        c.occupation ? `อาชีพ: ${c.occupation}` : null,
+        c.personality ? `อุปนิสัย: ${c.personality}` : null,
+        c.background ? `ปูมหลัง: ${c.background}` : null,
+        c.wound ? `ปม/บาดแผล: ${c.wound}` : null,
+        c.desire ? `สิ่งที่ต้องการ: ${c.desire}` : null,
+      ].filter(Boolean);
+      const missing = [
+        !c.age && "อายุ", !c.occupation && "อาชีพ", !c.personality && "อุปนิสัย",
+        !c.background && "ปูมหลัง", !c.wound && "ปม", !c.desire && "desire", "ลักษณะภายนอก"
+      ].filter(Boolean);
+      return `- ${c.name} (${c.role || "ตัวละคร"})${fixed.length ? " [คงไว้] " + fixed.join(", ") : ""} — เติมที่ขาด: ${missing.join(", ")}`;
+    }).join("\n")}`
     : "";
 
   const fullCharSection = fullChars.length > 0
