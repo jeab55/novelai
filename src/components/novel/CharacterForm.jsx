@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { saveVersion } from "@/lib/saveVersion";
+import { Sparkles, Loader2, ChevronDown, ChevronUp } from "lucide-react";
+import ReactMarkdown from "react-markdown";
 
 const ROLES = ["ตัวเอก", "ตัวรอง", "ตัวร้าย", "ตัวประกอบ"];
 
@@ -21,6 +23,9 @@ export default function CharacterForm({ novelId, character, onDone, novelIdForVe
     wound: character?.wound || "",
     relationships: character?.relationships || "",
   });
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analysis, setAnalysis] = useState(null);
+  const [analysisOpen, setAnalysisOpen] = useState(true);
   const queryClient = useQueryClient();
 
   const mutation = useMutation({
@@ -45,6 +50,40 @@ export default function CharacterForm({ novelId, character, onDone, novelIdForVe
   });
 
   const set = (field, value) => setForm((p) => ({ ...p, [field]: value }));
+
+  const handleAnalyze = async () => {
+    if (!form.name) return;
+    setAnalyzing(true);
+    setAnalysis(null);
+    const charDesc = [
+      form.name && `ชื่อ: ${form.name}`,
+      form.role && `บทบาท: ${form.role}`,
+      form.age && `อายุ: ${form.age}`,
+      form.appearance && `ลักษณะ: ${form.appearance}`,
+      form.personality && `นิสัย: ${form.personality}`,
+      form.background && `ปูมหลัง: ${form.background}`,
+      form.desire && `สิ่งที่ต้องการ (Want): ${form.desire}`,
+      form.wound && `ปม/บาดแผล (Wound/Need): ${form.wound}`,
+      form.relationships && `ความสัมพันธ์: ${form.relationships}`,
+    ].filter(Boolean).join("\n");
+
+    const prompt = `คุณคือนักวิเคราะห์ตัวละครในนิยายมืออาชีพ วิเคราะห์ตัวละครต่อไปนี้อย่างละเอียด:
+
+${charDesc}
+
+วิเคราะห์ใน 4 หัวข้อนี้:
+1. **จุดแข็ง** — สิ่งที่น่าสนใจและโดดเด่น
+2. **Want vs Need** — ความต้องการที่รับรู้ vs ความต้องการที่แท้จริง และความขัดแย้งภายใน
+3. **Character Arc** — เส้นทางการเติบโตที่เป็นไปได้ และจุดหักเหที่น่าสนใจ
+4. **คำแนะนำ** — สิ่งที่ควรเติมเพื่อทำให้ตัวละครสมบูรณ์และสมจริงยิ่งขึ้น
+
+ตอบเป็นภาษาไทย กระชับ ตรงประเด็น`;
+
+    const result = await base44.integrations.Core.InvokeLLM({ prompt });
+    setAnalysis(result);
+    setAnalysisOpen(true);
+    setAnalyzing(false);
+  };
 
   const fields = [
     { key: "name", label: "ชื่อตัวละคร", type: "input", placeholder: "เช่น เจ้าพระยาวิชาเยนทร์" },
@@ -85,6 +124,41 @@ export default function CharacterForm({ novelId, character, onDone, novelIdForVe
             )}
           </div>
         ))}
+
+        {/* Analyze button */}
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full gap-2 border-primary/30 text-primary hover:bg-primary/5"
+          onClick={handleAnalyze}
+          disabled={!form.name || analyzing}
+        >
+          {analyzing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+          {analyzing ? "กำลังวิเคราะห์..." : "วิเคราะห์ตัวละครด้วย AI"}
+        </Button>
+
+        {/* Analysis result */}
+        {analysis && (
+          <div className="rounded-xl border border-primary/20 bg-primary/4 overflow-hidden">
+            <button
+              type="button"
+              className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold text-primary hover:bg-primary/8 transition-colors"
+              onClick={() => setAnalysisOpen((v) => !v)}
+            >
+              <span className="flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5" />
+                ผลวิเคราะห์ AI
+              </span>
+              {analysisOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </button>
+            {analysisOpen && (
+              <div className="px-4 pb-4 text-sm prose prose-sm max-w-none [&>*:first-child]:mt-0 text-foreground/90">
+                <ReactMarkdown>{analysis}</ReactMarkdown>
+              </div>
+            )}
+          </div>
+        )}
+
         <Button type="submit" className="w-full" disabled={!form.name || mutation.isPending}>
           {mutation.isPending ? "กำลังบันทึก..." : character ? "อัปเดต" : "เพิ่มตัวละคร"}
         </Button>
