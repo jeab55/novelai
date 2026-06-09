@@ -47,7 +47,10 @@ export default function WorldBible({ novelId }) {
 
   const { data: entries = [], isLoading } = useQuery({
     queryKey: ["worldEntries", novelId],
-    queryFn: () => base44.entities.WorldEntry.filter({ novel_id: novelId }),
+    queryFn: async () => {
+      const all = await base44.entities.WorldEntry.filter({ novel_id: novelId });
+      return all.filter((e) => !e.is_deleted);
+    },
   });
 
   const saveMutation = useMutation({
@@ -74,7 +77,7 @@ export default function WorldBible({ novelId }) {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id) => base44.entities.WorldEntry.delete(id),
+    mutationFn: (id) => base44.entities.WorldEntry.update(id, { is_deleted: true }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["worldEntries", novelId] }),
   });
 

@@ -213,15 +213,21 @@ export default function AiPlotDialog({ open, onClose, novel, novelId, onOpenChap
 
   const { data: worldEntries = [] } = useQuery({
     queryKey: ["worldEntries", novelId],
-    queryFn: () => base44.entities.WorldEntry.filter({ novel_id: novelId }),
+    queryFn: async () => {
+      const all = await base44.entities.WorldEntry.filter({ novel_id: novelId });
+      return all.filter((w) => !w.is_deleted);
+    },
     enabled: !!novelId,
   });
 
   const { data: existingChapters = [] } = useQuery({
     queryKey: ["chapters", novelId],
-    queryFn: () => base44.entities.Chapter.filter({ novel_id: novelId }, "order"),
+    queryFn: async () => {
+      const all = await base44.entities.Chapter.filter({ novel_id: novelId }, "order");
+      return all.filter((c) => !c.is_deleted);
+    },
     enabled: !!novelId,
-    staleTime: 30000, // Cache for 30s — prevents re-fetching on every draft invalidation
+    staleTime: 30000,
   });
 
   const { data: existingEvents = [] } = useQuery({

@@ -145,7 +145,10 @@ export default function AiDraftDialog({ open, onClose, chapter, novel, novelId, 
   });
   const { data: worldEntries = [] } = useQuery({
     queryKey: ["worldEntries", novelId],
-    queryFn: () => base44.entities.WorldEntry.filter({ novel_id: novelId }),
+    queryFn: async () => {
+      const all = await base44.entities.WorldEntry.filter({ novel_id: novelId });
+      return all.filter((w) => !w.is_deleted);
+    },
     enabled: open,
   });
   const { data: plotEvents = [] } = useQuery({

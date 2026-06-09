@@ -172,16 +172,18 @@ export default function Dashboard() {
     mutationFn: async (id) => {
       const deletedAt = new Date().toISOString();
       await base44.entities.Novel.update(id, { is_deleted: true, deleted_at: deletedAt });
-      // Mark all child records as deleted too
-      const [chapters, characters, plotEvents] = await Promise.all([
+      // Mark all child records as deleted too (cascade soft delete)
+      const [chapters, characters, plotEvents, worldEntries] = await Promise.all([
         base44.entities.Chapter.filter({ novel_id: id }),
         base44.entities.Character.filter({ novel_id: id }),
         base44.entities.PlotEvent.filter({ novel_id: id }),
+        base44.entities.WorldEntry.filter({ novel_id: id }),
       ]);
       await Promise.all([
         ...chapters.map((c) => base44.entities.Chapter.update(c.id, { is_deleted: true })),
         ...characters.map((c) => base44.entities.Character.update(c.id, { is_deleted: true })),
         ...plotEvents.map((e) => base44.entities.PlotEvent.update(e.id, { is_deleted: true })),
+        ...worldEntries.map((w) => base44.entities.WorldEntry.update(w.id, { is_deleted: true })),
       ]);
     },
     onSuccess: () => {
