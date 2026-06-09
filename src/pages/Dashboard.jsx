@@ -11,43 +11,55 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, BookOpen, Feather, Pencil, LogOut, Trash2, Share2, X } from "lucide-react";
 
 const CHAR_ROLES = ["ตัวเอก", "ตัวรอง", "ตัวร้าย", "ตัวประกอบ"];
-const emptyChar = () => ({ name: "", role: "ตัวเอก", age: "", occupation: "" });
+const emptyChar = () => ({ name: "", role: "ตัวเอก", age: "", occupation: "", personality: "" });
 
 function CharacterInputList({ chars, onChange }) {
   const addRow = () => onChange([...chars, emptyChar()]);
   const removeRow = (i) => onChange(chars.filter((_, idx) => idx !== i));
   const updateRow = (i, field, value) => onChange(chars.map((c, idx) => idx === i ? { ...c, [field]: value } : c));
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       {chars.map((c, i) => (
-        <div key={i} className="flex items-center gap-2">
-          <Input
-            placeholder="ชื่อตัวละคร"
-            value={c.name}
-            onChange={(e) => updateRow(i, "name", e.target.value)}
-            className="flex-1 h-8 text-sm"
-          />
-          <Select value={c.role} onValueChange={(v) => updateRow(i, "role", v)}>
-            <SelectTrigger className="w-28 h-8 text-xs"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {CHAR_ROLES.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <Input
-            placeholder="อายุ"
-            value={c.age}
-            onChange={(e) => updateRow(i, "age", e.target.value)}
-            className="w-16 h-8 text-xs"
-          />
-          <Input
-            placeholder="อาชีพ"
-            value={c.occupation}
-            onChange={(e) => updateRow(i, "occupation", e.target.value)}
-            className="w-20 h-8 text-xs"
-          />
-          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive shrink-0" onClick={() => removeRow(i)}>
-            <X className="w-3.5 h-3.5" />
-          </Button>
+        <div key={i} className="border border-border/50 rounded-lg p-2.5 space-y-2 bg-muted/20">
+          {/* Row 1: ชื่อ + บทบาท + ปุ่มลบ */}
+          <div className="flex items-center gap-2">
+            <Input
+              placeholder="ชื่อตัวละคร"
+              value={c.name}
+              onChange={(e) => updateRow(i, "name", e.target.value)}
+              className="flex-1 h-8 text-sm"
+            />
+            <Select value={c.role} onValueChange={(v) => updateRow(i, "role", v)}>
+              <SelectTrigger className="w-28 h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {CHAR_ROLES.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive shrink-0" onClick={() => removeRow(i)}>
+              <X className="w-3.5 h-3.5" />
+            </Button>
+          </div>
+          {/* Row 2: อายุ + อาชีพ + อุปนิสัย */}
+          <div className="flex items-center gap-2">
+            <Input
+              placeholder="อายุ"
+              value={c.age}
+              onChange={(e) => updateRow(i, "age", e.target.value)}
+              className="w-16 h-8 text-xs"
+            />
+            <Input
+              placeholder="อาชีพ"
+              value={c.occupation}
+              onChange={(e) => updateRow(i, "occupation", e.target.value)}
+              className="w-24 h-8 text-xs"
+            />
+            <Input
+              placeholder="อุปนิสัย/บุคลิก"
+              value={c.personality}
+              onChange={(e) => updateRow(i, "personality", e.target.value)}
+              className="flex-1 h-8 text-xs"
+            />
+          </div>
         </div>
       ))}
       <Button variant="outline" size="sm" className="gap-1.5 text-xs h-7 mt-1" onClick={addRow}>
@@ -129,7 +141,7 @@ export default function Dashboard() {
       if (charsToSave.length > 0) {
         await Promise.all(
           charsToSave.map((c) =>
-            base44.entities.Character.create({ novel_id: novel.id, name: c.name.trim(), role: c.role, age: c.age || undefined, occupation: c.occupation || undefined })
+            base44.entities.Character.create({ novel_id: novel.id, name: c.name.trim(), role: c.role, age: c.age || undefined, occupation: c.occupation || undefined, personality: c.personality || undefined })
           )
         );
       }

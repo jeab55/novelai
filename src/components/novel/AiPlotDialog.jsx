@@ -51,7 +51,7 @@ function buildPrompt(novel, writer, characters) {
 
   const preEnteredSection = preEnteredChars.length > 0
     ? `ตัวละครที่ผู้ใช้กำหนดไว้แล้ว (ต้องใช้ตามนี้ ห้ามตัดหรือเปลี่ยนชื่อ — เติมรายละเอียดที่ขาดให้ครบ):
-${preEnteredChars.map((c) => `- ${c.name} (${c.role || "ตัวละคร"})${c.age ? ` อายุ ${c.age} [คงไว้]` : ""}${c.occupation ? ` อาชีพ: ${c.occupation} [คงไว้]` : ""} — เติมที่ขาด: ${[!c.age && "อายุ", !c.occupation && "อาชีพ", "ลักษณะภายนอก นิสัย ปูมหลัง want need ปม"].filter(Boolean).join(", ")}`).join("\n")}`
+${preEnteredChars.map((c) => `- ${c.name} (${c.role || "ตัวละคร"})${c.age ? ` อายุ ${c.age} [คงไว้]` : ""}${c.occupation ? ` อาชีพ: ${c.occupation} [คงไว้]` : ""}${c.personality ? ` อุปนิสัย: ${c.personality} [คงไว้]` : ""} — เติมที่ขาด: ${[!c.age && "อายุ", !c.occupation && "อาชีพ", !c.personality && "อุปนิสัย", "ลักษณะภายนอก ปูมหลัง want need ปม"].filter(Boolean).join(", ")}`).join("\n")}`
     : "";
 
   const fullCharSection = fullChars.length > 0
