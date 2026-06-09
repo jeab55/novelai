@@ -15,20 +15,26 @@ export default function ContinuityChecker({ novelId, chapter, onClose }) {
 
   const { data: characters = [] } = useQuery({
     queryKey: ["characters", novelId],
-    queryFn: () => base44.entities.Character.filter({ novel_id: novelId }),
-    enabled: open,
+    queryFn: async () => {
+      const all = await base44.entities.Character.filter({ novel_id: novelId });
+      return all.filter((c) => !c.is_deleted);
+    },
   });
 
   const { data: events = [] } = useQuery({
     queryKey: ["plotEvents", novelId],
-    queryFn: () => base44.entities.PlotEvent.filter({ novel_id: novelId }, "order"),
-    enabled: open,
+    queryFn: async () => {
+      const all = await base44.entities.PlotEvent.filter({ novel_id: novelId }, "order");
+      return all.filter((e) => !e.is_deleted);
+    },
   });
 
   const { data: chapters = [] } = useQuery({
     queryKey: ["chapters", novelId],
-    queryFn: () => base44.entities.Chapter.filter({ novel_id: novelId }, "order"),
-    enabled: open,
+    queryFn: async () => {
+      const all = await base44.entities.Chapter.filter({ novel_id: novelId }, "order");
+      return all.filter((c) => !c.is_deleted);
+    },
   });
 
   const checkContinuity = async () => {
