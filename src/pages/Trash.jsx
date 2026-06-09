@@ -42,7 +42,20 @@ export default function Trash() {
   });
 
   const restoreMutation = useMutation({
-    mutationFn: (id) => base44.entities.Novel.update(id, { is_deleted: false, deleted_at: "" }),
+    mutationFn: async (id) => {
+      await base44.entities.Novel.update(id, { is_deleted: false, deleted_at: "" });
+      // Restore all child records
+      const [chapters, characters, plotEvents] = await Promise.all([
+        base44.entities.Chapter.filter({ novel_id: id }),
+        base44.entities.Character.filter({ novel_id: id }),
+        base44.entities.PlotEvent.filter({ novel_id: id }),
+      ]);
+      await Promise.all([
+        ...chapters.map((c) => base44.entities.Chapter.update(c.id, { is_deleted: false })),
+        ...characters.map((c) => base44.entities.Character.update(c.id, { is_deleted: false })),
+        ...plotEvents.map((e) => base44.entities.PlotEvent.update(e.id, { is_deleted: false })),
+      ]);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["novels"] });
       queryClient.invalidateQueries({ queryKey: ["novels-trash"] });

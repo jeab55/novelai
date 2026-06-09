@@ -204,7 +204,10 @@ export default function AiPlotDialog({ open, onClose, novel, novelId, onOpenChap
 
   const { data: characters = [] } = useQuery({
     queryKey: ["characters", novelId],
-    queryFn: () => base44.entities.Character.filter({ novel_id: novelId }),
+    queryFn: async () => {
+      const all = await base44.entities.Character.filter({ novel_id: novelId });
+      return all.filter((c) => !c.is_deleted);
+    },
     enabled: !!novelId,
   });
 
@@ -223,7 +226,10 @@ export default function AiPlotDialog({ open, onClose, novel, novelId, onOpenChap
 
   const { data: existingEvents = [] } = useQuery({
     queryKey: ["plotEvents", novelId],
-    queryFn: () => base44.entities.PlotEvent.filter({ novel_id: novelId }, "order"),
+    queryFn: async () => {
+      const all = await base44.entities.PlotEvent.filter({ novel_id: novelId }, "order");
+      return all.filter((e) => !e.is_deleted);
+    },
     enabled: !!novelId,
   });
 
@@ -248,8 +254,10 @@ export default function AiPlotDialog({ open, onClose, novel, novelId, onOpenChap
         )
       );
 
-      // Save checked characters
-      const charsToSave = aiCharacters.filter((c) => c.checked && c.name);
+      // Save checked characters — skip any that already exist (by name, case-insensitive)
+      const currentChars = await base44.entities.Character.filter({ novel_id: novelId });
+      const existingNameSet = new Set(currentChars.map((c) => c.name.toLowerCase().trim()));
+      const charsToSave = aiCharacters.filter((c) => c.checked && c.name && !existingNameSet.has(c.name.toLowerCase().trim()));
       if (charsToSave.length > 0) {
         await Promise.all(
           charsToSave.map((c) =>
@@ -281,7 +289,7 @@ export default function AiPlotDialog({ open, onClose, novel, novelId, onOpenChap
   });
 
   const generate = async () => {
-    if (!novel) return;
+    if (!novel || step === "generating") return;
     setStep("generating");
     setParseError("");
 
@@ -480,7 +488,7 @@ export default function AiPlotDialog({ open, onClose, novel, novelId, onOpenChap
                   ✍️ ใช้สไตล์ของ <strong>{writer.name}</strong>
                 </p>
               )}
-              <Button onClick={generate} className="gap-2 mt-2">
+              <Button onClick={generate} disabled={step === "generating"} className="gap-2 mt-2">
                 <Sparkles className="w-4 h-4" />
                 เริ่มวางพล็อต
               </Button>

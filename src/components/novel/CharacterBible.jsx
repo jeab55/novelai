@@ -30,7 +30,10 @@ export default function CharacterBible({ novelId }) {
 
   const { data: characters = [], isLoading } = useQuery({
     queryKey: ["characters", novelId],
-    queryFn: () => base44.entities.Character.filter({ novel_id: novelId }),
+    queryFn: async () => {
+      const all = await base44.entities.Character.filter({ novel_id: novelId });
+      return all.filter((c) => !c.is_deleted);
+    },
   });
 
   const deleteMutation = useMutation({

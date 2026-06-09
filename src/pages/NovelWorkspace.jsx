@@ -60,7 +60,17 @@ export default function NovelWorkspace() {
           createdByName: user?.full_name || "",
         });
       }
-      return base44.entities.Novel.update(novelId, { is_deleted: true, deleted_at: new Date().toISOString() });
+      await base44.entities.Novel.update(novelId, { is_deleted: true, deleted_at: new Date().toISOString() });
+      const [chapters, characters, plotEvents] = await Promise.all([
+        base44.entities.Chapter.filter({ novel_id: novelId }),
+        base44.entities.Character.filter({ novel_id: novelId }),
+        base44.entities.PlotEvent.filter({ novel_id: novelId }),
+      ]);
+      await Promise.all([
+        ...chapters.map((c) => base44.entities.Chapter.update(c.id, { is_deleted: true })),
+        ...characters.map((c) => base44.entities.Character.update(c.id, { is_deleted: true })),
+        ...plotEvents.map((e) => base44.entities.PlotEvent.update(e.id, { is_deleted: true })),
+      ]);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["novels"] });
