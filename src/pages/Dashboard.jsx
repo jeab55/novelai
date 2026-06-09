@@ -277,7 +277,7 @@ export default function Dashboard() {
               <DialogHeader className="px-6 pt-5 pb-4 border-b border-border/40 shrink-0">
                 <DialogTitle className="font-heading text-lg">สร้างนิยายเรื่องใหม่</DialogTitle>
               </DialogHeader>
-              <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+              <div className="flex-1 overflow-y-auto px-6 pt-4 pb-8 space-y-4">
                 <div>
                   <label className="text-sm font-medium mb-1.5 block">ชื่อเรื่อง</label>
                   <Input
@@ -352,7 +352,7 @@ export default function Dashboard() {
                   )}
                 </div>
               </div>
-              <div className="px-6 py-4 border-t border-border/40 shrink-0 bg-background">
+              <div className="px-6 py-4 border-t border-border/40 shrink-0 bg-background relative z-10">
                 <Button
                   className="w-full"
                   onClick={() => createMutation.mutate(form)}
