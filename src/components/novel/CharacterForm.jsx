@@ -152,10 +152,26 @@ ${charDesc}
               {analysisOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
             </button>
             {analysisOpen && (
-              <div className="px-4 pb-4 text-sm prose prose-sm max-w-none [&>*:first-child]:mt-0 text-foreground/90">
+              <div className="px-4 pb-3 text-sm prose prose-sm max-w-none [&>*:first-child]:mt-0 text-foreground/90">
                 <ReactMarkdown>{analysis}</ReactMarkdown>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="mt-2 gap-1.5 border-primary/30 text-primary hover:bg-primary/8 text-xs"
+                  onClick={() => set("ai_analysis", analysis)}
+                >
+                  <Sparkles className="w-3 h-3" />
+                  บันทึกผลวิเคราะห์นี้ไว้กับตัวละคร
+                </Button>
               </div>
             )}
+          </div>
+        )}
+        {form.ai_analysis && !analysis && (
+          <div className="rounded-xl border border-border/50 bg-muted/20 p-3 text-xs text-muted-foreground">
+            <p className="font-medium text-foreground/70 mb-1 flex items-center gap-1"><Sparkles className="w-3 h-3" />ผลวิเคราะห์ที่บันทึกไว้</p>
+            <p className="line-clamp-3">{form.ai_analysis}</p>
           </div>
         )}
 

@@ -142,6 +142,16 @@ function CharacterCard({ c, i, onUpdate, onRemove }) {
           {analysisOpen && (
             <div className="px-3 pb-3 text-xs prose prose-sm max-w-none [&>*:first-child]:mt-0 text-foreground/90">
               <ReactMarkdown>{analysis}</ReactMarkdown>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="mt-2 gap-1.5 border-primary/30 text-primary hover:bg-primary/8 text-xs h-7"
+                onClick={() => onUpdate("ai_analysis", analysis)}
+              >
+                <Sparkles className="w-3 h-3" />
+                บันทึกผลวิเคราะห์นี้ไว้กับตัวละคร
+              </Button>
             </div>
           )}
         </div>
@@ -273,7 +283,7 @@ export default function Dashboard() {
       if (charsToSave.length > 0) {
         await Promise.all(
           charsToSave.map((c) =>
-            base44.entities.Character.create({ novel_id: novel.id, name: c.name.trim(), role: c.role, age: c.age || undefined, occupation: c.occupation || undefined, personality: c.personality || undefined, background: c.background || undefined, wound: c.wound || undefined, desire: c.desire || undefined })
+            base44.entities.Character.create({ novel_id: novel.id, name: c.name.trim(), role: c.role, age: c.age || undefined, occupation: c.occupation || undefined, personality: c.personality || undefined, background: c.background || undefined, wound: c.wound || undefined, desire: c.desire || undefined, ai_analysis: c.ai_analysis || undefined })
           )
         );
       }
