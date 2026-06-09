@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, BookOpen, Feather, Pencil, LogOut, Trash2, Share2, X } from "lucide-react";
 
 const CHAR_ROLES = ["ตัวเอก", "ตัวรอง", "ตัวร้าย", "ตัวประกอบ"];
-const emptyChar = () => ({ name: "", role: "ตัวเอก" });
+const emptyChar = () => ({ name: "", role: "ตัวเอก", age: "" });
 
 function CharacterInputList({ chars, onChange }) {
   const addRow = () => onChange([...chars, emptyChar()]);
@@ -33,6 +33,12 @@ function CharacterInputList({ chars, onChange }) {
               {CHAR_ROLES.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
             </SelectContent>
           </Select>
+          <Input
+            placeholder="อายุ"
+            value={c.age}
+            onChange={(e) => updateRow(i, "age", e.target.value)}
+            className="w-16 h-8 text-xs"
+          />
           <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive shrink-0" onClick={() => removeRow(i)}>
             <X className="w-3.5 h-3.5" />
           </Button>
@@ -117,7 +123,7 @@ export default function Dashboard() {
       if (charsToSave.length > 0) {
         await Promise.all(
           charsToSave.map((c) =>
-            base44.entities.Character.create({ novel_id: novel.id, name: c.name.trim(), role: c.role })
+            base44.entities.Character.create({ novel_id: novel.id, name: c.name.trim(), role: c.role, age: c.age || undefined })
           )
         );
       }
