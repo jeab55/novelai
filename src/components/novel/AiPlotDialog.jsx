@@ -42,10 +42,24 @@ function parseAiResult(raw) {
 }
 
 function buildPrompt(novel, writer, characters) {
-  const charList = characters.map((c) => `- ${c.name} (${c.role || "ตัวละคร"}): ${c.personality || ""}`).join("\n") || "ยังไม่มีตัวละคร";
   const writerContext = writer?.system_prompt ? `\nสไตล์การเขียน: ${writer.system_prompt}\n` : "";
   const targetChapters = novel.target_chapters || 10;
-  const mainCharCount = novel.main_character_count || 3;
+
+  // Separate pre-entered chars (from novel creation) vs chars already fully saved in DB
+  const preEnteredChars = characters.filter((c) => c.name && (!c.personality && !c.background && !c.appearance));
+  const fullChars = characters.filter((c) => c.name && (c.personality || c.background || c.appearance));
+
+  const preEnteredSection = preEnteredChars.length > 0
+    ? `ตัวละครที่ผู้ใช้กำหนดไว้แล้ว (ต้องใช้ตามนี้ ห้ามตัดหรือเปลี่ยนชื่อ — เติมรายละเอียดที่ขาดให้ครบ):
+${preEnteredChars.map((c) => `- ${c.name} (${c.role || "ตัวละคร"}) — ยังขาด: อายุ ลักษณะภายนอก นิสัย ปูมหลัง want need ปม`).join("\n")}`
+    : "";
+
+  const fullCharSection = fullChars.length > 0
+    ? `ตัวละครที่มีข้อมูลครบแล้ว (ห้ามสร้างซ้ำชื่อเหล่านี้ คงไว้ตามเดิม):
+${fullChars.map((c) => `- ${c.name} (${c.role || "ตัวละคร"}): ${c.personality || ""}`).join("\n")}`
+    : "";
+
+  const allExistingNames = characters.map((c) => c.name).filter(Boolean).join(", ") || "ยังไม่มี";
 
   return `${writerContext}
 คุณคือบรรณาธิการที่ช่วยวางโครงเรื่องนิยาย ตอบเป็น JSON เท่านั้น ห้ามมีข้อความอื่นนอก JSON
@@ -56,14 +70,18 @@ function buildPrompt(novel, writer, characters) {
 - เรื่องย่อ: ${novel.synopsis || "ไม่มีเรื่องย่อ"}
 - ยุคสมัย/ฉากหลัง: ${novel.era || "ไม่ระบุ"}
 - จำนวนตอนที่ต้องการ: ${targetChapters} ตอน
-- จำนวนตัวละครหลักที่ต้องการ: ${mainCharCount} คน
 
-ตัวละครที่มีอยู่แล้ว (ห้ามสร้างซ้ำชื่อเหล่านี้):
-${charList}
+${preEnteredSection}
+${fullCharSection}
+ชื่อทั้งหมดที่มีอยู่แล้ว (ห้ามสร้างซ้ำ): ${allExistingNames}
 
 งานที่ต้องทำ 2 ส่วน:
 
-[ส่วนที่ 1] สร้างตัวละครหลักของเรื่อง จำนวน ${mainCharCount} คนพอดี (ไม่มากกว่า ไม่น้อยกว่า) โดยแต่ละตัวต้องมีฟิลด์:
+[ส่วนที่ 1] จัดการตัวละครตามกฎดังนี้:
+  (ก) ตัวละครที่ผู้ใช้กำหนดไว้: ต้องอยู่ใน output ทุกตัว และเติมฟิลด์ที่ขาด (อายุ ลักษณะ นิสัย ปูมหลัง want need ปม ความสัมพันธ์) ให้สมบูรณ์
+  (ข) ตัวละครที่มีข้อมูลครบ: คงค่าเดิม ไม่ต้องเติม ไม่ต้องเปลี่ยน
+  (ค) ถ้าตัวละครที่มีอยู่ยังไม่เพียงพอสำหรับเรื่อง ให้สร้างตัวละครเพิ่มเติมใหม่ให้เรื่องครบสมบูรณ์
+แต่ละตัวต้องมีฟิลด์:
 - name: ชื่อตัวละคร
 - role: บทบาท (ตัวเอก / ตัวรอง / ตัวร้าย / ตัวประกอบ)
 - age: อายุ (ข้อความ เช่น "25 ปี")

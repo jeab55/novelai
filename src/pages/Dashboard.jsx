@@ -8,7 +8,43 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Plus, BookOpen, Feather, Pencil, LogOut, Trash2, Share2 } from "lucide-react";
+import { Plus, BookOpen, Feather, Pencil, LogOut, Trash2, Share2, X } from "lucide-react";
+
+const CHAR_ROLES = ["ตัวเอก", "ตัวรอง", "ตัวร้าย", "ตัวประกอบ"];
+const emptyChar = () => ({ name: "", role: "ตัวเอก" });
+
+function CharacterInputList({ chars, onChange }) {
+  const addRow = () => onChange([...chars, emptyChar()]);
+  const removeRow = (i) => onChange(chars.filter((_, idx) => idx !== i));
+  const updateRow = (i, field, value) => onChange(chars.map((c, idx) => idx === i ? { ...c, [field]: value } : c));
+  return (
+    <div className="space-y-2">
+      {chars.map((c, i) => (
+        <div key={i} className="flex items-center gap-2">
+          <Input
+            placeholder="ชื่อตัวละคร"
+            value={c.name}
+            onChange={(e) => updateRow(i, "name", e.target.value)}
+            className="flex-1 h-8 text-sm"
+          />
+          <Select value={c.role} onValueChange={(v) => updateRow(i, "role", v)}>
+            <SelectTrigger className="w-28 h-8 text-xs"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {CHAR_ROLES.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive shrink-0" onClick={() => removeRow(i)}>
+            <X className="w-3.5 h-3.5" />
+          </Button>
+        </div>
+      ))}
+      <Button variant="outline" size="sm" className="gap-1.5 text-xs h-7 mt-1" onClick={addRow}>
+        <Plus className="w-3 h-3" />
+        เพิ่มตัวละคร
+      </Button>
+    </div>
+  );
+}
 import DeleteNovelDialog from "@/components/novel/DeleteNovelDialog";
 import ShareNovelDialog from "@/components/novel/ShareNovelDialog";
 import { toast } from "sonner";
@@ -32,7 +68,8 @@ const genreColors = {
 
 export default function Dashboard() {
   const [open, setOpen] = useState(false);
-   const [form, setForm] = useState({ title: "", genre: "", synopsis: "", era: "", writer_id: "", target_chapters: "10", main_character_count: "3" });
+  const [form, setForm] = useState({ title: "", genre: "", synopsis: "", era: "", writer_id: "", target_chapters: "10" });
+  const [formChars, setFormChars] = useState([emptyChar()]);
   const [editOpen, setEditOpen] = useState(false);
   const [editForm, setEditForm] = useState({});
   const [editingId, setEditingId] = useState(null);
@@ -74,11 +111,23 @@ export default function Dashboard() {
   });
 
   const createMutation = useMutation({
-    mutationFn: (data) => base44.entities.Novel.create(data),
+    mutationFn: async (data) => {
+      const novel = await base44.entities.Novel.create(data);
+      const charsToSave = formChars.filter((c) => c.name.trim());
+      if (charsToSave.length > 0) {
+        await Promise.all(
+          charsToSave.map((c) =>
+            base44.entities.Character.create({ novel_id: novel.id, name: c.name.trim(), role: c.role })
+          )
+        );
+      }
+      return novel;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["novels"] });
       setOpen(false);
-      setForm({ title: "", genre: "", synopsis: "", era: "", writer_id: "", target_chapters: "10", main_character_count: "3" });
+      setForm({ title: "", genre: "", synopsis: "", era: "", writer_id: "", target_chapters: "10" });
+      setFormChars([emptyChar()]);
     },
   });
 
@@ -103,7 +152,6 @@ export default function Dashboard() {
       status: novel.status || "กำลังเขียน", 
       writer_id: novel.writer_id || "",
       target_chapters: novel.target_chapters || 10,
-      main_character_count: novel.main_character_count || 3
     });
     setEditOpen(true);
   };
@@ -203,21 +251,11 @@ export default function Dashboard() {
                   </Select>
                 </div>
                 <div>
-                  <label className="text-sm font-medium mb-1.5 block">จำนวนตัวละครหลัก</label>
-                  <Select value={form.main_character_count.toString()} onValueChange={(v) => setForm({ ...form, main_character_count: v })}>
-                    <SelectTrigger><SelectValue placeholder="เลือกจำนวนตัวละคร" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1">1 คน</SelectItem>
-                      <SelectItem value="2">2 คน</SelectItem>
-                      <SelectItem value="3">3 คน</SelectItem>
-                      <SelectItem value="4">4 คน</SelectItem>
-                      <SelectItem value="5">5 คน</SelectItem>
-                      <SelectItem value="6">6 คน</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <label className="text-sm font-medium mb-1.5 block">เรื่องย่อ</label>
+                   <label className="text-sm font-medium mb-1.5 block">ตัวละครหลัก <span className="text-muted-foreground font-normal text-xs">(ไม่บังคับ — ปล่อยให้ AI เติมทีหลังได้)</span></label>
+                   <CharacterInputList chars={formChars} onChange={setFormChars} />
+                 </div>
+                 <div>
+                   <label className="text-sm font-medium mb-1.5 block">เรื่องย่อ</label>
                   <Textarea
                     placeholder="เล่าเรื่องย่อของนิยาย..."
                     rows={4}
@@ -339,20 +377,6 @@ export default function Dashboard() {
                   <SelectItem value="20">20 ตอน</SelectItem>
                   <SelectItem value="30">30 ตอน</SelectItem>
                   <SelectItem value="40">40 ตอน</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <label className="text-sm font-medium mb-1.5 block">จำนวนตัวละครหลัก</label>
-              <Select value={(editForm.main_character_count || 3).toString()} onValueChange={(v) => setEditForm({ ...editForm, main_character_count: v })}>
-                <SelectTrigger><SelectValue placeholder="เลือกจำนวนตัวละคร" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="1">1 คน</SelectItem>
-                  <SelectItem value="2">2 คน</SelectItem>
-                  <SelectItem value="3">3 คน</SelectItem>
-                  <SelectItem value="4">4 คน</SelectItem>
-                  <SelectItem value="5">5 คน</SelectItem>
-                  <SelectItem value="6">6 คน</SelectItem>
                 </SelectContent>
               </Select>
             </div>
