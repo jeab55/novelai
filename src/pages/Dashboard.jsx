@@ -8,13 +8,41 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Plus, BookOpen, Feather, Pencil, LogOut, Trash2, Share2, X, Moon, Sun, TrendingUp, FileText } from "lucide-react";
+import { Plus, BookOpen, Feather, Pencil, LogOut, Trash2, Share2, X, Moon, Sun, TrendingUp, FileText, Sparkles, Loader2, ChevronDown, ChevronUp } from "lucide-react";
+import ReactMarkdown from "react-markdown";
 
 const CHAR_ROLES = ["ตัวเอก", "ตัวรอง", "ตัวร้าย", "ตัวประกอบ"];
 const emptyChar = () => ({ name: "", role: "ตัวเอก", age: "", occupation: "", personality: "", background: "", wound: "", desire: "" });
 
 function CharacterCard({ c, i, onUpdate, onRemove }) {
   const [expanded, setExpanded] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analysis, setAnalysis] = useState(null);
+  const [analysisOpen, setAnalysisOpen] = useState(true);
+
+  const handleAnalyze = async () => {
+    if (!c.name) return;
+    setAnalyzing(true);
+    setAnalysis(null);
+    const charDesc = [
+      `ชื่อ: ${c.name}`,
+      c.role && `บทบาท: ${c.role}`,
+      c.age && `อายุ: ${c.age}`,
+      c.occupation && `อาชีพ: ${c.occupation}`,
+      c.personality && `นิสัย: ${c.personality}`,
+      c.background && `ปูมหลัง: ${c.background}`,
+      c.desire && `สิ่งที่ต้องการ: ${c.desire}`,
+      c.wound && `ปม/บาดแผล: ${c.wound}`,
+    ].filter(Boolean).join("\n");
+
+    const result = await base44.integrations.Core.InvokeLLM({
+      prompt: `คุณคือนักวิเคราะห์ตัวละครในนิยายมืออาชีพ วิเคราะห์ตัวละครต่อไปนี้:\n\n${charDesc}\n\nวิเคราะห์ใน 4 หัวข้อ:\n1. **จุดแข็ง** — สิ่งที่น่าสนใจและโดดเด่น\n2. **Want vs Need** — ความต้องการที่รับรู้ vs ความต้องการที่แท้จริง\n3. **Character Arc** — เส้นทางการเติบโตที่เป็นไปได้\n4. **คำแนะนำ** — สิ่งที่ควรเติมเพื่อให้ตัวละครสมบูรณ์ยิ่งขึ้น\n\nตอบเป็นภาษาไทย กระชับ ตรงประเด็น`,
+    });
+    setAnalysis(result);
+    setAnalysisOpen(true);
+    setAnalyzing(false);
+  };
+
   return (
     <div className="border border-border/60 rounded-xl bg-muted/20 overflow-hidden">
       {/* Header row */}
@@ -84,6 +112,38 @@ function CharacterCard({ c, i, onUpdate, onRemove }) {
               className="flex-1 h-8 text-xs"
             />
           </div>
+        </div>
+      )}
+      {/* Analyze button */}
+      <div className="px-2.5 pb-2.5 pt-1 border-t border-border/30">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-7 text-xs gap-1.5 text-primary/70 hover:text-primary hover:bg-primary/8 w-full"
+          onClick={handleAnalyze}
+          disabled={!c.name || analyzing}
+        >
+          {analyzing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+          {analyzing ? "กำลังวิเคราะห์..." : "วิเคราะห์ตัวละคร AI"}
+        </Button>
+      </div>
+      {/* Analysis result */}
+      {analysis && (
+        <div className="mx-2.5 mb-2.5 rounded-lg border border-primary/20 bg-primary/4 overflow-hidden">
+          <button
+            type="button"
+            className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-primary hover:bg-primary/8 transition-colors"
+            onClick={() => setAnalysisOpen((v) => !v)}
+          >
+            <span className="flex items-center gap-1"><Sparkles className="w-3 h-3" />ผลวิเคราะห์ AI</span>
+            {analysisOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+          </button>
+          {analysisOpen && (
+            <div className="px-3 pb-3 text-xs prose prose-sm max-w-none [&>*:first-child]:mt-0 text-foreground/90">
+              <ReactMarkdown>{analysis}</ReactMarkdown>
+            </div>
+          )}
         </div>
       )}
     </div>
