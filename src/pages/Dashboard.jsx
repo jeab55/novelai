@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Plus, BookOpen, Feather, Pencil, LogOut, Trash2, Share2, X } from "lucide-react";
+import { Plus, BookOpen, Feather, Pencil, LogOut, Trash2, Share2, X, Moon, Sun, TrendingUp, FileText } from "lucide-react";
 
 const CHAR_ROLES = ["ตัวเอก", "ตัวรอง", "ตัวร้าย", "ตัวประกอบ"];
 const emptyChar = () => ({ name: "", role: "ตัวเอก", age: "", occupation: "", personality: "", background: "", wound: "", desire: "" });
@@ -133,7 +133,20 @@ const genreColors = {
   "อื่นๆ": "bg-gray-100 text-gray-700",
 };
 
+function useDarkMode() {
+  const [dark, setDark] = useState(() => {
+    const saved = localStorage.getItem("novelai-dark");
+    return saved === "true";
+  });
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", dark);
+    localStorage.setItem("novelai-dark", dark);
+  }, [dark]);
+  return [dark, setDark];
+}
+
 export default function Dashboard() {
+  const [dark, setDark] = useDarkMode();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ title: "", genre: "", synopsis: "", era: "", writer_id: "", target_chapters: "10" });
   const [formChars, setFormChars] = useState([emptyChar()]);
@@ -261,19 +274,22 @@ export default function Dashboard() {
     />
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="border-b border-border/60 bg-card/50 backdrop-blur-sm sticky top-0 z-10">
+      <header className="border-b border-border/60 bg-card/80 backdrop-blur-md sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20 flex items-center justify-center shadow-sm">
               <Feather className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <h1 className="text-xl font-heading font-bold text-foreground">NovelAi</h1>
+              <h1 className="text-xl font-heading font-bold text-foreground tracking-tight">NovelAi</h1>
               <p className="text-xs text-muted-foreground">ผู้ช่วยแต่งนิยายอัจฉริยะ</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground hidden sm:block">{user?.full_name || user?.email}</span>
+            <Button variant="ghost" size="icon" onClick={() => setDark((v) => !v)} title={dark ? "โหมดสว่าง" : "โหมดมืด"} className="text-muted-foreground hover:text-foreground">
+              {dark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </Button>
             <Link to="/trash">
               <Button variant="ghost" size="icon" title="ถังขยะ" className="text-muted-foreground hover:text-destructive">
                 <Trash2 className="w-4 h-4" />
@@ -479,7 +495,16 @@ export default function Dashboard() {
       </Dialog>
 
       {/* Content */}
-      <main className="max-w-6xl mx-auto px-6 py-8">
+      <main className="max-w-6xl mx-auto px-6 py-10">
+        {/* Section heading */}
+        {novels.length > 0 && (
+          <div className="flex items-center justify-between mb-7">
+            <div>
+              <h2 className="font-heading font-bold text-2xl text-foreground tracking-tight">ชั้นวางหนังสือ</h2>
+              <p className="text-sm text-muted-foreground mt-1">{novels.length} เรื่อง</p>
+            </div>
+          </div>
+        )}
         {isLoading ? (
           <div className="flex items-center justify-center py-20">
             <div className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
@@ -488,14 +513,14 @@ export default function Dashboard() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-center py-20"
+            className="text-center py-24"
           >
-            <div className="w-20 h-20 rounded-2xl bg-primary/5 flex items-center justify-center mx-auto mb-6">
-              <BookOpen className="w-10 h-10 text-primary/40" />
+            <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-primary/10 to-accent/30 flex items-center justify-center mx-auto mb-6 shadow-inner">
+              <BookOpen className="w-12 h-12 text-primary/50" />
             </div>
-            <h2 className="text-xl font-heading font-semibold mb-2">ยังไม่มีนิยาย</h2>
-            <p className="text-muted-foreground mb-6">เริ่มต้นเขียนนิยายเรื่องแรกของคุณเลย!</p>
-            <Button onClick={() => setOpen(true)} className="gap-2">
+            <h2 className="text-2xl font-heading font-semibold mb-3">ชั้นวางยังว่างเปล่า</h2>
+            <p className="text-muted-foreground mb-8 max-w-sm mx-auto leading-relaxed">เริ่มต้นเขียนนิยายเรื่องแรกของคุณ ทุกมหากาพย์ต้องเริ่มจากหน้าแรก</p>
+            <Button onClick={() => setOpen(true)} className="gap-2 h-11 px-6 text-base shadow-sm">
               <Plus className="w-4 h-4" />
               สร้างเรื่องใหม่
             </Button>
@@ -510,65 +535,78 @@ export default function Dashboard() {
                 transition={{ delay: i * 0.05 }}
               >
                 <Link to={`/novel/${novel.id}`}>
-                  <div className="group relative bg-card border border-border/60 rounded-2xl p-6 hover:shadow-lg hover:border-primary/20 transition-all duration-300 cursor-pointer h-full">
-                    <div className="flex items-start justify-between mb-3">
-                      <h3 className="font-heading font-semibold text-lg leading-tight group-hover:text-primary transition-colors pr-8">
-                        {novel.title}
-                      </h3>
-                      <div className="absolute top-4 right-4 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                  <div className="group relative bg-card border border-border/60 rounded-2xl overflow-hidden hover:shadow-xl hover:shadow-primary/5 hover:border-primary/25 transition-all duration-300 cursor-pointer h-full flex flex-col">
+                    {/* Decorative top stripe by genre */}
+                    <div className={`h-1.5 w-full ${genreColors[novel.genre] ? "opacity-100" : "opacity-30"}`}
+                      style={{ background: "linear-gradient(90deg, hsl(var(--primary)/0.6), hsl(var(--accent)))" }} />
+                    <div className="p-6 flex flex-col flex-1">
+                      {/* Action buttons */}
+                      <div className="absolute top-3 right-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
                         <button
                           onClick={(e) => openEdit(e, novel)}
-                          className="w-7 h-7 rounded-lg bg-secondary/60 hover:bg-primary/10 hover:text-primary flex items-center justify-center transition-all"
+                          className="w-7 h-7 rounded-lg bg-background/90 shadow-sm border border-border/60 hover:bg-primary/10 hover:text-primary flex items-center justify-center transition-all"
                           title="แก้ไขข้อมูลเรื่อง"
                         >
-                          <Pencil className="w-3.5 h-3.5" />
+                          <Pencil className="w-3 h-3" />
                         </button>
                         {(isAdmin || novel.created_by_id === user?.id) && (
                           <button
                             onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShareDialog({ open: true, novel }); }}
-                            className="w-7 h-7 rounded-lg bg-secondary/60 hover:bg-primary/10 hover:text-primary flex items-center justify-center transition-all"
+                            className="w-7 h-7 rounded-lg bg-background/90 shadow-sm border border-border/60 hover:bg-primary/10 hover:text-primary flex items-center justify-center transition-all"
                             title="แชร์เรื่อง"
                           >
-                            <Share2 className="w-3.5 h-3.5" />
+                            <Share2 className="w-3 h-3" />
                           </button>
                         )}
                         {(isAdmin || novel.created_by_id === user?.id) && (
                           <button
                             onClick={(e) => { e.preventDefault(); e.stopPropagation(); setDeleteDialog({ open: true, novel }); }}
-                            className="w-7 h-7 rounded-lg bg-secondary/60 hover:bg-destructive/10 hover:text-destructive flex items-center justify-center transition-all"
+                            className="w-7 h-7 rounded-lg bg-background/90 shadow-sm border border-border/60 hover:bg-destructive/10 hover:text-destructive flex items-center justify-center transition-all"
                             title="ย้ายไปถังขยะ"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <Trash2 className="w-3 h-3" />
                           </button>
                         )}
                       </div>
-                    </div>
-                    {novel.genre && (
-                      <Badge className={`${genreColors[novel.genre] || "bg-gray-100 text-gray-700"} text-xs mb-2`}>
-                        {novel.genre}
-                      </Badge>
-                    )}
-                    {novel.era && (
-                      <p className="text-xs text-primary/70 mb-2 font-medium">{novel.era}</p>
-                    )}
-                    {novel.synopsis && (
-                      <p className="text-sm text-muted-foreground line-clamp-3 leading-relaxed">
-                        {novel.synopsis}
-                      </p>
-                    )}
-                    <div className="mt-4 pt-3 border-t border-border/40 flex items-center justify-between">
-                      <Badge variant="outline" className="text-xs">
-                        {novel.status || "กำลังเขียน"}
-                      </Badge>
-                      <div className="flex items-center gap-2">
-                        {getWriterName(novel.writer_id) && (
-                          <span className="text-[11px] text-primary/60 font-medium bg-primary/5 px-2 py-0.5 rounded-full">
-                            ✍️ {getWriterName(novel.writer_id)}
+
+                      {/* Genre badge */}
+                      {novel.genre && (
+                        <Badge className={`${genreColors[novel.genre] || "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"} text-xs mb-3 w-fit`}>
+                          {novel.genre}
+                        </Badge>
+                      )}
+
+                      {/* Title */}
+                      <h3 className="font-heading font-bold text-lg leading-tight group-hover:text-primary transition-colors mb-2 pr-8">
+                        {novel.title}
+                      </h3>
+
+                      {novel.era && (
+                        <p className="text-xs text-primary/65 mb-2 font-medium flex items-center gap-1">
+                          <span>📍</span>{novel.era}
+                        </p>
+                      )}
+                      {novel.synopsis && (
+                        <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed flex-1">
+                          {novel.synopsis}
+                        </p>
+                      )}
+
+                      {/* Footer */}
+                      <div className="mt-4 pt-4 border-t border-border/40 flex items-center justify-between">
+                        <Badge variant="outline" className="text-xs font-normal">
+                          {novel.status || "กำลังเขียน"}
+                        </Badge>
+                        <div className="flex items-center gap-2">
+                          {getWriterName(novel.writer_id) && (
+                            <span className="text-[11px] text-primary/60 font-medium bg-primary/6 border border-primary/15 px-2 py-0.5 rounded-full">
+                              ✍️ {getWriterName(novel.writer_id)}
+                            </span>
+                          )}
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(novel.created_date).toLocaleDateString("th-TH")}
                           </span>
-                        )}
-                        <span className="text-xs text-muted-foreground">
-                          {new Date(novel.created_date).toLocaleDateString("th-TH")}
-                        </span>
+                        </div>
                       </div>
                     </div>
                   </div>

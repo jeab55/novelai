@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Feather, PenTool, Users, Globe, Clock, Sparkles, Bot, Trash2, Share2, History } from "lucide-react";
+import { ArrowLeft, Feather, PenTool, Users, Globe, Clock, Sparkles, Bot, Trash2, Share2, History, LayoutDashboard } from "lucide-react";
 import VersionHistoryDialog from "@/components/novel/VersionHistoryDialog";
 import { saveVersion } from "@/lib/saveVersion";
 import { useNavigate } from "react-router-dom";
@@ -19,10 +19,11 @@ import WorldBible from "@/components/novel/WorldBible";
 import Timeline from "@/components/novel/Timeline";
 import AiAssistant from "@/components/novel/AiAssistant";
 import WriterManager from "@/components/novel/WriterManager";
+import NovelOverview from "@/components/novel/NovelOverview";
 
 export default function NovelWorkspace() {
   const novelId = window.location.pathname.split("/novel/")[1];
-  const [activeTab, setActiveTab] = useState("writing");
+  const [activeTab, setActiveTab] = useState("overview");
   const [pendingOpenChapter, setPendingOpenChapter] = useState(null);
   const [deleteDialog, setDeleteDialog] = useState(false);
   const [shareDialog, setShareDialog] = useState(false);
@@ -196,38 +197,35 @@ export default function NovelWorkspace() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
-        <div className="border-b border-border/60 bg-card/30">
-          <div className="max-w-7xl mx-auto px-4">
-            <TabsList className="bg-transparent h-auto p-0 gap-1">
-              <TabsTrigger value="writing" className="gap-1.5 data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-none border-b-2 border-transparent data-[state=active]:border-primary px-4 py-2.5">
-                <PenTool className="w-3.5 h-3.5" />
-                <span className="text-sm">ห้องเขียน</span>
-              </TabsTrigger>
-              <TabsTrigger value="characters" className="gap-1.5 data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-none border-b-2 border-transparent data-[state=active]:border-primary px-4 py-2.5">
-                <Users className="w-3.5 h-3.5" />
-                <span className="text-sm">ตัวละคร</span>
-              </TabsTrigger>
-              <TabsTrigger value="world" className="gap-1.5 data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-none border-b-2 border-transparent data-[state=active]:border-primary px-4 py-2.5">
-                <Globe className="w-3.5 h-3.5" />
-                <span className="text-sm">โลก/ฉาก</span>
-              </TabsTrigger>
-              <TabsTrigger value="timeline" className="gap-1.5 data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-none border-b-2 border-transparent data-[state=active]:border-primary px-4 py-2.5">
-                <Clock className="w-3.5 h-3.5" />
-                <span className="text-sm">ไทม์ไลน์</span>
-              </TabsTrigger>
-              <TabsTrigger value="ai" className="gap-1.5 data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-none border-b-2 border-transparent data-[state=active]:border-primary px-4 py-2.5">
-                <Sparkles className="w-3.5 h-3.5" />
-                <span className="text-sm">ผู้ช่วย AI</span>
-              </TabsTrigger>
-              <TabsTrigger value="writers" className="gap-1.5 data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-none border-b-2 border-transparent data-[state=active]:border-primary px-4 py-2.5">
-                <Bot className="w-3.5 h-3.5" />
-                <span className="text-sm">นักเขียน AI</span>
-              </TabsTrigger>
+        <div className="border-b border-border/60 bg-card/40 backdrop-blur-sm">
+          <div className="max-w-7xl mx-auto px-4 overflow-x-auto">
+            <TabsList className="bg-transparent h-auto p-0 gap-0 flex-nowrap whitespace-nowrap">
+              {[
+                { value: "overview", icon: LayoutDashboard, label: "ภาพรวม" },
+                { value: "writing", icon: PenTool, label: "ห้องเขียน" },
+                { value: "characters", icon: Users, label: "ตัวละคร" },
+                { value: "world", icon: Globe, label: "โลก/ฉาก" },
+                { value: "timeline", icon: Clock, label: "ไทม์ไลน์" },
+                { value: "ai", icon: Sparkles, label: "ผู้ช่วย AI" },
+                { value: "writers", icon: Bot, label: "นักเขียน AI" },
+              ].map(({ value, icon: Icon, label }) => (
+                <TabsTrigger
+                  key={value}
+                  value={value}
+                  className="gap-1.5 data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-none border-b-2 border-transparent data-[state=active]:border-primary px-4 py-3 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <Icon className="w-3.5 h-3.5 shrink-0" />
+                  <span className="text-sm">{label}</span>
+                </TabsTrigger>
+              ))}
             </TabsList>
           </div>
         </div>
 
         <div className="flex-1">
+          <TabsContent value="overview" className="m-0">
+            <NovelOverview novel={novel} novelId={novelId} onTabChange={setActiveTab} />
+          </TabsContent>
           <TabsContent value="writing" className="m-0 h-full">
             <WritingRoom novelId={novelId} novel={novel} pendingOpenChapter={pendingOpenChapter} onPendingOpenChapterConsumed={() => setPendingOpenChapter(null)} />
           </TabsContent>

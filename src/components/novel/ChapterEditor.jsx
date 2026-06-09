@@ -3,7 +3,7 @@ import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Save, Loader2, Download, Copy, MoreHorizontal, Maximize2, Minimize2, Sparkles, Clock, X, RefreshCw, Volume2, History, PieChart, FileText, StickyNote } from "lucide-react";
+import { ArrowLeft, Save, Loader2, Download, Copy, MoreHorizontal, Maximize2, Minimize2, Sparkles, Clock, X, RefreshCw, Volume2, History, PieChart, FileText, StickyNote, CheckCircle2, Type, AlignJustify } from "lucide-react";
 import AiDraftDialog from "./AiDraftDialog";
 import EditorReviewPanel from "./EditorReviewPanel";
 import TextToSpeechPanel from "./TextToSpeechPanel";
@@ -57,6 +57,9 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
   const [balanceOpen, setBalanceOpen] = useState(false);
   const [templateOpen, setTemplateOpen] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
+  const [autoSaveStatus, setAutoSaveStatus] = useState("saved"); // "saving" | "saved"
+  const [fontSize, setFontSize] = useState(19);
+  const [contentWidth, setContentWidth] = useState(720);
   const queryClient = useQueryClient();
 
   const { data: plotEvents = [] } = useQuery({
@@ -139,11 +142,12 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
 
   const debouncedAutoSave = useCallback(
     debounce((newContent) => {
+      setAutoSaveStatus("saving");
       base44.entities.Chapter.update(chapter.id, {
         content: newContent,
         word_count: countWords(newContent),
-      });
-    }, 3000),
+      }).then(() => setAutoSaveStatus("saved"));
+    }, 2000),
     [chapter.id]
   );
 
@@ -160,9 +164,33 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
         className="max-w-sm font-heading font-semibold border-none bg-transparent shadow-none focus-visible:ring-0 px-0 text-base"
       />
       <div className="flex items-center gap-2 ml-auto">
-        <span className="text-xs text-muted-foreground tabular-nums">
+        {/* Autosave indicator */}
+        <span className={`text-xs flex items-center gap-1 tabular-nums transition-colors ${autoSaveStatus === "saving" ? "text-amber-500" : "text-emerald-600"}`}>
+          {autoSaveStatus === "saving"
+            ? <><Loader2 className="w-3 h-3 animate-spin" />กำลังบันทึก...</>
+            : <><CheckCircle2 className="w-3 h-3" />บันทึกแล้ว</>
+          }
+        </span>
+        <span className="text-xs text-muted-foreground tabular-nums border-l border-border/50 pl-2">
           {wordCount.toLocaleString()} คำ
         </span>
+        {/* Font size control */}
+        <div className="flex items-center gap-1 border border-border/50 rounded-lg px-2 h-8">
+          <Type className="w-3 h-3 text-muted-foreground" />
+          <button onClick={() => setFontSize(v => Math.max(14, v - 1))} className="text-muted-foreground hover:text-foreground text-xs px-0.5">−</button>
+          <span className="text-xs tabular-nums w-5 text-center">{fontSize}</span>
+          <button onClick={() => setFontSize(v => Math.min(28, v + 1))} className="text-muted-foreground hover:text-foreground text-xs px-0.5">+</button>
+        </div>
+        {/* Content width control */}
+        <div className="flex items-center gap-1 border border-border/50 rounded-lg px-2 h-8">
+          <AlignJustify className="w-3 h-3 text-muted-foreground" />
+          {[600, 720, 900].map(w => (
+            <button key={w} onClick={() => setContentWidth(w)}
+              className={`text-[10px] px-1 rounded transition-colors ${contentWidth === w ? "text-primary font-bold" : "text-muted-foreground hover:text-foreground"}`}>
+              {w === 600 ? "S" : w === 720 ? "M" : "L"}
+            </button>
+          ))}
+        </div>
 
         {/* TTS button */}
         <Button
@@ -339,21 +367,22 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
       <div className="fixed inset-0 z-50 bg-[hsl(35,30%,97%)] flex flex-col">
         {toolbar}
         <div className="flex-1 overflow-auto">
-          <div className="mx-auto px-8 py-12" style={{ maxWidth: "720px" }}>
+          <div className="mx-auto px-8 py-12" style={{ maxWidth: `${contentWidth}px` }}>
             <textarea
               autoFocus
               value={content}
               onChange={(e) => {
                 setContent(e.target.value);
+                setAutoSaveStatus("saving");
                 debouncedAutoSave(e.target.value);
               }}
               placeholder="เริ่มเขียนเรื่องราวของคุณที่นี่..."
               className="w-full min-h-[80vh] bg-transparent border-none outline-none resize-none placeholder:text-muted-foreground/40"
               style={{
                 fontFamily: "'Sarabun', 'Noto Sans Thai', sans-serif",
-                fontSize: "19px",
-                lineHeight: "1.9",
-                color: "hsl(25, 20%, 15%)",
+                fontSize: `${fontSize}px`,
+                lineHeight: "1.95",
+                color: "hsl(var(--foreground))",
               }}
             />
           </div>
@@ -496,20 +525,21 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
       />
       <div className="flex flex-1 overflow-hidden">
         <div className="flex-1 overflow-auto bg-background">
-          <div className="mx-auto px-8 py-10" style={{ maxWidth: "720px" }}>
+          <div className="mx-auto px-8 py-10" style={{ maxWidth: `${contentWidth}px` }}>
             <textarea
               value={content}
               onChange={(e) => {
                 setContent(e.target.value);
+                setAutoSaveStatus("saving");
                 debouncedAutoSave(e.target.value);
               }}
               placeholder="เริ่มเขียนเรื่องราวของคุณที่นี่..."
               className="w-full min-h-[65vh] bg-transparent border-none outline-none resize-none placeholder:text-muted-foreground/40"
               style={{
                 fontFamily: "'Sarabun', 'Noto Sans Thai', sans-serif",
-                fontSize: "19px",
-                lineHeight: "1.9",
-                color: "hsl(25, 20%, 15%)",
+                fontSize: `${fontSize}px`,
+                lineHeight: "1.95",
+                color: "hsl(var(--foreground))",
               }}
             />
           </div>
