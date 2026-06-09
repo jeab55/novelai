@@ -273,12 +273,12 @@ export default function Dashboard() {
                 สร้างเรื่องใหม่
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-lg">
-              <DialogHeader>
+            <DialogContent className="sm:max-w-lg flex flex-col max-h-[85vh]">
+              <DialogHeader className="sticky top-0 bg-background z-10 py-4 px-6 -mx-6 mb-0 border-b border-border/40">
                 <DialogTitle className="font-heading text-lg">สร้างนิยายเรื่องใหม่</DialogTitle>
               </DialogHeader>
-              <div className="space-y-4 mt-2">
-                <div>
+              <div className="space-y-4 overflow-y-auto flex-1 px-0">
+                <div className="px-6">
                   <label className="text-sm font-medium mb-1.5 block">ชื่อเรื่อง</label>
                   <Input
                     placeholder="เช่น ลับแลลายเมฆ"
@@ -286,7 +286,7 @@ export default function Dashboard() {
                     onChange={(e) => setForm({ ...form, title: e.target.value })}
                   />
                 </div>
-                <div>
+                <div className="px-6">
                   <label className="text-sm font-medium mb-1.5 block">แนวนิยาย</label>
                   <Select value={form.genre} onValueChange={(v) => setForm({ ...form, genre: v })}>
                     <SelectTrigger><SelectValue placeholder="เลือกแนว" /></SelectTrigger>
@@ -297,7 +297,7 @@ export default function Dashboard() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div>
+                <div className="px-6">
                   <label className="text-sm font-medium mb-1.5 block">ยุคสมัยและฉากหลัง</label>
                   <Input
                     placeholder="เช่น กรุงศรีอยุธยาตอนปลาย พ.ศ. 2310"
@@ -305,7 +305,7 @@ export default function Dashboard() {
                     onChange={(e) => setForm({ ...form, era: e.target.value })}
                   />
                 </div>
-                <div>
+                <div className="px-6">
                   <label className="text-sm font-medium mb-1.5 block">จำนวนตอนที่ต้องการ</label>
                   <Select value={form.target_chapters.toString()} onValueChange={(v) => setForm({ ...form, target_chapters: v })}>
                     <SelectTrigger><SelectValue placeholder="เลือกจำนวนตอน" /></SelectTrigger>
@@ -317,11 +317,11 @@ export default function Dashboard() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div>
+                <div className="px-6">
                    <label className="text-sm font-medium mb-1.5 block">ตัวละครหลัก <span className="text-muted-foreground font-normal text-xs">(ไม่บังคับ — ปล่อยให้ AI เติมทีหลังได้)</span></label>
                    <CharacterInputList chars={formChars} onChange={setFormChars} />
                  </div>
-                 <div>
+                 <div className="px-6">
                    <label className="text-sm font-medium mb-1.5 block">เรื่องย่อ</label>
                   <Textarea
                     placeholder="เล่าเรื่องย่อของนิยาย..."
@@ -330,7 +330,7 @@ export default function Dashboard() {
                     onChange={(e) => setForm({ ...form, synopsis: e.target.value })}
                   />
                 </div>
-                <div>
+                <div className="px-6 pb-4">
                   <label className="text-sm font-medium mb-1.5 block">
                     นักเขียน AI ประจำเรื่อง <span className="text-destructive">*</span>
                   </label>
@@ -351,6 +351,8 @@ export default function Dashboard() {
                     </p>
                   )}
                 </div>
+              </div>
+              <div className="sticky bottom-0 bg-background z-10 px-6 py-4 border-t border-border/40">
                 <Button
                   className="w-full"
                   onClick={() => createMutation.mutate(form)}
@@ -367,19 +369,19 @@ export default function Dashboard() {
 
       {/* Edit Dialog */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-lg flex flex-col max-h-[85vh]">
+          <DialogHeader className="sticky top-0 bg-background z-10 py-4 px-6 -mx-6 mb-0 border-b border-border/40">
             <DialogTitle className="font-heading text-lg">แก้ไขข้อมูลเรื่อง</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 mt-2">
-            <div>
+          <div className="space-y-4 overflow-y-auto flex-1 px-0">
+            <div className="px-6">
               <label className="text-sm font-medium mb-1.5 block">ชื่อเรื่อง</label>
               <Input
                 value={editForm.title || ""}
                 onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
               />
             </div>
-            <div>
+            <div className="px-6">
               <label className="text-sm font-medium mb-1.5 block">แนวนิยาย</label>
               <Select value={editForm.genre || ""} onValueChange={(v) => setEditForm({ ...editForm, genre: v })}>
                 <SelectTrigger><SelectValue placeholder="เลือกแนว" /></SelectTrigger>
@@ -390,14 +392,14 @@ export default function Dashboard() {
                 </SelectContent>
               </Select>
             </div>
-            <div>
+            <div className="px-6">
               <label className="text-sm font-medium mb-1.5 block">ยุคสมัยและฉากหลัง</label>
               <Input
                 value={editForm.era || ""}
                 onChange={(e) => setEditForm({ ...editForm, era: e.target.value })}
               />
             </div>
-            <div>
+            <div className="px-6">
               <label className="text-sm font-medium mb-1.5 block">คำโปรย / เรื่องย่อ</label>
               <Textarea
                 rows={4}
@@ -405,7 +407,7 @@ export default function Dashboard() {
                 onChange={(e) => setEditForm({ ...editForm, synopsis: e.target.value })}
               />
             </div>
-            <div>
+            <div className="px-6">
               <label className="text-sm font-medium mb-1.5 block">สถานะ</label>
               <Select value={editForm.status || "กำลังเขียน"} onValueChange={(v) => setEditForm({ ...editForm, status: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
@@ -416,7 +418,7 @@ export default function Dashboard() {
                 </SelectContent>
               </Select>
             </div>
-            <div>
+            <div className="px-6">
               <label className="text-sm font-medium mb-1.5 block">นักเขียน AI ประจำเรื่อง</label>
               <Select value={editForm.writer_id || ""} onValueChange={(v) => setEditForm({ ...editForm, writer_id: v })}>
                 <SelectTrigger><SelectValue placeholder="เลือกนักเขียน AI" /></SelectTrigger>
@@ -435,7 +437,7 @@ export default function Dashboard() {
                 </p>
               )}
             </div>
-            <div>
+            <div className="px-6 pb-4">
               <label className="text-sm font-medium mb-1.5 block">จำนวนตอนที่ต้องการ</label>
               <Select value={(editForm.target_chapters || 10).toString()} onValueChange={(v) => setEditForm({ ...editForm, target_chapters: v })}>
                 <SelectTrigger><SelectValue placeholder="เลือกจำนวนตอน" /></SelectTrigger>
@@ -447,6 +449,8 @@ export default function Dashboard() {
                 </SelectContent>
               </Select>
             </div>
+          </div>
+          <div className="sticky bottom-0 bg-background z-10 px-6 py-4 border-t border-border/40">
             <Button
               className="w-full"
               onClick={() => updateMutation.mutate({ id: editingId, data: editForm })}
