@@ -37,7 +37,7 @@ export default function CharacterBible({ novelId }) {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id) => base44.entities.Character.delete(id),
+    mutationFn: (id) => base44.entities.Character.update(id, { is_deleted: true }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["characters", novelId] }),
   });
 

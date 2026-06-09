@@ -72,7 +72,7 @@ export default function Timeline({ novelId, novel, onOpenChapter }) {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id) => base44.entities.PlotEvent.delete(id),
+    mutationFn: (id) => base44.entities.PlotEvent.update(id, { is_deleted: true }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["plotEvents", novelId] }),
   });
 

@@ -25,13 +25,19 @@ export default function AiChapterGeneratorDialog({ open, onClose, novel, novelId
 
   const { data: plotEvents = [] } = useQuery({
     queryKey: ["plotEvents", novelId],
-    queryFn: () => base44.entities.PlotEvent.filter({ novel_id: novelId }, "order"),
+    queryFn: async () => {
+      const all = await base44.entities.PlotEvent.filter({ novel_id: novelId }, "order");
+      return all.filter((e) => !e.is_deleted);
+    },
     enabled: !!novelId && step !== "idle",
   });
 
   const { data: existingChapters = [] } = useQuery({
     queryKey: ["chapters", novelId],
-    queryFn: () => base44.entities.Chapter.filter({ novel_id: novelId }, "order"),
+    queryFn: async () => {
+      const all = await base44.entities.Chapter.filter({ novel_id: novelId }, "order");
+      return all.filter((c) => !c.is_deleted);
+    },
     enabled: !!novelId && step !== "idle",
   });
 

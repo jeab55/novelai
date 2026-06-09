@@ -61,7 +61,10 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
 
   const { data: plotEvents = [] } = useQuery({
     queryKey: ["plotEvents", novelId],
-    queryFn: () => base44.entities.PlotEvent.filter({ novel_id: novelId }, "order"),
+    queryFn: async () => {
+      const all = await base44.entities.PlotEvent.filter({ novel_id: novelId }, "order");
+      return all.filter((e) => !e.is_deleted);
+    },
   });
 
   const wordCount = countWords(content);

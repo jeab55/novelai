@@ -44,13 +44,19 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
 
   const { data: chapters = [], isLoading } = useQuery({
     queryKey: ["chapters", novelId],
-    queryFn: () => base44.entities.Chapter.filter({ novel_id: novelId }, "order"),
-    staleTime: 10000, // Don't re-fetch within 10s to prevent jank during rapid drafting
+    queryFn: async () => {
+      const all = await base44.entities.Chapter.filter({ novel_id: novelId }, "order");
+      return all.filter((c) => !c.is_deleted);
+    },
+    staleTime: 10000,
   });
 
   const { data: plotEvents = [] } = useQuery({
     queryKey: ["plotEvents", novelId],
-    queryFn: () => base44.entities.PlotEvent.filter({ novel_id: novelId }, "order"),
+    queryFn: async () => {
+      const all = await base44.entities.PlotEvent.filter({ novel_id: novelId }, "order");
+      return all.filter((e) => !e.is_deleted);
+    },
   });
 
   const createChapter = useMutation({
