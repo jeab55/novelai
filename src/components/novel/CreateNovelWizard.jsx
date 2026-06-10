@@ -135,12 +135,61 @@ function Stepper({ currentStep }) {
 }
 
 // ─── Step 1: Novel Info ────────────────────────────────────────────────────
-function Step1({ form, setForm }) {
+function Step1({ form, setForm, chars }) {
+  const [drafting, setDrafting] = useState(false);
+  const [draftError, setDraftError] = useState("");
+  const [confirmMode, setConfirmMode] = useState(false); // pending overwrite confirm
+
+  const handleDraftSynopsis = async (append = false) => {
+    setConfirmMode(false);
+    setDraftError("");
+    setDrafting(true);
+    const namedChars = chars.filter((c) => c.name.trim());
+    const contextParts = [
+      `ชื่อเรื่อง: ${form.title}`,
+      form.genre && `แนวนิยาย: ${form.genre}`,
+      form.era && `ยุคสมัยและฉากหลัง: ${form.era}`,
+      form.target_chapters && `จำนวนตอน: ${form.target_chapters} ตอน`,
+      namedChars.length > 0 && `ตัวละครหลัก: ${namedChars.map((c) => `${c.name} (${c.role})`).join(", ")}`,
+    ].filter(Boolean).join("\n");
+
+    const result = await base44.integrations.Core.InvokeLLM({
+      prompt: `คุณคือนักเขียนนิยายมืออาชีพ ช่วยร่างเรื่องย่อนิยายเรื่องนี้:\n\n${contextParts}\n\nเขียนเรื่องย่อภาษาไทย 3-5 ประโยค กระชับ น่าสนใจ ดึงดูดให้อยากอ่าน เหมาะกับแนว${form.genre || "นิยาย"}ที่เลือก อย่าเพิ่งเปิดเผยปมสำคัญทั้งหมด ให้รู้สึกอยากติดตาม ตอบเฉพาะเรื่องย่อ ไม่ต้องมีหัวข้อหรือคำอธิบายเพิ่มเติม`,
+    });
+
+    // Strip code fences
+    const cleaned = result.replace(/^```[\w]*\n?/m, "").replace(/```$/m, "").trim();
+    if (!cleaned) {
+      setDraftError("AI ไม่สามารถร่างเรื่องย่อได้ กรุณาลองใหม่อีกครั้ง");
+      setDrafting(false);
+      return;
+    }
+
+    if (append && form.synopsis.trim()) {
+      setForm({ ...form, synopsis: form.synopsis.trim() + "\n\n" + cleaned });
+    } else {
+      setForm({ ...form, synopsis: cleaned });
+    }
+    setDrafting(false);
+  };
+
+  const handleAiClick = () => {
+    if (!form.title.trim()) {
+      setDraftError("กรุณากรอกชื่อเรื่องก่อนให้ AI ช่วยร่าง");
+      return;
+    }
+    if (form.synopsis.trim()) {
+      setConfirmMode(true); // ask overwrite or append
+      return;
+    }
+    handleDraftSynopsis(false);
+  };
+
   return (
     <div className="space-y-4">
       <div>
         <label className="text-sm font-medium mb-1.5 block">ชื่อเรื่อง <span className="text-destructive">*</span></label>
-        <Input placeholder="เช่น ลับแลลายเมฆ" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} autoFocus />
+        <Input placeholder="เช่น ลับแลลายเมฆ" value={form.title} onChange={(e) => { setForm({ ...form, title: e.target.value }); setDraftError(""); }} autoFocus />
       </div>
       <div>
         <label className="text-sm font-medium mb-1.5 block">แนวนิยาย</label>
@@ -166,7 +215,36 @@ function Step1({ form, setForm }) {
         </Select>
       </div>
       <div>
-        <label className="text-sm font-medium mb-1.5 block">เรื่องย่อ</label>
+        <div className="flex items-center justify-between mb-1.5">
+          <label className="text-sm font-medium">เรื่องย่อ</label>
+          {!confirmMode ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs gap-1 text-primary/70 hover:text-primary hover:bg-primary/8 px-2"
+              onClick={handleAiClick}
+              disabled={drafting}
+            >
+              {drafting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+              {drafting ? "กำลังร่าง..." : "✨ ให้ AI ช่วยร่างเรื่องย่อ"}
+            </Button>
+          ) : (
+            <div className="flex items-center gap-1">
+              <span className="text-xs text-muted-foreground mr-1">มีข้อความอยู่แล้ว:</span>
+              <Button type="button" size="sm" variant="outline" className="h-6 text-xs px-2 border-destructive/40 text-destructive hover:bg-destructive/8" onClick={() => handleDraftSynopsis(false)}>
+                แทนที่
+              </Button>
+              <Button type="button" size="sm" variant="outline" className="h-6 text-xs px-2 border-primary/40 text-primary hover:bg-primary/8" onClick={() => handleDraftSynopsis(true)}>
+                ต่อท้าย
+              </Button>
+              <Button type="button" size="sm" variant="ghost" className="h-6 text-xs px-1.5 text-muted-foreground" onClick={() => setConfirmMode(false)}>
+                ยกเลิก
+              </Button>
+            </div>
+          )}
+        </div>
+        {draftError && <p className="text-xs text-destructive mb-1.5">{draftError}</p>}
         <Textarea placeholder="เล่าเรื่องย่อของนิยาย..." rows={4} value={form.synopsis} onChange={(e) => setForm({ ...form, synopsis: e.target.value })} />
       </div>
     </div>
@@ -328,7 +406,7 @@ export default function CreateNovelWizard({ open, onOpenChange, activeWriters, o
 
         {/* Scrollable body */}
         <div className="flex-1 overflow-y-auto px-6 py-5">
-          {step === 1 && <Step1 form={form} setForm={setForm} />}
+          {step === 1 && <Step1 form={form} setForm={setForm} chars={chars} />}
           {step === 2 && <Step2 chars={chars} setChars={setChars} />}
           {step === 3 && <Step3 form={form} setForm={setForm} chars={chars} activeWriters={activeWriters} />}
         </div>
