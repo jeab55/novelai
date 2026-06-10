@@ -201,8 +201,8 @@ export default function NovelWorkspace() {
               {[
                 { value: "writing", icon: PenTool, label: "ห้องเขียน" },
                 { value: "characters", icon: Users, label: "ตัวละคร" },
-                { value: "world", icon: Globe, label: "โลก/ฉาก" },
                 { value: "timeline", icon: Clock, label: "ไทม์ไลน์" },
+                { value: "world", icon: Globe, label: "โลก/ฉาก" },
                 { value: "writers", icon: Bot, label: "นักเขียน AI" },
               ].map(({ value, icon: Icon, label }) => (
                 <TabsTrigger
