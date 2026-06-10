@@ -21,7 +21,7 @@ import WriterManager from "@/components/novel/WriterManager";
 
 export default function NovelWorkspace() {
   const novelId = window.location.pathname.split("/novel/")[1];
-  const [activeTab, setActiveTab] = useState("writing");
+  const [activeTab, setActiveTab] = useState("characters");
   const [pendingOpenChapter, setPendingOpenChapter] = useState(null);
   const [deleteDialog, setDeleteDialog] = useState(false);
   const [shareDialog, setShareDialog] = useState(false);
@@ -199,11 +199,11 @@ export default function NovelWorkspace() {
           <div className="max-w-7xl mx-auto px-4 overflow-x-auto">
             <TabsList className="bg-transparent h-auto p-0 gap-0 flex-nowrap whitespace-nowrap">
               {[
-                { value: "writing", icon: PenTool, label: "ห้องเขียน" },
                 { value: "characters", icon: Users, label: "ตัวละคร" },
                 { value: "timeline", icon: Clock, label: "ไทม์ไลน์" },
                 { value: "world", icon: Globe, label: "โลก/ฉาก" },
                 { value: "writers", icon: Bot, label: "นักเขียน AI" },
+                { value: "writing", icon: PenTool, label: "ห้องเขียน" },
               ].map(({ value, icon: Icon, label }) => (
                 <TabsTrigger
                   key={value}
