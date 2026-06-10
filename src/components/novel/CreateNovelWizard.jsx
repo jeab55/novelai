@@ -8,6 +8,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Plus, X, Sparkles, Loader2, ChevronDown, ChevronUp, Check, Users, BookOpen, Feather } from "lucide-react";
 import ReactMarkdown from "react-markdown";
+import { toast } from "sonner";
 
 const GENRES = ["โรแมนติก", "แฟนตาซี", "อิงประวัติศาสตร์", "จีนย้อนยุค", "วาย", "สยองขวัญ", "ลึกลับ", "แอ็คชั่น", "ดราม่า", "อื่นๆ"];
 const CHAR_ROLES = ["ตัวเอก", "ตัวรอง", "ตัวร้าย", "ตัวประกอบ"];
@@ -23,8 +24,8 @@ const STEPS = [
 function CharacterCard({ c, onUpdate, onRemove }) {
   const [expanded, setExpanded] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
-  const [analysis, setAnalysis] = useState(null);
-  const [analysisOpen, setAnalysisOpen] = useState(true);
+  const [analysis, setAnalysis] = useState(c.ai_analysis || null);
+  const [analysisOpen, setAnalysisOpen] = useState(!!c.ai_analysis);
 
   const handleAnalyze = async () => {
     if (!c.name) return;
@@ -47,16 +48,31 @@ function CharacterCard({ c, onUpdate, onRemove }) {
     setAnalysis(result);
     setAnalysisOpen(true);
     setAnalyzing(false);
+    // clear saved badge when new analysis is generated (not saved yet)
+    if (c.ai_analysis) onUpdate("ai_analysis", "");
+  };
+
+  const handleSaveAnalysis = () => {
+    onUpdate("ai_analysis", analysis);
+    toast.success(`บันทึกผลวิเคราะห์ของ ${c.name || "ตัวละคร"} แล้ว ✓`);
   };
 
   return (
-    <div className="border border-border/60 rounded-xl bg-muted/20 overflow-hidden">
+    <div className={`border rounded-xl bg-muted/20 overflow-hidden transition-colors ${c.ai_analysis ? "border-primary/30" : "border-border/60"}`}>
       <div className="flex items-center gap-2 p-2.5">
-        <Input placeholder="ชื่อตัวละคร" value={c.name} onChange={(e) => onUpdate("name", e.target.value)} className="flex-1 h-8 text-sm font-medium" />
+        <div className="flex-1 flex items-center gap-1.5 min-w-0">
+          <Input placeholder="ชื่อตัวละคร" value={c.name} onChange={(e) => onUpdate("name", e.target.value)} className="flex-1 h-8 text-sm font-medium" />
+          {c.ai_analysis && (
+            <span className="shrink-0 flex items-center gap-0.5 text-[10px] text-primary font-medium bg-primary/8 border border-primary/20 rounded-full px-1.5 py-0.5 whitespace-nowrap">
+              <Sparkles className="w-2.5 h-2.5" />มีผลวิเคราะห์
+            </span>
+          )}
+        </div>
         <Select value={c.role} onValueChange={(v) => onUpdate("role", v)}>
           <SelectTrigger className="w-26 h-8 text-xs shrink-0"><SelectValue /></SelectTrigger>
           <SelectContent>{CHAR_ROLES.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
         </Select>
+
         <Input placeholder="อายุ" value={c.age} onChange={(e) => onUpdate("age", e.target.value)} className="w-14 h-8 text-xs shrink-0" />
         <Input placeholder="อาชีพ" value={c.occupation} onChange={(e) => onUpdate("occupation", e.target.value)} className="w-20 h-8 text-xs shrink-0" />
         <button type="button" onClick={() => setExpanded((v) => !v)} className="h-8 w-8 shrink-0 rounded-md flex items-center justify-center text-muted-foreground hover:bg-accent transition-colors text-xs" title={expanded ? "ย่อ" : "กรอกรายละเอียด"}>
@@ -91,9 +107,15 @@ function CharacterCard({ c, onUpdate, onRemove }) {
           {analysisOpen && (
             <div className="px-3 pb-3 text-xs prose prose-sm max-w-none [&>*:first-child]:mt-0 text-foreground/90">
               <ReactMarkdown>{analysis}</ReactMarkdown>
-              <Button type="button" size="sm" variant="outline" className="mt-2 gap-1.5 border-primary/30 text-primary hover:bg-primary/8 text-xs h-7" onClick={() => onUpdate("ai_analysis", analysis)}>
-                <Sparkles className="w-3 h-3" />บันทึกผลวิเคราะห์นี้ไว้กับตัวละคร
-              </Button>
+              {c.ai_analysis === analysis ? (
+                <div className="mt-2 flex items-center gap-1.5 text-xs text-primary font-medium">
+                  <Check className="w-3.5 h-3.5" />บันทึกแล้ว
+                </div>
+              ) : (
+                <Button type="button" size="sm" variant="outline" className="mt-2 gap-1.5 border-primary/30 text-primary hover:bg-primary/8 text-xs h-7" onClick={handleSaveAnalysis}>
+                  <Sparkles className="w-3 h-3" />บันทึกผลวิเคราะห์นี้ไว้กับตัวละคร
+                </Button>
+              )}
             </div>
           )}
         </div>
