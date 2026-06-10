@@ -17,6 +17,7 @@ import AiPlotDialog from "./AiPlotDialog";
 import AiWorldBuilderDialog from "./AiWorldBuilderDialog";
 import CharacterRelationshipDiagram from "./CharacterRelationshipDiagram";
 import TimelineCalendarView from "./TimelineCalendarView";
+import HistoricalEventSearchDialog from "./HistoricalEventSearchDialog";
 
 export default function Timeline({ novelId, novel, onOpenChapter, onNavigateToWorldBible }) {
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -26,6 +27,7 @@ export default function Timeline({ novelId, novel, onOpenChapter, onNavigateToWo
   const [form, setForm] = useState({ title: "", description: "", order: 0, time_period: "", location: "", world_entry_id: "", characters_involved: "", is_historical: false });
   const [versionEvent, setVersionEvent] = useState(null);
   const [viewMode, setViewMode] = useState("list"); // list | calendar
+  const [historicalSearchOpen, setHistoricalSearchOpen] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: events = [], isLoading } = useQuery({
@@ -146,6 +148,15 @@ export default function Timeline({ novelId, novel, onOpenChapter, onNavigateToWo
           <Button
             variant="outline"
             size="sm"
+            className="gap-1.5 text-amber-700 border-amber-300 hover:bg-amber-50"
+            onClick={() => setHistoricalSearchOpen(true)}
+          >
+            <Landmark className="w-3.5 h-3.5" />
+            เหตุการณ์ประวัติศาสตร์
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
             className="gap-1.5 text-primary border-primary/30 hover:bg-primary/5"
             onClick={() => setAiDialogOpen(true)}
           >
@@ -223,6 +234,13 @@ export default function Timeline({ novelId, novel, onOpenChapter, onNavigateToWo
         </Dialog>
         </div>
       </div>
+
+      <HistoricalEventSearchDialog
+        open={historicalSearchOpen}
+        onClose={() => setHistoricalSearchOpen(false)}
+        novelId={novelId}
+        onEventsAdded={() => queryClient.invalidateQueries({ queryKey: ["plotEvents", novelId] })}
+      />
 
       <AiPlotDialog
         open={aiDialogOpen}
