@@ -16,7 +16,8 @@ import {
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
   AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Loader2, Sparkles, Plus, Trash2, RefreshCw, FileText, CheckCircle2, AlertCircle, ChevronDown, ChevronUp, Users } from "lucide-react";
+import { Loader2, Sparkles, Plus, Trash2, RefreshCw, FileText, CheckCircle2, AlertCircle, ChevronDown, ChevronUp, Users, Globe } from "lucide-react";
+import AiWorldBuilderDialog from "./AiWorldBuilderDialog";
 
 function stripCodeFence(text) {
   if (typeof text !== "string") return text;
@@ -194,6 +195,8 @@ export default function AiPlotDialog({ open, onClose, novel, novelId, onOpenChap
   const [parseError, setParseError] = useState("");
   // draftStatus: map of event index -> "drafting" | "done" | ""
   const [draftStatus, setDraftStatus] = useState({});
+  const [worldBuilderOpen, setWorldBuilderOpen] = useState(false);
+  const [savedSuccessfully, setSavedSuccessfully] = useState(false);
 
   const { data: writer } = useQuery({
     queryKey: ["writer", novel?.writer_id],
@@ -286,11 +289,7 @@ export default function AiPlotDialog({ open, onClose, novel, novelId, onOpenChap
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["plotEvents", novelId] });
       queryClient.invalidateQueries({ queryKey: ["characters", novelId] });
-      onClose();
-      setStep("idle");
-      setOutline("");
-      setEvents([]);
-      setAiCharacters([]);
+      setSavedSuccessfully(true);
     },
   });
 
@@ -465,6 +464,7 @@ export default function AiPlotDialog({ open, onClose, novel, novelId, onOpenChap
     setAiCharacters([]);
     setDraftStatus({});
     setParseError("");
+    setSavedSuccessfully(false);
   };
 
   const updateAiChar = (idx, field, value) => {
@@ -719,27 +719,55 @@ export default function AiPlotDialog({ open, onClose, novel, novelId, onOpenChap
               )}
 
               {/* Actions */}
-              <div className="flex gap-2 pt-2">
-                <Button variant="outline" className="gap-2 flex-1" onClick={() => { setStep("idle"); setOutline(""); setEvents([]); setAiCharacters([]); }}>
-                  <RefreshCw className="w-3.5 h-3.5" />
-                  เขียนใหม่
-                </Button>
-                <Button
-                  className="gap-2 flex-1"
-                  onClick={handleSave}
-                  disabled={saveMutation.isPending || events.every((e) => !e.title)}
-                >
-                  {saveMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                  บันทึกลงไทม์ไลน์
-                  {aiCharacters.filter((c) => c.checked).length > 0 && (
-                    <span className="text-xs opacity-70">+ {aiCharacters.filter((c) => c.checked).length} ตัวละคร</span>
-                  )}
-                </Button>
-              </div>
+              {savedSuccessfully ? (
+                <div className="pt-2 space-y-3">
+                  <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+                    <CheckCircle2 className="w-4 h-4 shrink-0" />
+                    บันทึกไทม์ไลน์และตัวละครเรียบร้อยแล้ว
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="outline" className="gap-2 flex-1" onClick={handleClose}>
+                      ปิด
+                    </Button>
+                    <Button
+                      className="gap-2 flex-1 bg-emerald-600 hover:bg-emerald-700 text-white"
+                      onClick={() => setWorldBuilderOpen(true)}
+                    >
+                      <Globe className="w-4 h-4" />
+                      ✨ สร้างโลก/ฉากต่อ
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex gap-2 pt-2">
+                  <Button variant="outline" className="gap-2 flex-1" onClick={() => { setStep("idle"); setOutline(""); setEvents([]); setAiCharacters([]); }}>
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    เขียนใหม่
+                  </Button>
+                  <Button
+                    className="gap-2 flex-1"
+                    onClick={handleSave}
+                    disabled={saveMutation.isPending || events.every((e) => !e.title)}
+                  >
+                    {saveMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                    บันทึกลงไทม์ไลน์
+                    {aiCharacters.filter((c) => c.checked).length > 0 && (
+                      <span className="text-xs opacity-70">+ {aiCharacters.filter((c) => c.checked).length} ตัวละคร</span>
+                    )}
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </DialogContent>
       </Dialog>
+
+      <AiWorldBuilderDialog
+        open={worldBuilderOpen}
+        onClose={() => { setWorldBuilderOpen(false); handleClose(); }}
+        novel={novel}
+        novelId={novelId}
+      />
 
       {/* Confirm replace/append */}
       <AlertDialog open={replaceConfirm} onOpenChange={setReplaceConfirm}>

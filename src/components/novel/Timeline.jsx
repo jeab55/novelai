@@ -9,17 +9,19 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, Clock, Trash2, Edit2, BookOpen, Landmark, Loader2, Sparkles, History, Calendar, List, MapPin, ExternalLink } from "lucide-react";
+import { Plus, Clock, Trash2, Edit2, BookOpen, Landmark, Loader2, Sparkles, History, Calendar, List, MapPin, ExternalLink, Globe } from "lucide-react";
 import VersionHistoryDialog from "./VersionHistoryDialog";
 import { saveVersion } from "@/lib/saveVersion";
 import { motion } from "framer-motion";
 import AiPlotDialog from "./AiPlotDialog";
+import AiWorldBuilderDialog from "./AiWorldBuilderDialog";
 import CharacterRelationshipDiagram from "./CharacterRelationshipDiagram";
 import TimelineCalendarView from "./TimelineCalendarView";
 
 export default function Timeline({ novelId, novel, onOpenChapter, onNavigateToWorldBible }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [aiDialogOpen, setAiDialogOpen] = useState(false);
+  const [worldBuilderOpen, setWorldBuilderOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({ title: "", description: "", order: 0, time_period: "", location: "", world_entry_id: "", characters_involved: "", is_historical: false });
   const [versionEvent, setVersionEvent] = useState(null);
@@ -150,6 +152,15 @@ export default function Timeline({ novelId, novel, onOpenChapter, onNavigateToWo
             <Sparkles className="w-3.5 h-3.5" />
             ให้ AI ช่วยวางพล็อต
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5 text-emerald-700 border-emerald-300 hover:bg-emerald-50"
+            onClick={() => setWorldBuilderOpen(true)}
+          >
+            <Globe className="w-3.5 h-3.5" />
+            ✨ สร้างโลก/ฉากต่อ
+          </Button>
           <Dialog open={dialogOpen} onOpenChange={(v) => { if (!v) closeDialog(); else setDialogOpen(true); }}>
           <DialogTrigger asChild>
             <Button size="sm" className="gap-1.5" onClick={() => setForm({ ...form, order: events.length + 1 })}>
@@ -227,6 +238,12 @@ export default function Timeline({ novelId, novel, onOpenChapter, onNavigateToWo
         novel={novel}
         novelId={novelId}
         onOpenChapter={onOpenChapter}
+      />
+      <AiWorldBuilderDialog
+        open={worldBuilderOpen}
+        onClose={() => setWorldBuilderOpen(false)}
+        novel={novel}
+        novelId={novelId}
       />
       <CharacterRelationshipDiagram
         novelId={novelId}
