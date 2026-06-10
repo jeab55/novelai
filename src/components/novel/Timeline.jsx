@@ -6,9 +6,10 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, Clock, Trash2, Edit2, BookOpen, Landmark, Loader2, Sparkles, History, Calendar, List } from "lucide-react";
+import { Plus, Clock, Trash2, Edit2, BookOpen, Landmark, Loader2, Sparkles, History, Calendar, List, MapPin, ExternalLink } from "lucide-react";
 import VersionHistoryDialog from "./VersionHistoryDialog";
 import { saveVersion } from "@/lib/saveVersion";
 import { motion } from "framer-motion";
@@ -16,11 +17,11 @@ import AiPlotDialog from "./AiPlotDialog";
 import CharacterRelationshipDiagram from "./CharacterRelationshipDiagram";
 import TimelineCalendarView from "./TimelineCalendarView";
 
-export default function Timeline({ novelId, novel, onOpenChapter }) {
+export default function Timeline({ novelId, novel, onOpenChapter, onNavigateToWorldBible }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [aiDialogOpen, setAiDialogOpen] = useState(false);
   const [editing, setEditing] = useState(null);
-  const [form, setForm] = useState({ title: "", description: "", order: 0, time_period: "", location: "", characters_involved: "", is_historical: false });
+  const [form, setForm] = useState({ title: "", description: "", order: 0, time_period: "", location: "", world_entry_id: "", characters_involved: "", is_historical: false });
   const [versionEvent, setVersionEvent] = useState(null);
   const [viewMode, setViewMode] = useState("list"); // list | calendar
   const queryClient = useQueryClient();
@@ -40,6 +41,18 @@ export default function Timeline({ novelId, novel, onOpenChapter }) {
       return all.filter((c) => !c.is_deleted);
     },
   });
+
+  // World entries for location linking (หมวดสถานที่)
+  const { data: worldEntries = [] } = useQuery({
+    queryKey: ["worldEntries", novelId],
+    queryFn: async () => {
+      const all = await base44.entities.WorldEntry.filter({ novel_id: novelId });
+      return all.filter((e) => !e.is_deleted && e.category === "สถานที่");
+    },
+  });
+
+  // Map world_entry_id -> entry for quick lookup
+  const worldEntryMap = Object.fromEntries(worldEntries.map((e) => [e.id, e]));
 
   // Map plot_event_id -> chapter for calendar view
   const linkedChaptersByEvent = (() => {
@@ -79,7 +92,7 @@ export default function Timeline({ novelId, novel, onOpenChapter }) {
   const closeDialog = () => {
     setDialogOpen(false);
     setEditing(null);
-    setForm({ title: "", description: "", order: events.length + 1, time_period: "", location: "", characters_involved: "", is_historical: false });
+    setForm({ title: "", description: "", order: events.length + 1, time_period: "", location: "", world_entry_id: "", characters_involved: "", is_historical: false });
   };
 
   const openEdit = (ev) => {
@@ -90,6 +103,7 @@ export default function Timeline({ novelId, novel, onOpenChapter }) {
       order: ev.order || 0,
       time_period: ev.time_period || "",
       location: ev.location || "",
+      world_entry_id: ev.world_entry_id || "",
       characters_involved: ev.characters_involved || "",
       is_historical: ev.is_historical || false,
     });
@@ -159,8 +173,34 @@ export default function Timeline({ novelId, novel, onOpenChapter }) {
                   <Input value={form.time_period} onChange={(e) => setForm({ ...form, time_period: e.target.value })} placeholder="เช่น ปี พ.ศ. 2310" />
                 </div>
               </div>
-              <div><label className="text-sm font-medium mb-1.5 block">สถานที่</label>
-                <Input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="เช่น กรุงศรีอยุธยา, ทุ่งพระเมรุ" />
+              <div>
+                <label className="text-sm font-medium mb-1.5 block">สถานที่</label>
+                {worldEntries.length > 0 && (
+                  <div className="mb-2">
+                    <Select
+                      value={form.world_entry_id || "_none"}
+                      onValueChange={(v) => {
+                        const entry = worldEntryMap[v];
+                        setForm({ ...form, world_entry_id: v === "_none" ? "" : v, location: entry ? entry.title : form.location });
+                      }}
+                    >
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue placeholder="ผูกกับสถานที่ใน World Bible (ไม่บังคับ)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="_none">— ไม่ผูก (พิมพ์อิสระ) —</SelectItem>
+                        {worldEntries.map((e) => (
+                          <SelectItem key={e.id} value={e.id}>{e.title}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                <Input
+                  value={form.location}
+                  onChange={(e) => setForm({ ...form, location: e.target.value, world_entry_id: "" })}
+                  placeholder="เช่น กรุงศรีอยุธยา, ทุ่งพระเมรุ"
+                />
               </div>
               <div><label className="text-sm font-medium mb-1.5 block">คำอธิบาย</label>
                 <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={3} placeholder="อธิบายเหตุการณ์..." />
@@ -250,7 +290,21 @@ export default function Timeline({ novelId, novel, onOpenChapter }) {
                         )}
                       </div>
                       {ev.time_period && <p className="text-xs text-primary/70 mb-1">{ev.time_period}</p>}
-                      {ev.location && <p className="text-xs text-muted-foreground mb-1">📍 {ev.location}</p>}
+                      {ev.location && (
+                        <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                          <MapPin className="w-3 h-3 shrink-0" />
+                          {ev.world_entry_id && worldEntryMap[ev.world_entry_id] ? (
+                            <button
+                              className="text-primary/80 hover:text-primary underline underline-offset-2 transition-colors"
+                              onClick={() => onNavigateToWorldBible?.(ev.world_entry_id)}
+                              title="ดูรายละเอียดสถานที่ใน World Bible"
+                            >
+                              {ev.location}
+                              <ExternalLink className="w-2.5 h-2.5 inline ml-0.5 mb-0.5" />
+                            </button>
+                          ) : ev.location}
+                        </p>
+                      )}
                       {ev.description && <p className="text-sm text-muted-foreground">{ev.description}</p>}
                       {ev.characters_involved && (
                         <p className="text-xs text-muted-foreground mt-2">

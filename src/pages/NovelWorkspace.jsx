@@ -228,10 +228,18 @@ export default function NovelWorkspace() {
             <CharacterBible novelId={novelId} />
           </TabsContent>
           <TabsContent value="world" className="m-0">
-            <WorldBible novelId={novelId} />
+            <WorldBible
+              novelId={novelId}
+              onNavigateToTimeline={(eventId) => setActiveTab("timeline")}
+            />
           </TabsContent>
           <TabsContent value="timeline" className="m-0">
-            <Timeline novelId={novelId} novel={novel} onOpenChapter={(ch) => { setPendingOpenChapter(ch); setActiveTab("writing"); }} />
+            <Timeline
+              novelId={novelId}
+              novel={novel}
+              onOpenChapter={(ch) => { setPendingOpenChapter(ch); setActiveTab("writing"); }}
+              onNavigateToWorldBible={() => setActiveTab("world")}
+            />
           </TabsContent>
           <TabsContent value="ai" className="m-0 h-full">
             <AiAssistant novelId={novelId} novel={novel} />

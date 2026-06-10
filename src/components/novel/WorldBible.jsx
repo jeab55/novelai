@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import {
   Plus, Globe, Trash2, Edit2, Loader2, History, BookOpen,
   ChevronDown, ChevronUp, CheckCircle2, Search, X, Settings2,
-  ChevronRight,
+  ChevronRight, Clock,
 } from "lucide-react";
 import VersionHistoryDialog from "./VersionHistoryDialog";
 import { saveVersion } from "@/lib/saveVersion";
@@ -28,7 +28,7 @@ const DEFAULT_CATEGORIES = [
   { id: "_อื่นๆ", name: "อื่นๆ", color: "เทา" },
 ];
 
-export default function WorldBible({ novelId }) {
+export default function WorldBible({ novelId, onNavigateToTimeline }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({ title: "", category: "", description: "" });
@@ -56,6 +56,24 @@ export default function WorldBible({ novelId }) {
     queryFn: () =>
       base44.entities.WorldCategory.filter({ novel_id: novelId }),
   });
+
+  // PlotEvents for linking (กรองเฉพาะที่ไม่ถูกลบ)
+  const { data: plotEvents = [] } = useQuery({
+    queryKey: ["plotEvents", novelId],
+    queryFn: async () => {
+      const all = await base44.entities.PlotEvent.filter({ novel_id: novelId }, "order");
+      return all.filter((e) => !e.is_deleted);
+    },
+  });
+
+  // Map world_entry_id -> plotEvents[]
+  const eventsByWorldEntry = plotEvents.reduce((acc, ev) => {
+    if (ev.world_entry_id) {
+      if (!acc[ev.world_entry_id]) acc[ev.world_entry_id] = [];
+      acc[ev.world_entry_id].push(ev);
+    }
+    return acc;
+  }, {});
 
   // Merge: use custom if any, else fallback to defaults
   const allCategories = customCategories.length > 0 ? customCategories : DEFAULT_CATEGORIES;
@@ -329,15 +347,17 @@ export default function WorldBible({ novelId }) {
                   <AnimatePresence>
                     {items.map((entry, i) => (
                       <WorldEntryCard
-                        key={entry.id}
-                        entry={entry}
-                        index={i}
-                        colors={colors}
-                        expanded={expandedId === entry.id}
-                        onToggle={() => setExpandedId(expandedId === entry.id ? null : entry.id)}
-                        onEdit={() => openEdit(entry)}
-                        onDelete={() => deleteMutation.mutate(entry.id)}
-                        onHistory={() => setVersionEntry(entry)}
+                       key={entry.id}
+                       entry={entry}
+                       index={i}
+                       colors={colors}
+                       expanded={expandedId === entry.id}
+                       onToggle={() => setExpandedId(expandedId === entry.id ? null : entry.id)}
+                       onEdit={() => openEdit(entry)}
+                       onDelete={() => deleteMutation.mutate(entry.id)}
+                       onHistory={() => setVersionEntry(entry)}
+                       linkedEvents={eventsByWorldEntry[entry.id] || []}
+                       onNavigateToTimeline={onNavigateToTimeline}
                       />
                     ))}
                   </AnimatePresence>
@@ -365,6 +385,8 @@ export default function WorldBible({ novelId }) {
                   onDelete={() => deleteMutation.mutate(entry.id)}
                   onHistory={() => setVersionEntry(entry)}
                   search={search}
+                  linkedEvents={eventsByWorldEntry[entry.id] || []}
+                  onNavigateToTimeline={onNavigateToTimeline}
                 />
               );
             })}
@@ -384,8 +406,9 @@ function highlightText(text, query) {
   );
 }
 
-function WorldEntryCard({ entry, index, colors, expanded, onToggle, onEdit, onDelete, onHistory, search }) {
+function WorldEntryCard({ entry, index, colors, expanded, onToggle, onEdit, onDelete, onHistory, search, linkedEvents = [], onNavigateToTimeline }) {
   const isLong = entry.description && entry.description.length > 120;
+  const isLocation = entry.category === "สถานที่";
 
   return (
     <motion.div
@@ -442,6 +465,31 @@ function WorldEntryCard({ entry, index, colors, expanded, onToggle, onEdit, onDe
           </Button>
         </div>
       </div>
+
+      {/* Linked timeline events — shown for สถานที่ category */}
+      {isLocation && linkedEvents.length > 0 && (
+        <div className="mx-4 mb-4 rounded-lg border border-primary/15 bg-primary/4 overflow-hidden">
+          <div className="flex items-center gap-1.5 px-3 py-1.5 border-b border-primary/10">
+            <Clock className="w-3 h-3 text-primary/60" />
+            <span className="text-[11px] font-semibold text-primary/70">เหตุการณ์ไทม์ไลน์ที่เกิดที่นี่ ({linkedEvents.length})</span>
+          </div>
+          <ul className="divide-y divide-primary/10">
+            {linkedEvents.map((ev) => (
+              <li key={ev.id}>
+                <button
+                  className="w-full text-left px-3 py-2 flex items-center gap-2 hover:bg-primary/8 transition-colors"
+                  onClick={() => onNavigateToTimeline?.(ev.id)}
+                >
+                  <span className="text-[10px] font-mono text-muted-foreground w-5 shrink-0">#{ev.order}</span>
+                  <span className="text-xs font-medium flex-1 text-foreground/90 leading-snug">{ev.title}</span>
+                  {ev.time_period && <span className="text-[10px] text-muted-foreground shrink-0">{ev.time_period}</span>}
+                  <ChevronRight className="w-3 h-3 text-muted-foreground shrink-0" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </motion.div>
   );
 }
