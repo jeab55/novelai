@@ -231,6 +231,7 @@ export default function NovelWorkspace() {
             <WorldBible
               novelId={novelId}
               onNavigateToTimeline={(eventId) => setActiveTab("timeline")}
+              novel={novel}
             />
           </TabsContent>
           <TabsContent value="timeline" className="m-0">

@@ -152,15 +152,7 @@ export default function Timeline({ novelId, novel, onOpenChapter, onNavigateToWo
             <Sparkles className="w-3.5 h-3.5" />
             ให้ AI ช่วยวางพล็อต
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-1.5 text-emerald-700 border-emerald-300 hover:bg-emerald-50"
-            onClick={() => setWorldBuilderOpen(true)}
-          >
-            <Globe className="w-3.5 h-3.5" />
-            ✨ สร้างโลก/ฉากต่อ
-          </Button>
+
           <Dialog open={dialogOpen} onOpenChange={(v) => { if (!v) closeDialog(); else setDialogOpen(true); }}>
           <DialogTrigger asChild>
             <Button size="sm" className="gap-1.5" onClick={() => setForm({ ...form, order: events.length + 1 })}>
@@ -239,12 +231,7 @@ export default function Timeline({ novelId, novel, onOpenChapter, onNavigateToWo
         novelId={novelId}
         onOpenChapter={onOpenChapter}
       />
-      <AiWorldBuilderDialog
-        open={worldBuilderOpen}
-        onClose={() => setWorldBuilderOpen(false)}
-        novel={novel}
-        novelId={novelId}
-      />
+
       <CharacterRelationshipDiagram
         novelId={novelId}
       />

@@ -10,13 +10,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import {
   Plus, Globe, Trash2, Edit2, Loader2, History, BookOpen,
   ChevronDown, ChevronUp, CheckCircle2, Search, X, Settings2,
-  ChevronRight, Clock,
+  ChevronRight, Clock, Sparkles,
 } from "lucide-react";
 import VersionHistoryDialog from "./VersionHistoryDialog";
 import { saveVersion } from "@/lib/saveVersion";
 import { motion, AnimatePresence } from "framer-motion";
 import { ERA_TEMPLATES } from "./EraTemplates";
 import WorldCategoryManager, { getColorClasses } from "./WorldCategoryManager";
+import AiWorldBuilderDialog from "./AiWorldBuilderDialog";
 
 // Built-in fallback categories
 const DEFAULT_CATEGORIES = [
@@ -28,7 +29,7 @@ const DEFAULT_CATEGORIES = [
   { id: "_อื่นๆ", name: "อื่นๆ", color: "เทา" },
 ];
 
-export default function WorldBible({ novelId, onNavigateToTimeline }) {
+export default function WorldBible({ novelId, onNavigateToTimeline, novel }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({ title: "", category: "", description: "" });
@@ -41,6 +42,7 @@ export default function WorldBible({ novelId, onNavigateToTimeline }) {
   const [search, setSearch] = useState("");
   const [catManagerOpen, setCatManagerOpen] = useState(false);
   const [expandedId, setExpandedId] = useState(null);
+  const [worldBuilderOpen, setWorldBuilderOpen] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: entries = [], isLoading } = useQuery({
@@ -149,18 +151,25 @@ export default function WorldBible({ novelId, onNavigateToTimeline }) {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-6">
+      <AiWorldBuilderDialog
+        open={worldBuilderOpen}
+        onClose={() => setWorldBuilderOpen(false)}
+        novel={novel}
+        novelId={novelId}
+      />
+
       {versionEntry && (
-        <VersionHistoryDialog
-          open={!!versionEntry}
-          onClose={() => setVersionEntry(null)}
-          entityType="world_entry"
-          entityId={versionEntry.id}
-          novelId={novelId}
-          currentData={versionEntry}
-          currentLabel={versionEntry.title}
-          onRestored={() => queryClient.invalidateQueries({ queryKey: ["worldEntries", novelId] })}
-        />
-      )}
+         <VersionHistoryDialog
+           open={!!versionEntry}
+           onClose={() => setVersionEntry(null)}
+           entityType="world_entry"
+           entityId={versionEntry.id}
+           novelId={novelId}
+           currentData={versionEntry}
+           currentLabel={versionEntry.title}
+           onRestored={() => queryClient.invalidateQueries({ queryKey: ["worldEntries", novelId] })}
+         />
+       )}
 
       {/* Header */}
       <div className="flex items-center justify-between mb-5">
@@ -169,13 +178,18 @@ export default function WorldBible({ novelId, onNavigateToTimeline }) {
           <p className="text-sm text-muted-foreground">{entries.length} รายการ</p>
         </div>
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" className="gap-1.5 border-amber-300 text-amber-700 hover:bg-amber-50"
-            onClick={() => { setTemplatePickerOpen((v) => !v); setImportDone(false); setSelectedEra(null); }}>
-            <BookOpen className="w-3.5 h-3.5" />
-            เทมเพลตยุคสมัย
-            {templatePickerOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-          </Button>
-          <Dialog open={dialogOpen} onOpenChange={(v) => { setDialogOpen(v); if (!v) { setEditing(null); setForm({ title: "", category: "", description: "" }); } }}>
+           <Button size="sm" variant="outline" className="gap-1.5 text-emerald-700 border-emerald-300 hover:bg-emerald-50"
+             onClick={() => setWorldBuilderOpen(true)}>
+             <Sparkles className="w-3.5 h-3.5" />
+             ✨ สร้างโลก/ฉาก
+           </Button>
+           <Button size="sm" variant="outline" className="gap-1.5 border-amber-300 text-amber-700 hover:bg-amber-50"
+             onClick={() => { setTemplatePickerOpen((v) => !v); setImportDone(false); setSelectedEra(null); }}>
+             <BookOpen className="w-3.5 h-3.5" />
+             เทมเพลตยุคสมัย
+             {templatePickerOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+           </Button>
+           <Dialog open={dialogOpen} onOpenChange={(v) => { setDialogOpen(v); if (!v) { setEditing(null); setForm({ title: "", category: "", description: "" }); } }}>
             <DialogTrigger asChild>
               <Button size="sm" className="gap-1.5"><Plus className="w-3.5 h-3.5" />เพิ่มข้อมูล</Button>
             </DialogTrigger>

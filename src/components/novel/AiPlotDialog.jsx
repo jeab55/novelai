@@ -720,23 +720,9 @@ export default function AiPlotDialog({ open, onClose, novel, novelId, onOpenChap
 
               {/* Actions */}
               {savedSuccessfully ? (
-                <div className="pt-2 space-y-3">
-                  <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
-                    <CheckCircle2 className="w-4 h-4 shrink-0" />
-                    บันทึกไทม์ไลน์และตัวละครเรียบร้อยแล้ว
-                  </div>
-                  <div className="flex gap-2">
-                    <Button variant="outline" className="gap-2 flex-1" onClick={handleClose}>
-                      ปิด
-                    </Button>
-                    <Button
-                      className="gap-2 flex-1 bg-emerald-600 hover:bg-emerald-700 text-white"
-                      onClick={() => setWorldBuilderOpen(true)}
-                    >
-                      <Globe className="w-4 h-4" />
-                      ✨ สร้างโลก/ฉากต่อ
-                    </Button>
-                  </div>
+                <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2 mt-2">
+                  <CheckCircle2 className="w-4 h-4 shrink-0" />
+                  บันทึกไทม์ไลน์และตัวละครเรียบร้อยแล้ว
                 </div>
               ) : (
                 <div className="flex gap-2 pt-2">
@@ -761,13 +747,6 @@ export default function AiPlotDialog({ open, onClose, novel, novelId, onOpenChap
           )}
         </DialogContent>
       </Dialog>
-
-      <AiWorldBuilderDialog
-        open={worldBuilderOpen}
-        onClose={() => { setWorldBuilderOpen(false); handleClose(); }}
-        novel={novel}
-        novelId={novelId}
-      />
 
       {/* Confirm replace/append */}
       <AlertDialog open={replaceConfirm} onOpenChange={setReplaceConfirm}>
