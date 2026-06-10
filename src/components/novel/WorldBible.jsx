@@ -7,31 +7,26 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, Globe, Trash2, Edit2, MapPin, Crown, Scroll, Package, Settings, HelpCircle, Loader2, History, BookOpen, ChevronDown, ChevronUp, CheckCircle2 } from "lucide-react";
+import {
+  Plus, Globe, Trash2, Edit2, Loader2, History, BookOpen,
+  ChevronDown, ChevronUp, CheckCircle2, Search, X, Settings2,
+  ChevronRight,
+} from "lucide-react";
 import VersionHistoryDialog from "./VersionHistoryDialog";
 import { saveVersion } from "@/lib/saveVersion";
 import { motion, AnimatePresence } from "framer-motion";
 import { ERA_TEMPLATES } from "./EraTemplates";
+import WorldCategoryManager, { getColorClasses } from "./WorldCategoryManager";
 
-const CATEGORIES = ["สถานที่", "ขนบธรรมเนียม", "ยุคสมัย", "สิ่งของ", "ระบบ", "อื่นๆ"];
-
-const categoryIcons = {
-  "สถานที่": MapPin,
-  "ขนบธรรมเนียม": Crown,
-  "ยุคสมัย": Scroll,
-  "สิ่งของ": Package,
-  "ระบบ": Settings,
-  "อื่นๆ": HelpCircle,
-};
-
-const categoryColors = {
-  "สถานที่": "bg-emerald-100 text-emerald-700",
-  "ขนบธรรมเนียม": "bg-purple-100 text-purple-700",
-  "ยุคสมัย": "bg-amber-100 text-amber-700",
-  "สิ่งของ": "bg-sky-100 text-sky-700",
-  "ระบบ": "bg-indigo-100 text-indigo-700",
-  "อื่นๆ": "bg-gray-100 text-gray-600",
-};
+// Built-in fallback categories
+const DEFAULT_CATEGORIES = [
+  { id: "_สถานที่", name: "สถานที่", color: "เขียว" },
+  { id: "_ขนบธรรมเนียม", name: "ขนบธรรมเนียม", color: "ม่วง" },
+  { id: "_ยุคสมัย", name: "ยุคสมัย", color: "เหลือง" },
+  { id: "_สิ่งของ", name: "สิ่งของ", color: "ฟ้า" },
+  { id: "_ระบบ", name: "ระบบ", color: "น้ำเงิน" },
+  { id: "_อื่นๆ", name: "อื่นๆ", color: "เทา" },
+];
 
 export default function WorldBible({ novelId }) {
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -43,6 +38,9 @@ export default function WorldBible({ novelId }) {
   const [selectedEra, setSelectedEra] = useState(null);
   const [importingEra, setImportingEra] = useState(false);
   const [importDone, setImportDone] = useState(false);
+  const [search, setSearch] = useState("");
+  const [catManagerOpen, setCatManagerOpen] = useState(false);
+  const [expandedId, setExpandedId] = useState(null);
   const queryClient = useQueryClient();
 
   const { data: entries = [], isLoading } = useQuery({
@@ -52,6 +50,16 @@ export default function WorldBible({ novelId }) {
       return all.filter((e) => !e.is_deleted);
     },
   });
+
+  const { data: customCategories = [] } = useQuery({
+    queryKey: ["worldCategories", novelId],
+    queryFn: () =>
+      base44.entities.WorldCategory.filter({ novel_id: novelId }),
+  });
+
+  // Merge: use custom if any, else fallback to defaults
+  const allCategories = customCategories.length > 0 ? customCategories : DEFAULT_CATEGORIES;
+  const categoryNames = allCategories.map((c) => c.name);
 
   const saveMutation = useMutation({
     mutationFn: async (data) => {
@@ -87,18 +95,22 @@ export default function WorldBible({ novelId }) {
     setDialogOpen(true);
   };
 
-  const filtered = filterCat === "ทั้งหมด" ? entries : entries.filter((e) => e.category === filterCat);
+  const filtered = entries
+    .filter((e) => filterCat === "ทั้งหมด" || e.category === filterCat)
+    .filter((e) => {
+      if (!search.trim()) return true;
+      const q = search.toLowerCase();
+      return e.title?.toLowerCase().includes(q) || e.description?.toLowerCase().includes(q) || e.category?.toLowerCase().includes(q);
+    });
 
   const handleImportEra = async () => {
     if (!selectedEra) return;
     setImportingEra(true);
     const era = ERA_TEMPLATES.find((t) => t.label === selectedEra);
     if (era) {
-      await Promise.all(
-        era.entries.map((entry) =>
-          base44.entities.WorldEntry.create({ ...entry, novel_id: novelId })
-        )
-      );
+      await Promise.all(era.entries.map((entry) =>
+        base44.entities.WorldEntry.create({ ...entry, novel_id: novelId })
+      ));
       queryClient.invalidateQueries({ queryKey: ["worldEntries", novelId] });
     }
     setImportingEra(false);
@@ -109,6 +121,13 @@ export default function WorldBible({ novelId }) {
       setSelectedEra(null);
     }, 1500);
   };
+
+  // Group by category for grouped view
+  const grouped = categoryNames
+    .map((name) => ({ name, items: filtered.filter((e) => e.category === name) }))
+    .filter((g) => g.items.length > 0);
+  const uncategorized = filtered.filter((e) => !e.category || !categoryNames.includes(e.category));
+  if (uncategorized.length > 0) grouped.push({ name: "ไม่มีหมวดหมู่", items: uncategorized });
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-6">
@@ -124,49 +143,52 @@ export default function WorldBible({ novelId }) {
           onRestored={() => queryClient.invalidateQueries({ queryKey: ["worldEntries", novelId] })}
         />
       )}
-      <div className="flex items-center justify-between mb-6">
+
+      {/* Header */}
+      <div className="flex items-center justify-between mb-5">
         <div>
           <h2 className="font-heading text-lg font-semibold">โลกและฉาก</h2>
           <p className="text-sm text-muted-foreground">{entries.length} รายการ</p>
         </div>
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" className="gap-1.5 border-amber-300 text-amber-700 hover:bg-amber-50" onClick={() => { setTemplatePickerOpen((v) => !v); setImportDone(false); setSelectedEra(null); }}>
+          <Button size="sm" variant="outline" className="gap-1.5 border-amber-300 text-amber-700 hover:bg-amber-50"
+            onClick={() => { setTemplatePickerOpen((v) => !v); setImportDone(false); setSelectedEra(null); }}>
             <BookOpen className="w-3.5 h-3.5" />
             เทมเพลตยุคสมัย
             {templatePickerOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
           </Button>
-        <Dialog open={dialogOpen} onOpenChange={(v) => { setDialogOpen(v); if (!v) { setEditing(null); setForm({ title: "", category: "", description: "" }); } }}>
-          <DialogTrigger asChild>
-            <Button size="sm" className="gap-1.5"><Plus className="w-3.5 h-3.5" />เพิ่มข้อมูล</Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-lg">
-            <DialogHeader>
-              <DialogTitle className="font-heading">{editing ? "แก้ไข" : "เพิ่มข้อมูลโลก"}</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 mt-2">
-              <div>
-                <label className="text-sm font-medium mb-1.5 block">ชื่อ</label>
-                <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="เช่น พระราชวังหลวง" />
+          <Dialog open={dialogOpen} onOpenChange={(v) => { setDialogOpen(v); if (!v) { setEditing(null); setForm({ title: "", category: "", description: "" }); } }}>
+            <DialogTrigger asChild>
+              <Button size="sm" className="gap-1.5"><Plus className="w-3.5 h-3.5" />เพิ่มข้อมูล</Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-lg">
+              <DialogHeader>
+                <DialogTitle className="font-heading">{editing ? "แก้ไขข้อมูล" : "เพิ่มข้อมูลโลก"}</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 mt-2">
+                <div>
+                  <label className="text-sm font-medium mb-1.5 block">ชื่อ</label>
+                  <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="เช่น พระราชวังหลวง" />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1.5 block">หมวดหมู่</label>
+                  <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v })}>
+                    <SelectTrigger><SelectValue placeholder="เลือกหมวดหมู่" /></SelectTrigger>
+                    <SelectContent>
+                      {categoryNames.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1.5 block">รายละเอียด</label>
+                  <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={5} placeholder="อธิบายรายละเอียด..." />
+                </div>
+                <Button className="w-full" onClick={() => saveMutation.mutate(form)} disabled={!form.title || saveMutation.isPending}>
+                  {saveMutation.isPending ? "กำลังบันทึก..." : editing ? "อัปเดต" : "เพิ่ม"}
+                </Button>
               </div>
-              <div>
-                <label className="text-sm font-medium mb-1.5 block">ประเภท</label>
-                <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v })}>
-                  <SelectTrigger><SelectValue placeholder="เลือกประเภท" /></SelectTrigger>
-                  <SelectContent>
-                    {CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-1.5 block">รายละเอียด</label>
-                <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={5} placeholder="อธิบายรายละเอียด..." />
-              </div>
-              <Button className="w-full" onClick={() => saveMutation.mutate(form)} disabled={!form.title || saveMutation.isPending}>
-                {saveMutation.isPending ? "กำลังบันทึก..." : editing ? "อัปเดต" : "เพิ่ม"}
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
@@ -176,11 +198,8 @@ export default function WorldBible({ novelId }) {
           <p className="text-sm font-semibold text-amber-900 mb-3">เลือกยุคสมัยที่ต้องการเติมข้อมูลพื้นหลัง</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-4">
             {ERA_TEMPLATES.map((era) => (
-              <button
-                key={era.label}
-                onClick={() => setSelectedEra(era.label)}
-                className={`text-left px-3 py-2 rounded-lg border text-sm transition-all ${selectedEra === era.label ? "border-amber-500 bg-amber-100 text-amber-900 font-medium" : "border-amber-200 bg-white text-foreground hover:border-amber-400 hover:bg-amber-50"}`}
-              >
+              <button key={era.label} onClick={() => setSelectedEra(era.label)}
+                className={`text-left px-3 py-2 rounded-lg border text-sm transition-all ${selectedEra === era.label ? "border-amber-500 bg-amber-100 text-amber-900 font-medium" : "border-amber-200 bg-white text-foreground hover:border-amber-400 hover:bg-amber-50"}`}>
                 {era.label}
                 <span className="block text-xs text-muted-foreground mt-0.5">{era.entries.length} รายการ</span>
               </button>
@@ -199,86 +218,230 @@ export default function WorldBible({ novelId }) {
               </ul>
             </div>
           )}
-          <Button
-            size="sm"
-            className="gap-1.5 bg-amber-600 hover:bg-amber-700 text-white"
-            disabled={!selectedEra || importingEra || importDone}
-            onClick={handleImportEra}
-          >
+          <Button size="sm" className="gap-1.5 bg-amber-600 hover:bg-amber-700 text-white"
+            disabled={!selectedEra || importingEra || importDone} onClick={handleImportEra}>
             {importingEra ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : importDone ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
             {importDone ? "เพิ่มสำเร็จแล้ว!" : importingEra ? "กำลังเพิ่ม..." : "เพิ่มข้อมูลยุคสมัยนี้"}
           </Button>
         </div>
       )}
 
-      {/* Filter */}
-      <div className="flex gap-2 mb-4 flex-wrap">
-        {["ทั้งหมด", ...CATEGORIES].map((c) => (
-          <Button
-            key={c}
-            variant={filterCat === c ? "default" : "outline"}
-            size="sm"
-            className="text-xs h-7"
-            onClick={() => setFilterCat(c)}
-          >
-            {c}
-          </Button>
-        ))}
+      {/* Search + Category Manager toggle */}
+      <div className="flex gap-2 mb-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+          <Input
+            className="pl-8 h-8 text-sm"
+            placeholder="ค้นหาข้อมูลโลก..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          {search && (
+            <button className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" onClick={() => setSearch("")}>
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+        <Button
+          size="sm"
+          variant={catManagerOpen ? "default" : "outline"}
+          className="gap-1.5 shrink-0"
+          onClick={() => setCatManagerOpen((v) => !v)}
+        >
+          <Settings2 className="w-3.5 h-3.5" />
+          หมวดหมู่
+        </Button>
       </div>
 
+      {/* Category Manager Panel */}
+      <AnimatePresence>
+        {catManagerOpen && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            className="overflow-hidden mb-4"
+          >
+            <div className="border border-border/60 rounded-xl p-4 bg-card/60">
+              <WorldCategoryManager
+                novelId={novelId}
+                categories={customCategories}
+                onClose={() => setCatManagerOpen(false)}
+              />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Filter tabs */}
+      <div className="flex gap-2 mb-5 flex-wrap">
+        <Button
+          key="all"
+          variant={filterCat === "ทั้งหมด" ? "default" : "outline"}
+          size="sm"
+          className="text-xs h-7 rounded-full"
+          onClick={() => setFilterCat("ทั้งหมด")}
+        >
+          ทั้งหมด <span className="ml-1 opacity-60">{entries.length}</span>
+        </Button>
+        {allCategories.map((cat) => {
+          const colors = getColorClasses(cat.color);
+          const count = entries.filter((e) => e.category === cat.name).length;
+          if (count === 0) return null;
+          return (
+            <button
+              key={cat.id}
+              onClick={() => setFilterCat(filterCat === cat.name ? "ทั้งหมด" : cat.name)}
+              className={`px-3 h-7 rounded-full text-xs font-medium border-2 transition-all ${
+                filterCat === cat.name
+                  ? `${colors.bg} ${colors.text} border-current`
+                  : `bg-transparent border-border/50 text-muted-foreground hover:${colors.bg} hover:${colors.text}`
+              }`}
+            >
+              {cat.name} <span className="ml-1 opacity-60">{count}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Content */}
       {isLoading ? (
         <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-16">
           <Globe className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
-          <p className="text-muted-foreground">ยังไม่มีข้อมูล</p>
+          <p className="text-muted-foreground">{search ? `ไม่พบผลลัพธ์สำหรับ "${search}"` : "ยังไม่มีข้อมูล"}</p>
+        </div>
+      ) : filterCat === "ทั้งหมด" && !search ? (
+        /* Grouped view */
+        <div className="space-y-6">
+          {grouped.map(({ name, items }) => {
+            const cat = allCategories.find((c) => c.name === name);
+            const colors = cat ? getColorClasses(cat.color) : getColorClasses("เทา");
+            return (
+              <div key={name}>
+                <div className="flex items-center gap-2 mb-3">
+                  <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${colors.bg} ${colors.text}`}>{name}</span>
+                  <span className="text-xs text-muted-foreground">{items.length} รายการ</span>
+                  <div className="flex-1 h-px bg-border/40 ml-1" />
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <AnimatePresence>
+                    {items.map((entry, i) => (
+                      <WorldEntryCard
+                        key={entry.id}
+                        entry={entry}
+                        index={i}
+                        colors={colors}
+                        expanded={expandedId === entry.id}
+                        onToggle={() => setExpandedId(expandedId === entry.id ? null : entry.id)}
+                        onEdit={() => openEdit(entry)}
+                        onDelete={() => deleteMutation.mutate(entry.id)}
+                        onHistory={() => setVersionEntry(entry)}
+                      />
+                    ))}
+                  </AnimatePresence>
+                </div>
+              </div>
+            );
+          })}
         </div>
       ) : (
+        /* Flat view for filtered/searched */
         <div className="grid gap-3 sm:grid-cols-2">
           <AnimatePresence>
             {filtered.map((entry, i) => {
-              const Icon = categoryIcons[entry.category] || HelpCircle;
+              const cat = allCategories.find((c) => c.name === entry.category);
+              const colors = cat ? getColorClasses(cat.color) : getColorClasses("เทา");
               return (
-                <motion.div
+                <WorldEntryCard
                   key={entry.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.03 }}
-                  className="border border-border/60 rounded-xl p-4 bg-card/50 hover:border-primary/20 transition-all"
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-primary/5 flex items-center justify-center shrink-0 mt-0.5">
-                      <Icon className="w-4 h-4 text-primary/60" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <p className="font-medium truncate">{entry.title}</p>
-                        {entry.category && (
-                          <Badge className={`${categoryColors[entry.category] || ""} text-xs shrink-0`}>{entry.category}</Badge>
-                        )}
-                      </div>
-                      {entry.description && (
-                        <p className="text-sm text-muted-foreground line-clamp-3">{entry.description}</p>
-                      )}
-                    </div>
-                    <div className="flex gap-1 shrink-0">
-                      <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" title="ประวัติเวอร์ชัน" onClick={() => setVersionEntry(entry)}>
-                        <History className="w-3 h-3" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(entry)}>
-                        <Edit2 className="w-3 h-3" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => deleteMutation.mutate(entry.id)}>
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
-                    </div>
-                  </div>
-                </motion.div>
+                  entry={entry}
+                  index={i}
+                  colors={colors}
+                  expanded={expandedId === entry.id}
+                  onToggle={() => setExpandedId(expandedId === entry.id ? null : entry.id)}
+                  onEdit={() => openEdit(entry)}
+                  onDelete={() => deleteMutation.mutate(entry.id)}
+                  onHistory={() => setVersionEntry(entry)}
+                  search={search}
+                />
               );
             })}
           </AnimatePresence>
         </div>
       )}
     </div>
+  );
+}
+
+function highlightText(text, query) {
+  if (!query || !text) return text;
+  const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "gi");
+  const parts = text.split(regex);
+  return parts.map((part, i) =>
+    regex.test(part) ? <mark key={i} className="bg-yellow-200 text-yellow-900 rounded-sm px-0.5">{part}</mark> : part
+  );
+}
+
+function WorldEntryCard({ entry, index, colors, expanded, onToggle, onEdit, onDelete, onHistory, search }) {
+  const isLong = entry.description && entry.description.length > 120;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.97 }}
+      transition={{ delay: index * 0.03 }}
+      className={`border rounded-xl bg-card/60 hover:shadow-md transition-all overflow-hidden ${expanded ? "border-primary/30 shadow-sm" : "border-border/60"}`}
+    >
+      {/* Card header */}
+      <div className="flex items-start gap-3 p-4">
+        <div className={`w-1 self-stretch rounded-full ${colors.bg} shrink-0`} />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <p className="font-semibold text-sm leading-snug flex-1">
+              {search ? highlightText(entry.title, search) : entry.title}
+            </p>
+            {entry.category && (
+              <Badge className={`${colors.bg} ${colors.text} border-0 text-xs shrink-0`}>{entry.category}</Badge>
+            )}
+          </div>
+          {entry.description && (
+            <div className="text-sm text-muted-foreground">
+              {expanded ? (
+                <p className="leading-relaxed whitespace-pre-wrap">
+                  {search ? highlightText(entry.description, search) : entry.description}
+                </p>
+              ) : (
+                <p className="line-clamp-2">
+                  {search ? highlightText(entry.description, search) : entry.description}
+                </p>
+              )}
+              {isLong && (
+                <button
+                  className="mt-1 text-xs text-primary/70 hover:text-primary flex items-center gap-0.5 transition-colors"
+                  onClick={onToggle}
+                >
+                  {expanded ? <><ChevronUp className="w-3 h-3" />ย่อ</> : <><ChevronRight className="w-3 h-3" />อ่านเพิ่มเติม</>}
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+        {/* Actions */}
+        <div className="flex flex-col gap-1 shrink-0">
+          <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-foreground" title="ประวัติ" onClick={onHistory}>
+            <History className="w-3 h-3" />
+          </Button>
+          <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-foreground" onClick={onEdit}>
+            <Edit2 className="w-3 h-3" />
+          </Button>
+          <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-destructive" onClick={onDelete}>
+            <Trash2 className="w-3 h-3" />
+          </Button>
+        </div>
+      </div>
+    </motion.div>
   );
 }
