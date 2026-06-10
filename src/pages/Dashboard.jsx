@@ -6,189 +6,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Plus, BookOpen, Feather, Pencil, LogOut, Trash2, Share2, X, Moon, Sun, TrendingUp, FileText, Sparkles, Loader2, ChevronDown, ChevronUp } from "lucide-react";
-import ReactMarkdown from "react-markdown";
-
-const CHAR_ROLES = ["ตัวเอก", "ตัวรอง", "ตัวร้าย", "ตัวประกอบ"];
-const emptyChar = () => ({ name: "", role: "ตัวเอก", age: "", occupation: "", personality: "", background: "", wound: "", desire: "" });
-
-function CharacterCard({ c, i, onUpdate, onRemove }) {
-  const [expanded, setExpanded] = useState(false);
-  const [analyzing, setAnalyzing] = useState(false);
-  const [analysis, setAnalysis] = useState(null);
-  const [analysisOpen, setAnalysisOpen] = useState(true);
-
-  const handleAnalyze = async () => {
-    if (!c.name) return;
-    setAnalyzing(true);
-    setAnalysis(null);
-    const charDesc = [
-      `ชื่อ: ${c.name}`,
-      c.role && `บทบาท: ${c.role}`,
-      c.age && `อายุ: ${c.age}`,
-      c.occupation && `อาชีพ: ${c.occupation}`,
-      c.personality && `นิสัย: ${c.personality}`,
-      c.background && `ปูมหลัง: ${c.background}`,
-      c.desire && `สิ่งที่ต้องการ: ${c.desire}`,
-      c.wound && `ปม/บาดแผล: ${c.wound}`,
-    ].filter(Boolean).join("\n");
-
-    const result = await base44.integrations.Core.InvokeLLM({
-      prompt: `คุณคือนักวิเคราะห์ตัวละครในนิยายมืออาชีพ วิเคราะห์ตัวละครต่อไปนี้:\n\n${charDesc}\n\nวิเคราะห์ใน 4 หัวข้อ:\n1. **จุดแข็ง** — สิ่งที่น่าสนใจและโดดเด่น\n2. **Want vs Need** — ความต้องการที่รับรู้ vs ความต้องการที่แท้จริง\n3. **Character Arc** — เส้นทางการเติบโตที่เป็นไปได้\n4. **คำแนะนำ** — สิ่งที่ควรเติมเพื่อให้ตัวละครสมบูรณ์ยิ่งขึ้น\n\nตอบเป็นภาษาไทย กระชับ ตรงประเด็น`,
-    });
-    setAnalysis(result);
-    setAnalysisOpen(true);
-    setAnalyzing(false);
-  };
-
-  return (
-    <div className="border border-border/60 rounded-xl bg-muted/20 overflow-hidden">
-      {/* Header row */}
-      <div className="flex items-center gap-2 p-2.5">
-        <Input
-          placeholder="ชื่อตัวละคร"
-          value={c.name}
-          onChange={(e) => onUpdate("name", e.target.value)}
-          className="flex-1 h-8 text-sm font-medium"
-        />
-        <Select value={c.role} onValueChange={(v) => onUpdate("role", v)}>
-          <SelectTrigger className="w-26 h-8 text-xs shrink-0"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            {CHAR_ROLES.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <Input
-          placeholder="อายุ"
-          value={c.age}
-          onChange={(e) => onUpdate("age", e.target.value)}
-          className="w-14 h-8 text-xs shrink-0"
-        />
-        <Input
-          placeholder="อาชีพ"
-          value={c.occupation}
-          onChange={(e) => onUpdate("occupation", e.target.value)}
-          className="w-20 h-8 text-xs shrink-0"
-        />
-        <button
-          type="button"
-          onClick={() => setExpanded((v) => !v)}
-          className="h-8 w-8 shrink-0 rounded-md flex items-center justify-center text-muted-foreground hover:bg-accent transition-colors text-xs"
-          title={expanded ? "ย่อ" : "กรอกรายละเอียด"}
-        >
-          {expanded ? "▲" : "▼"}
-        </button>
-        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive" onClick={onRemove}>
-          <X className="w-3.5 h-3.5" />
-        </Button>
-      </div>
-      {/* Detail rows (collapsible) */}
-      {expanded && (
-        <div className="px-2.5 pb-2.5 space-y-2 border-t border-border/40 pt-2">
-          <Input
-            placeholder="อุปนิสัย/บุคลิก"
-            value={c.personality}
-            onChange={(e) => onUpdate("personality", e.target.value)}
-            className="h-8 text-xs w-full"
-          />
-          <Input
-            placeholder="ปูมหลัง"
-            value={c.background}
-            onChange={(e) => onUpdate("background", e.target.value)}
-            className="h-8 text-xs w-full"
-          />
-          <div className="flex gap-2">
-            <Input
-              placeholder="ปม/บาดแผล"
-              value={c.wound}
-              onChange={(e) => onUpdate("wound", e.target.value)}
-              className="flex-1 h-8 text-xs"
-            />
-            <Input
-              placeholder="สิ่งที่ต้องการ"
-              value={c.desire}
-              onChange={(e) => onUpdate("desire", e.target.value)}
-              className="flex-1 h-8 text-xs"
-            />
-          </div>
-        </div>
-      )}
-      {/* Analyze button */}
-      <div className="px-2.5 pb-2.5 pt-1 border-t border-border/30">
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="h-7 text-xs gap-1.5 text-primary/70 hover:text-primary hover:bg-primary/8 w-full"
-          onClick={handleAnalyze}
-          disabled={!c.name || analyzing}
-        >
-          {analyzing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
-          {analyzing ? "กำลังวิเคราะห์..." : "วิเคราะห์ตัวละคร AI"}
-        </Button>
-      </div>
-      {/* Analysis result */}
-      {analysis && (
-        <div className="mx-2.5 mb-2.5 rounded-lg border border-primary/20 bg-primary/4 overflow-hidden">
-          <button
-            type="button"
-            className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-primary hover:bg-primary/8 transition-colors"
-            onClick={() => setAnalysisOpen((v) => !v)}
-          >
-            <span className="flex items-center gap-1"><Sparkles className="w-3 h-3" />ผลวิเคราะห์ AI</span>
-            {analysisOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-          </button>
-          {analysisOpen && (
-            <div className="px-3 pb-3 text-xs prose prose-sm max-w-none [&>*:first-child]:mt-0 text-foreground/90">
-              <ReactMarkdown>{analysis}</ReactMarkdown>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="mt-2 gap-1.5 border-primary/30 text-primary hover:bg-primary/8 text-xs h-7"
-                onClick={() => onUpdate("ai_analysis", analysis)}
-              >
-                <Sparkles className="w-3 h-3" />
-                บันทึกผลวิเคราะห์นี้ไว้กับตัวละคร
-              </Button>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function CharacterInputList({ chars, onChange }) {
-  const addRow = () => onChange([...chars, emptyChar()]);
-  const removeRow = (i) => onChange(chars.filter((_, idx) => idx !== i));
-  const updateRow = (i, field, value) => onChange(chars.map((c, idx) => idx === i ? { ...c, [field]: value } : c));
-  return (
-    <div className="space-y-2">
-      {chars.map((c, i) => (
-        <CharacterCard
-          key={i}
-          c={c}
-          i={i}
-          onUpdate={(field, value) => updateRow(i, field, value)}
-          onRemove={() => removeRow(i)}
-        />
-      ))}
-      <Button variant="outline" size="sm" className="gap-1.5 text-xs h-7 mt-1" onClick={addRow}>
-        <Plus className="w-3 h-3" />
-        เพิ่มตัวละคร
-      </Button>
-    </div>
-  );
-}
+import { Plus, BookOpen, Feather, Pencil, LogOut, Trash2, Share2, Moon, Sun } from "lucide-react";
 import DeleteNovelDialog from "@/components/novel/DeleteNovelDialog";
+import CreateNovelWizard from "@/components/novel/CreateNovelWizard";
 import ShareNovelDialog from "@/components/novel/ShareNovelDialog";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { useAuth } from "@/lib/AuthContext";
 
-const GENRES = ["โรแมนติก", "แฟนตาซี", "อิงประวัติศาสตร์", "จีนย้อนยุค", "วาย", "สยองขวัญ", "ลึกลับ", "แอ็คชั่น", "ดราม่า", "อื่นๆ"];
+const GENRES = ["โรแมนติก", "แฟนตาซี", "อิงประวัติศาสตร์", "จีนย้อนยุค", "วาย", "สยองขวัญ", "ลึกลับ", "แอ็คชั่น", "ดราม่า", "อื่นๆ"]; // used in editForm
 
 const genreColors = {
   "โรแมนติก": "bg-pink-100 text-pink-700",
@@ -218,8 +46,6 @@ function useDarkMode() {
 export default function Dashboard() {
   const [dark, setDark] = useDarkMode();
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ title: "", genre: "", synopsis: "", era: "", writer_id: "", target_chapters: "10" });
-  const [formChars, setFormChars] = useState([emptyChar()]);
   const [editOpen, setEditOpen] = useState(false);
   const [editForm, setEditForm] = useState({});
   const [editingId, setEditingId] = useState(null);
@@ -273,27 +99,6 @@ export default function Dashboard() {
       queryClient.invalidateQueries({ queryKey: ["novels"] });
       toast.success("ย้ายไปถังขยะแล้ว");
       setDeleteDialog({ open: false, novel: null });
-    },
-  });
-
-  const createMutation = useMutation({
-    mutationFn: async (data) => {
-      const novel = await base44.entities.Novel.create(data);
-      const charsToSave = formChars.filter((c) => c.name.trim());
-      if (charsToSave.length > 0) {
-        await Promise.all(
-          charsToSave.map((c) =>
-            base44.entities.Character.create({ novel_id: novel.id, name: c.name.trim(), role: c.role, age: c.age || undefined, occupation: c.occupation || undefined, personality: c.personality || undefined, background: c.background || undefined, wound: c.wound || undefined, desire: c.desire || undefined, ai_analysis: c.ai_analysis || undefined })
-          )
-        );
-      }
-      return novel;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["novels"] });
-      setOpen(false);
-      setForm({ title: "", genre: "", synopsis: "", era: "", writer_id: "", target_chapters: "10" });
-      setFormChars([emptyChar()]);
     },
   });
 
@@ -368,103 +173,16 @@ export default function Dashboard() {
             <Button variant="ghost" size="icon" onClick={() => logout()} title="ออกจากระบบ" className="text-muted-foreground hover:text-foreground">
               <LogOut className="w-4 h-4" />
             </Button>
-            <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button className="gap-2 font-body">
+            <Button className="gap-2 font-body" onClick={() => setOpen(true)}>
                 <Plus className="w-4 h-4" />
                 สร้างเรื่องใหม่
               </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-lg flex flex-col max-h-[85vh] p-0 gap-0 overflow-hidden">
-              <DialogHeader className="px-6 pt-5 pb-4 border-b border-border/40 shrink-0">
-                <DialogTitle className="font-heading text-lg">สร้างนิยายเรื่องใหม่</DialogTitle>
-              </DialogHeader>
-              <div className="flex-1 overflow-y-auto px-6 pt-4 pb-8 space-y-4">
-                <div>
-                  <label className="text-sm font-medium mb-1.5 block">ชื่อเรื่อง</label>
-                  <Input
-                    placeholder="เช่น ลับแลลายเมฆ"
-                    value={form.title}
-                    onChange={(e) => setForm({ ...form, title: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium mb-1.5 block">แนวนิยาย</label>
-                  <Select value={form.genre} onValueChange={(v) => setForm({ ...form, genre: v })}>
-                    <SelectTrigger><SelectValue placeholder="เลือกแนว" /></SelectTrigger>
-                    <SelectContent>
-                      {GENRES.map((g) => (
-                        <SelectItem key={g} value={g}>{g}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <label className="text-sm font-medium mb-1.5 block">ยุคสมัยและฉากหลัง</label>
-                  <Input
-                    placeholder="เช่น กรุงศรีอยุธยาตอนปลาย พ.ศ. 2310"
-                    value={form.era}
-                    onChange={(e) => setForm({ ...form, era: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium mb-1.5 block">จำนวนตอนที่ต้องการ</label>
-                  <Select value={form.target_chapters.toString()} onValueChange={(v) => setForm({ ...form, target_chapters: v })}>
-                    <SelectTrigger><SelectValue placeholder="เลือกจำนวนตอน" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="10">10 ตอน</SelectItem>
-                      <SelectItem value="20">20 ตอน</SelectItem>
-                      <SelectItem value="30">30 ตอน</SelectItem>
-                      <SelectItem value="40">40 ตอน</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <label className="text-sm font-medium mb-1.5 block">ตัวละครหลัก <span className="text-muted-foreground font-normal text-xs">(ไม่บังคับ — ปล่อยให้ AI เติมทีหลังได้)</span></label>
-                  <CharacterInputList chars={formChars} onChange={setFormChars} />
-                </div>
-                <div>
-                  <label className="text-sm font-medium mb-1.5 block">เรื่องย่อ</label>
-                  <Textarea
-                    placeholder="เล่าเรื่องย่อของนิยาย..."
-                    rows={4}
-                    value={form.synopsis}
-                    onChange={(e) => setForm({ ...form, synopsis: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium mb-1.5 block">
-                    นักเขียน AI ประจำเรื่อง <span className="text-destructive">*</span>
-                  </label>
-                  <Select value={form.writer_id} onValueChange={(v) => setForm({ ...form, writer_id: v })}>
-                    <SelectTrigger><SelectValue placeholder="เลือกนักเขียน AI" /></SelectTrigger>
-                    <SelectContent>
-                      {activeWriters.map((w) => (
-                        <SelectItem key={w.id} value={w.id}>
-                          <span className="font-medium">{w.name}</span>
-                          {w.description && <span className="text-muted-foreground ml-1.5 text-xs">— {w.description}</span>}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {form.writer_id && (
-                    <p className="text-xs text-primary/60 mt-1">
-                      โทน: {activeWriters.find((w) => w.id === form.writer_id)?.style || "-"}
-                    </p>
-                  )}
-                </div>
-              </div>
-              <div className="px-6 py-4 border-t border-border/40 shrink-0 bg-background relative z-10">
-                <Button
-                  className="w-full"
-                  onClick={() => createMutation.mutate(form)}
-                  disabled={!form.title || !form.writer_id || createMutation.isPending}
-                >
-                  {createMutation.isPending ? "กำลังสร้าง..." : "สร้างนิยาย"}
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
+            <CreateNovelWizard
+              open={open}
+              onOpenChange={setOpen}
+              activeWriters={activeWriters}
+              onCreated={() => queryClient.invalidateQueries({ queryKey: ["novels"] })}
+            />
           </div>
         </div>
       </header>
