@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Landmark, Plus, Check } from "lucide-react";
+import { Loader2, Landmark, Plus, Check, AlertCircle } from "lucide-react";
 
 export default function HistoricalEventSearchDialog({ open, onClose, novelId, onEventsAdded }) {
   const [yearInput, setYearInput] = useState("");
@@ -13,6 +13,7 @@ export default function HistoricalEventSearchDialog({ open, onClose, novelId, on
   const [selected, setSelected] = useState(new Set());
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(new Set());
+  const [saveError, setSaveError] = useState("");
 
   const handleSearch = async () => {
     if (!yearInput.trim()) return;
@@ -59,25 +60,38 @@ export default function HistoricalEventSearchDialog({ open, onClose, novelId, on
   const handleAddSelected = async () => {
     if (selected.size === 0) return;
     setSaving(true);
+    setSaveError("");
     const toAdd = [...selected].map((i) => results[i]);
-    const created = await Promise.all(
-      toAdd.map((ev) =>
-        base44.entities.PlotEvent.create({
-          novel_id: novelId,
-          title: String(ev.title || ""),
-          description: String(ev.description || ""),
-          time_period: String(ev.time_period || ""),
-          location: String(ev.location || ""),
-          characters_involved: String(ev.characters_involved || ""),
-          is_historical: true,
-          order: 0,
-        })
-      )
-    );
-    setSaved(new Set([...saved, ...selected]));
-    setSelected(new Set());
-    setSaving(false);
-    onEventsAdded?.();
+    try {
+      const created = await Promise.all(
+        toAdd.map((ev) =>
+          base44.entities.PlotEvent.create({
+            novel_id: novelId,
+            title: String(ev.title || ""),
+            description: String(ev.description || ""),
+            time_period: String(ev.time_period || ""),
+            location: String(ev.location || ""),
+            characters_involved: String(ev.characters_involved || ""),
+            is_historical: true,
+            order: 0,
+          })
+        )
+      );
+      // Verify all records were actually created
+      const failedCount = created.filter((r) => !r || !r.id).length;
+      if (failedCount > 0) {
+        setSaveError(`บันทึกไม่สำเร็จ ${failedCount} รายการ — กรุณาลองใหม่อีกครั้ง`);
+        setSaving(false);
+        return;
+      }
+      setSaved(new Set([...saved, ...selected]));
+      setSelected(new Set());
+      onEventsAdded?.();
+    } catch (err) {
+      setSaveError(`เกิดข้อผิดพลาด: ${err?.message || "ไม่ทราบสาเหตุ"}`);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleClose = () => {
@@ -85,6 +99,7 @@ export default function HistoricalEventSearchDialog({ open, onClose, novelId, on
     setResults([]);
     setSelected(new Set());
     setSaved(new Set());
+    setSaveError("");
     setLoading(false);
     onClose();
   };
@@ -183,7 +198,14 @@ export default function HistoricalEventSearchDialog({ open, onClose, novelId, on
 
         {/* Footer */}
         {results.length > 0 && (
-          <div className="shrink-0 pt-3 border-t border-border/60 flex items-center justify-between gap-3">
+          <div className="shrink-0 pt-3 border-t border-border/60 space-y-2">
+            {saveError && (
+              <div className="flex items-center gap-2 text-sm text-destructive bg-destructive/10 rounded-lg px-3 py-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                {saveError}
+              </div>
+            )}
+            <div className="flex items-center justify-between gap-3">
             <p className="text-sm text-muted-foreground">
               {selected.size > 0 ? `เลือก ${selected.size} รายการ` : "คลิกเลือกรายการที่ต้องการ"}
             </p>
@@ -198,6 +220,7 @@ export default function HistoricalEventSearchDialog({ open, onClose, novelId, on
                 {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
                 เพิ่มลงไทม์ไลน์ ({selected.size})
               </Button>
+            </div>
             </div>
           </div>
         )}
