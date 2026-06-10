@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Feather, PenTool, Users, Globe, Clock, Sparkles, Bot, Trash2, Share2, History } from "lucide-react";
+import { ArrowLeft, Feather, PenTool, Users, Globe, Clock, Bot, Trash2, Share2, History } from "lucide-react";
 import VersionHistoryDialog from "@/components/novel/VersionHistoryDialog";
 import { saveVersion } from "@/lib/saveVersion";
 import { useNavigate } from "react-router-dom";
@@ -17,7 +17,6 @@ import WritingRoom from "@/components/novel/WritingRoom";
 import CharacterBible from "@/components/novel/CharacterBible";
 import WorldBible from "@/components/novel/WorldBible";
 import Timeline from "@/components/novel/Timeline";
-import AiAssistant from "@/components/novel/AiAssistant";
 import WriterManager from "@/components/novel/WriterManager";
 
 export default function NovelWorkspace() {
@@ -204,7 +203,6 @@ export default function NovelWorkspace() {
                 { value: "characters", icon: Users, label: "ตัวละคร" },
                 { value: "world", icon: Globe, label: "โลก/ฉาก" },
                 { value: "timeline", icon: Clock, label: "ไทม์ไลน์" },
-                { value: "ai", icon: Sparkles, label: "ผู้ช่วย AI" },
                 { value: "writers", icon: Bot, label: "นักเขียน AI" },
               ].map(({ value, icon: Icon, label }) => (
                 <TabsTrigger
@@ -241,9 +239,6 @@ export default function NovelWorkspace() {
               onOpenChapter={(ch) => { setPendingOpenChapter(ch); setActiveTab("writing"); }}
               onNavigateToWorldBible={() => setActiveTab("world")}
             />
-          </TabsContent>
-          <TabsContent value="ai" className="m-0 h-full">
-            <AiAssistant novelId={novelId} novel={novel} />
           </TabsContent>
           <TabsContent value="writers" className="m-0">
             <WriterManager />
