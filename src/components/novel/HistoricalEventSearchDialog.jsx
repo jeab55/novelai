@@ -64,11 +64,11 @@ export default function HistoricalEventSearchDialog({ open, onClose, novelId, on
       toAdd.map((ev) =>
         base44.entities.PlotEvent.create({
           novel_id: novelId,
-          title: ev.title,
-          description: ev.description || "",
-          time_period: ev.time_period || "",
-          location: ev.location || "",
-          characters_involved: ev.characters_involved || "",
+          title: String(ev.title || ""),
+          description: String(ev.description || ""),
+          time_period: String(ev.time_period || ""),
+          location: String(ev.location || ""),
+          characters_involved: String(ev.characters_involved || ""),
           is_historical: true,
           order: 0,
         })
