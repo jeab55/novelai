@@ -18,6 +18,7 @@ import AiDraftDialog from "./AiDraftDialog";
 import BulkDraftDialog from "./BulkDraftDialog";
 import ContinuityChecker from "./ContinuityChecker";
 import NovelContinuityDialog from "./NovelContinuityDialog";
+import PublishExportDialog from "./PublishExportDialog";
 
 const statusColors = {
   "ร่าง": "bg-amber-50 text-amber-700 border border-amber-200",
@@ -36,6 +37,7 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
   const [draftChapter, setDraftChapter] = useState(null);
   const [bulkDraftOpen, setBulkDraftOpen] = useState(false);
   const [continuityOpen, setContinuityOpen] = useState(false);
+  const [publishExportOpen, setPublishExportOpen] = useState(false);
   const queryClient = useQueryClient();
 
   // Handle chapter navigation from other tabs (e.g. AiPlotDialog draft)
@@ -112,6 +114,13 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
       novel={novel}
       novelId={novelId}
     />
+    <PublishExportDialog
+      open={publishExportOpen}
+      onClose={() => setPublishExportOpen(false)}
+      novel={novel}
+      novelId={novelId}
+      chapters={chapters}
+    />
     {draftChapter && (
       <AiDraftDialog
         open={aiDraftOpen}
@@ -176,10 +185,10 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
               variant="outline"
               size="sm"
               className="gap-1.5 text-muted-foreground"
-              onClick={() => downloadAllChaptersMd(novel?.title || "novel", chapters)}
+              onClick={() => setPublishExportOpen(true)}
             >
               <Download className="w-3.5 h-3.5" />
-              ส่งออกทั้งเรื่อง
+              ส่งออก / ลงแพลตฟอร์ม
             </Button>
           )}
           <Dialog open={newChapterOpen} onOpenChange={setNewChapterOpen}>
