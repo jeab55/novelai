@@ -15,6 +15,7 @@ import { downloadChapterTxt, downloadChapterMd, copyChapterToClipboard, download
 import { toast } from "sonner";
 import AiChapterGeneratorDialog from "./AiChapterGeneratorDialog";
 import AiDraftDialog from "./AiDraftDialog";
+import BulkDraftDialog from "./BulkDraftDialog";
 import ContinuityChecker from "./ContinuityChecker";
 
 const statusColors = {
@@ -32,6 +33,7 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
   const [aiChapterGeneratorOpen, setAiChapterGeneratorOpen] = useState(false);
   const [aiDraftOpen, setAiDraftOpen] = useState(false);
   const [draftChapter, setDraftChapter] = useState(null);
+  const [bulkDraftOpen, setBulkDraftOpen] = useState(false);
   const queryClient = useQueryClient();
 
   // Handle chapter navigation from other tabs (e.g. AiPlotDialog draft)
@@ -96,6 +98,12 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
       novel={novel}
       novelId={novelId}
     />
+    <BulkDraftDialog
+      open={bulkDraftOpen}
+      onClose={() => setBulkDraftOpen(false)}
+      novel={novel}
+      novelId={novelId}
+    />
     {draftChapter && (
       <AiDraftDialog
         open={aiDraftOpen}
@@ -133,6 +141,17 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
             <Sparkles className="w-3.5 h-3.5" />
             AI สร้างตอน
           </Button>
+          {chapters.filter(ch => !ch.word_count || ch.word_count === 0).length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5 text-primary border-primary/30 bg-primary/5 hover:bg-primary/10"
+              onClick={() => setBulkDraftOpen(true)}
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              ร่างทุกตอน
+            </Button>
+          )}
           {chapters.length > 0 && (
             <Button
               variant="outline"

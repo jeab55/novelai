@@ -216,11 +216,27 @@ export default function AiDraftDialog({ open, onClose, chapter, novel, novelId, 
     const sysPrompt = getSystemPrompt();
     const prompt = buildDraftPrompt(form, sysPrompt, form.wordTarget);
     const result = await base44.integrations.Core.InvokeLLM({ prompt, model: "claude_sonnet_4_6" });
-    // Strip code fences before using result
     let text = typeof result === "string" ? result : (result?.text || "");
     text = text.replace(/^```[\w]*\n?/m, "").replace(/\n?```$/m, "").trim();
     setDraft(text);
     setStep(2);
+
+    // Auto-save immediately after draft is complete
+    setLoadingType("saving");
+    const saveResult = await saveChapterContent({
+      novelId,
+      chapterId: chapter?.id,
+      title: form.chapterTitle || chapter?.title,
+      order: chapter?.order,
+      content: text,
+      status: "ร่าง",
+    });
+    if (saveResult.success) {
+      queryClient.invalidateQueries({ queryKey: ["chapters", novelId] });
+      toast.success("บันทึกร่างอัตโนมัติแล้ว ✓");
+    } else {
+      setSaveError(saveResult.error || "บันทึกอัตโนมัติไม่สำเร็จ กรุณากด 'ใส่ลง editor' เพื่อบันทึกอีกครั้ง");
+    }
     setLoading(false);
     setLoadingType("");
   };
@@ -291,8 +307,12 @@ export default function AiDraftDialog({ open, onClose, chapter, novel, novelId, 
   };
 
   const handleClose = () => {
+    if (loading) {
+      if (!window.confirm("AI กำลังร่างอยู่ ถ้าปิดตอนนี้ร่างที่ยังไม่เสร็จจะหาย ต้องการปิดจริงหรือไม่?")) return;
+    }
     setStep(1);
     setDraft("");
+    setSaveError("");
     setLinkedPlotEventId("");
     setForm({ chapterTitle: chapter?.title || "", summary: "", characters: "", tone: "", wordTarget: 1200 });
     onClose();
