@@ -294,7 +294,16 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
               }}
             >
               <Copy className="w-3.5 h-3.5 mr-2" />
-              คัดลอกทั้งตอน
+              คัดลอกทั้งตอน (เนื้อหา + ชื่อ)
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={async () => {
+                await navigator.clipboard.writeText(content);
+                toast.success("คัดลอกแล้ว");
+              }}
+            >
+              <Copy className="w-3.5 h-3.5 mr-2" />
+              คัดลอกเฉพาะเนื้อหา
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

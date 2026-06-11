@@ -12,6 +12,7 @@ import {
   ChevronDown, ChevronUp, CheckCircle2, Search, X, Settings2,
   ChevronRight, Clock, Sparkles,
 } from "lucide-react";
+import CopyButton from "@/components/ui/CopyButton";
 import VersionHistoryDialog from "./VersionHistoryDialog";
 import { saveVersion } from "@/lib/saveVersion";
 import { motion, AnimatePresence } from "framer-motion";
@@ -468,6 +469,14 @@ function WorldEntryCard({ entry, index, colors, expanded, onToggle, onEdit, onDe
         </div>
         {/* Actions */}
         <div className="flex flex-col gap-1 shrink-0">
+          <CopyButton
+            size="xs"
+            text={[
+              entry.title,
+              entry.category && `[${entry.category}]`,
+              entry.description,
+            ].filter(Boolean).join("\n")}
+          />
           <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-foreground" title="ประวัติ" onClick={onHistory}>
             <History className="w-3 h-3" />
           </Button>

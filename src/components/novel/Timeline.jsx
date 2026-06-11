@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Plus, Clock, Trash2, Edit2, BookOpen, Landmark, Loader2, Sparkles, History, Calendar, List, MapPin, ExternalLink, Globe } from "lucide-react";
+import CopyButton from "@/components/ui/CopyButton";
 import VersionHistoryDialog from "./VersionHistoryDialog";
 import { saveVersion } from "@/lib/saveVersion";
 import { motion } from "framer-motion";
@@ -334,7 +335,17 @@ export default function Timeline({ novelId, novel, onOpenChapter, onNavigateToWo
                         </p>
                       )}
                     </div>
-                    <div className="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity items-center">
+                      <CopyButton
+                        size="xs"
+                        text={[
+                          `#${ev.order} ${ev.title}`,
+                          ev.time_period && `ช่วงเวลา: ${ev.time_period}`,
+                          ev.location && `สถานที่: ${ev.location}`,
+                          ev.description && `รายละเอียด: ${ev.description}`,
+                          ev.characters_involved && `ตัวละคร: ${ev.characters_involved}`,
+                        ].filter(Boolean).join("\n")}
+                      />
                       <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" title="ประวัติเวอร์ชัน" onClick={() => setVersionEvent(ev)}>
                         <History className="w-3 h-3" />
                       </Button>

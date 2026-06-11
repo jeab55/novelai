@@ -4,6 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { BookOpen, Users, Globe, Clock, FileText, Target, TrendingUp, Feather, ArrowRight, CheckCircle2, Edit3 } from "lucide-react";
+// Note: Icon is used via dynamic shortcut map below
+import CopyButton from "@/components/ui/CopyButton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
@@ -79,6 +81,22 @@ export default function NovelOverview({ novel, novelId, onTabChange }) {
   return (
     <div className="max-w-5xl mx-auto px-4 py-8 space-y-8">
 
+      {/* Plot Outline */}
+      {novel?.plot_outline && (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-card border border-border/60 rounded-2xl p-6 shadow-sm"
+        >
+          <div className="flex items-center gap-2 mb-3">
+            <BookOpen className="w-4 h-4 text-primary" />
+            <span className="text-sm font-semibold text-primary font-heading">โครงเรื่อง 3 องก์</span>
+            <CopyButton text={novel.plot_outline} label="คัดลอก" size="xs" className="ml-auto" />
+          </div>
+          <p className="text-sm leading-relaxed text-foreground/85 font-body whitespace-pre-wrap">{novel.plot_outline}</p>
+        </motion.div>
+      )}
+
       {/* Synopsis */}
       {novel?.synopsis && (
         <motion.div
@@ -89,6 +107,7 @@ export default function NovelOverview({ novel, novelId, onTabChange }) {
           <div className="flex items-center gap-2 mb-3">
             <Feather className="w-4 h-4 text-primary" />
             <span className="text-sm font-semibold text-primary font-heading">เรื่องย่อ</span>
+            <CopyButton text={novel.synopsis} label="คัดลอก" size="xs" className="ml-auto" />
           </div>
           <p className="text-sm leading-relaxed text-foreground/85 font-body italic">"{novel.synopsis}"</p>
           {novel.era && <p className="text-xs text-primary/60 mt-3 font-medium">📍 {novel.era}</p>}

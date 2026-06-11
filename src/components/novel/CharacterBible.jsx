@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Plus, Users, Trash2, Edit2, User, Loader2, History, Network } from "lucide-react";
+import CopyButton from "@/components/ui/CopyButton";
 import VersionHistoryDialog from "./VersionHistoryDialog";
 import { motion, AnimatePresence } from "framer-motion";
 import CharacterForm from "./CharacterForm";
@@ -187,6 +188,24 @@ export default function CharacterBible({ novelId }) {
                     exit={{ height: 0, opacity: 0 }}
                     className="border-t border-border/40 px-4 py-4 space-y-3 text-sm"
                   >
+                    <div className="flex justify-end mb-1">
+                      <CopyButton
+                        size="xs"
+                        label="คัดลอกทั้งหมด"
+                        text={[
+                          `ชื่อ: ${char.name}`,
+                          char.role && `บทบาท: ${char.role}`,
+                          char.age && `อายุ: ${char.age}`,
+                          char.occupation && `อาชีพ: ${char.occupation}`,
+                          char.appearance && `ลักษณะ: ${char.appearance}`,
+                          char.personality && `นิสัย: ${char.personality}`,
+                          char.background && `ปูมหลัง: ${char.background}`,
+                          char.desire && `ต้องการ: ${char.desire}`,
+                          char.wound && `ปม/บาดแผล: ${char.wound}`,
+                          char.relationships && `ความสัมพันธ์: ${char.relationships}`,
+                        ].filter(Boolean).join("\n")}
+                      />
+                    </div>
                     {char.appearance && <div><span className="text-muted-foreground font-medium">ลักษณะ:</span> {char.appearance}</div>}
                     {char.personality && <div><span className="text-muted-foreground font-medium">นิสัย:</span> {char.personality}</div>}
                     {char.background && <div><span className="text-muted-foreground font-medium">ปูมหลัง:</span> {char.background}</div>}
