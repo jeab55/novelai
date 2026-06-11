@@ -3,7 +3,6 @@ import { base44 } from "@/api/base44Client";
 import { useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sparkles, Loader2, CheckCircle2, BookOpen, Star, Zap } from "lucide-react";
 import { toast } from "sonner";
 import CopyButton from "@/components/ui/CopyButton";
@@ -39,8 +38,6 @@ const BLURB_TYPES = [
 function buildBlurbPrompt(novel, chapters) {
   const sortedChapters = [...chapters].sort((a, b) => (a.order || 0) - (b.order || 0));
   const totalChapters = sortedChapters.length;
-
-  // ใช้เนื้อหา 60% แรกเท่านั้น เพื่อไม่สปอยล์ตอนจบ
   const safeChapters = sortedChapters.slice(0, Math.ceil(totalChapters * 0.6));
 
   let ctx = `คุณคือนักเขียนคำโปรยนิยายมืออาชีพ\n\n`;
@@ -48,33 +45,28 @@ function buildBlurbPrompt(novel, chapters) {
   if (novel.genre) ctx += `แนว: ${novel.genre}\n`;
   if (novel.era) ctx += `ยุคสมัย: ${novel.era}\n`;
   if (novel.synopsis) ctx += `เรื่องย่อ (จากผู้เขียน): ${novel.synopsis}\n`;
-
   ctx += `\n=== เนื้อหาจริงจากนิยาย (${safeChapters.length} ตอนแรกจาก ${totalChapters} ตอน เพื่อไม่สปอยล์ตอนจบ) ===\n`;
   safeChapters.forEach((ch) => {
     const preview = (ch.content || "").substring(0, 1000);
     ctx += `\n[ตอนที่ ${ch.order}: ${ch.title}]\n${preview}${(ch.content || "").length > 1000 ? "…" : ""}\n`;
   });
-
   ctx += `\n=== คำสั่ง ===\n`;
   ctx += `จากเนื้อหาที่อ่านมา ให้เขียนคำโปรย 3 แบบ:\n`;
-  ctx += `1. แบบ "main_conflict": 2-3 ประโยค เน้นปมหลัก ความขัดแย้ง และเดิมพันของตัวละคร ห้ามสปอยล์จุดหักเหท้ายเรื่อง\n`;
-  ctx += `2. แบบ "character_conflict": เน้นความสัมพันธ์ระหว่างตัวละครหลักและแรงดึงดูด/ความขัดแย้งระหว่างกัน ห้ามสปอยล์ตอนจบ\n`;
-  ctx += `3. แบบ "tagline": 1 ประโยคสั้น คม จำง่าย ดึงอารมณ์ผู้อ่าน\n`;
-  ctx += `\nทั้ง 3 แบบ ต้องดึงมาจากเนื้อหาจริงที่อ่านมา ไม่ใช่แค่แต่งเอง ใช้ภาษาไทยที่อ่านลื่น กระชับ\n`;
-
+  ctx += `1. "main_conflict": 2-3 ประโยค เน้นปมหลัก ความขัดแย้ง และเดิมพันของตัวละคร ห้ามสปอยล์จุดหักเหท้ายเรื่อง\n`;
+  ctx += `2. "character_conflict": เน้นความสัมพันธ์ระหว่างตัวละครหลักและแรงดึงดูด/ความขัดแย้งระหว่างกัน ห้ามสปอยล์ตอนจบ\n`;
+  ctx += `3. "tagline": 1 ประโยคสั้น คม จำง่าย ดึงอารมณ์ผู้อ่าน\n`;
+  ctx += `\nทั้ง 3 แบบ ต้องดึงมาจากเนื้อหาจริง ใช้ภาษาไทยที่อ่านลื่น กระชับ\n`;
   return ctx;
 }
 
 function buildSummaryPrompt(novel, chapters) {
   const sortedChapters = [...chapters].sort((a, b) => (a.order || 0) - (b.order || 0));
-
   let ctx = `สรุปนิยายเรื่อง "${novel.title}" ให้เป็น 1 ย่อหน้า (4-6 ประโยค) ที่ครอบคลุมทั้งเรื่อง รวมถึงตอนจบ ใช้ภาษาไทยที่อ่านง่าย ไม่ต้องมีคำนำหรืออธิบาย\n\n`;
   ctx += `=== เนื้อหาทุกตอน ===\n`;
   sortedChapters.forEach((ch) => {
     const preview = (ch.content || "").substring(0, 800);
     ctx += `\n[ตอน ${ch.order}: ${ch.title}]\n${preview}${(ch.content || "").length > 800 ? "…" : ""}\n`;
   });
-
   return ctx;
 }
 
@@ -90,9 +82,12 @@ export default function NovelBlurbDialog({ open, onClose, novel, novelId, chapte
   const { run: saveBlurb, isPending: saving } = useSafeAction({
     action: "บันทึกคำโปรย",
     entity: "Novel",
-    fn: async (text) => {
-      await base44.entities.Novel.update(novelId, { blurb: text });
-      // verify by re-fetching
+    fn: async ({ blurbText, summaryText }) => {
+      await base44.entities.Novel.update(novelId, {
+        blurb: blurbText,
+        full_summary: summaryText || undefined,
+      });
+      // verify
       const all = await base44.entities.Novel.list();
       const updated = all.find((n) => String(n.id) === String(novelId));
       if (!updated?.blurb) throw new Error("blurb ยังว่างหลังบันทึก");
@@ -106,9 +101,9 @@ export default function NovelBlurbDialog({ open, onClose, novel, novelId, chapte
 
   const handleSaveBlurb = async () => {
     if (!selectedBlurb || !blurbs) return;
-    const text = blurbs[selectedBlurb];
-    if (!text) return;
-    await saveBlurb(text);
+    const blurbText = blurbs[selectedBlurb];
+    if (!blurbText) return;
+    await saveBlurb({ blurbText, summaryText: summary });
   };
 
   const handleGenerate = async () => {
@@ -146,7 +141,9 @@ export default function NovelBlurbDialog({ open, onClose, novel, novelId, chapte
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col gap-0 p-0">
+      {/* fixed height dialog with internal scroll */}
+      <DialogContent className="sm:max-w-2xl h-[88vh] max-h-[88vh] flex flex-col gap-0 p-0 overflow-hidden">
+        {/* ── Header ── */}
         <DialogHeader className="px-6 pt-5 pb-4 border-b border-border/60 shrink-0">
           <DialogTitle className="font-heading flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-primary" />
@@ -159,7 +156,8 @@ export default function NovelBlurbDialog({ open, onClose, novel, novelId, chapte
           </p>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 px-6 py-5">
+        {/* ── Scrollable body ── */}
+        <div className="flex-1 overflow-y-auto px-6 py-5 min-h-0">
           {!blurbs && !loading && (
             <div className="text-center py-14">
               <BookOpen className="w-14 h-14 text-muted-foreground/25 mx-auto mb-4" />
@@ -187,7 +185,7 @@ export default function NovelBlurbDialog({ open, onClose, novel, novelId, chapte
           )}
 
           {blurbs && !loading && (
-            <div className="space-y-6">
+            <div className="space-y-6 pb-2">
               {/* Summary */}
               {summary && (
                 <div className="rounded-xl border border-border/60 bg-muted/20 px-4 py-4">
@@ -196,12 +194,13 @@ export default function NovelBlurbDialog({ open, onClose, novel, novelId, chapte
                     <CopyButton text={summary} label="คัดลอก" size="sm" />
                   </div>
                   <p className="text-sm text-foreground/80 leading-relaxed">{summary}</p>
+                  <p className="text-xs text-muted-foreground mt-2">* สรุปนี้จะถูกบันทึกพร้อมคำโปรยที่เลือกโดยอัตโนมัติ</p>
                 </div>
               )}
 
               {/* Blurb options */}
               <div>
-                <p className="text-sm font-semibold mb-3">เลือกคำโปรยที่ถูกใจ</p>
+                <p className="text-sm font-semibold mb-3">เลือกคำโปรยที่ถูกใจ (คลิกเพื่อเลือก)</p>
                 <div className="space-y-3">
                   {BLURB_TYPES.map((type) => {
                     const Icon = type.icon;
@@ -215,11 +214,11 @@ export default function NovelBlurbDialog({ open, onClose, novel, novelId, chapte
                           isSelected ? type.activeColor + " ring-1 ring-primary/30" : type.color + " hover:opacity-90"
                         }`}
                       >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex items-center gap-2 mb-1.5">
+                        <div className="flex items-start justify-between gap-3 mb-1.5">
+                          <div className="flex items-center gap-2">
                             <Icon className="w-4 h-4 text-primary shrink-0" />
                             <span className="text-sm font-semibold">{type.label}</span>
-                            <span className="text-xs text-muted-foreground">— {type.desc}</span>
+                            <span className="text-xs text-muted-foreground hidden sm:inline">— {type.desc}</span>
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
                             <CopyButton text={text} label="คัดลอก" size="sm" />
@@ -232,40 +231,40 @@ export default function NovelBlurbDialog({ open, onClose, novel, novelId, chapte
                   })}
                 </div>
               </div>
-
-              {selectedBlurb && (
-                <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 px-4 py-3 flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-medium text-emerald-800">
-                      เลือก: {BLURB_TYPES.find((t) => t.id === selectedBlurb)?.label}
-                    </p>
-                    <p className="text-xs text-emerald-700 mt-0.5">
-                      บันทึกเป็นคำโปรยของเรื่อง — หน้าส่งออกจะดึงไปใช้โดยอัตโนมัติ
-                    </p>
-                  </div>
-                  <Button
-                    size="sm"
-                    className="gap-1.5 shrink-0"
-                    onClick={handleSaveBlurb}
-                    disabled={saving}
-                  >
-                    {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
-                    {saving ? "กำลังบันทึก..." : "ใช้เป็นคำโปรยของเรื่อง"}
-                  </Button>
-                </div>
-              )}
             </div>
           )}
-        </ScrollArea>
+        </div>
 
-        <div className="px-6 py-4 border-t border-border/60 shrink-0 flex items-center justify-between gap-2">
-          <Button variant="ghost" size="sm" onClick={onClose} disabled={loading}>ปิด</Button>
-          <Button onClick={handleGenerate} disabled={loading || contentChapters.length === 0} className="gap-2">
-            {loading
-              ? <><Loader2 className="w-4 h-4 animate-spin" />กำลังสร้าง...</>
-              : <><Sparkles className="w-4 h-4" />{blurbs ? "สร้างใหม่" : "สร้างสรุป + คำโปรย"}</>
-            }
-          </Button>
+        {/* ── Fixed Footer ── */}
+        <div className="px-6 py-4 border-t border-border/60 shrink-0 flex items-center justify-between gap-2 bg-background">
+          <Button variant="ghost" size="sm" onClick={onClose} disabled={loading || saving}>ปิด</Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleGenerate}
+              disabled={loading || saving || contentChapters.length === 0}
+              className="gap-1.5"
+            >
+              {loading
+                ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />กำลังสร้าง...</>
+                : <><Sparkles className="w-3.5 h-3.5" />{blurbs ? "สร้างใหม่" : "สร้างสรุป + คำโปรย"}</>
+              }
+            </Button>
+            {blurbs && (
+              <Button
+                size="sm"
+                className="gap-1.5"
+                onClick={handleSaveBlurb}
+                disabled={!selectedBlurb || saving || loading}
+              >
+                {saving
+                  ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />กำลังบันทึก...</>
+                  : <><CheckCircle2 className="w-3.5 h-3.5" />{selectedBlurb ? `บันทึก "${BLURB_TYPES.find(t=>t.id===selectedBlurb)?.label}"` : "เลือกคำโปรยก่อน"}</>
+                }
+              </Button>
+            )}
+          </div>
         </div>
       </DialogContent>
     </Dialog>

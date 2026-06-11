@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Sparkles, BookOpen, BookText, Feather, Hash, Calendar, PenTool,
-  CheckCircle2, Edit3, X, Save, Loader2, Bot
+  CheckCircle2, Edit3, X, Save, Loader2, Bot, ChevronDown, ChevronUp
 } from "lucide-react";
 import { toast } from "sonner";
 import CopyButton from "@/components/ui/CopyButton";
@@ -24,6 +24,7 @@ export default function NovelHomePage({ novel, novelId }) {
   const [blurbDraft, setBlurbDraft] = useState("");
   const [savingBlurb, setSavingBlurb] = useState(false);
   const [blurbDialogOpen, setBlurbDialogOpen] = useState(false);
+  const [summaryExpanded, setSummaryExpanded] = useState(false);
 
   const { data: chapters = [] } = useQuery({
     queryKey: ["chapters", novelId],
@@ -151,6 +152,34 @@ export default function NovelHomePage({ novel, novelId }) {
             </div>
           )}
         </section>
+
+        {/* ─── Full Summary (collapsible, from AI) ─── */}
+        {novel?.full_summary && (
+          <section>
+            <button
+              className="w-full flex items-center justify-between mb-2 group"
+              onClick={() => setSummaryExpanded((v) => !v)}
+            >
+              <h2 className="font-heading text-base font-semibold flex items-center gap-2">
+                <BookOpen className="w-4 h-4 text-primary" />
+                สรุปเรื่องทั้งหมด
+                <span className="text-xs text-muted-foreground font-normal">(AI)</span>
+              </h2>
+              <div className="flex items-center gap-1.5">
+                {summaryExpanded && <CopyButton text={novel.full_summary} label="คัดลอก" size="sm" />}
+                {summaryExpanded
+                  ? <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                  : <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                }
+              </div>
+            </button>
+            {summaryExpanded && (
+              <div className="rounded-xl border border-border/60 bg-card/60 px-5 py-4">
+                <p className="text-sm leading-[1.9] text-foreground/80 whitespace-pre-wrap">{novel.full_summary}</p>
+              </div>
+            )}
+          </section>
+        )}
 
         {/* ─── Synopsis ─── */}
         {novel?.synopsis && (
