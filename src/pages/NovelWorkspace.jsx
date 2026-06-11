@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Feather, PenTool, Users, Globe, Clock, Bot, Trash2, Share2, History, BookOpen } from "lucide-react";
+import { ArrowLeft, Feather, PenTool, Users, Globe, Clock, Bot, Trash2, Share2, History } from "lucide-react";
 import VersionHistoryDialog from "@/components/novel/VersionHistoryDialog";
 import { saveVersion } from "@/lib/saveVersion";
 import { useNavigate } from "react-router-dom";
@@ -18,11 +18,10 @@ import CharacterBible from "@/components/novel/CharacterBible";
 import WorldBible from "@/components/novel/WorldBible";
 import Timeline from "@/components/novel/Timeline";
 import WriterManager from "@/components/novel/WriterManager";
-import NovelOverview from "@/components/novel/NovelOverview";
 
 export default function NovelWorkspace() {
   const novelId = window.location.pathname.split("/novel/")[1];
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState("characters");
   const [pendingOpenChapter, setPendingOpenChapter] = useState(null);
   const [deleteDialog, setDeleteDialog] = useState(false);
   const [shareDialog, setShareDialog] = useState(false);
@@ -200,7 +199,6 @@ export default function NovelWorkspace() {
           <div className="max-w-7xl mx-auto px-4 overflow-x-auto">
             <TabsList className="bg-transparent h-auto p-0 gap-0 flex-nowrap whitespace-nowrap">
               {[
-                { value: "overview", icon: BookOpen, label: "หน้าแรก" },
                 { value: "characters", icon: Users, label: "ตัวละคร" },
                 { value: "timeline", icon: Clock, label: "ไทม์ไลน์" },
                 { value: "world", icon: Globe, label: "โลก/ฉาก" },
@@ -221,9 +219,6 @@ export default function NovelWorkspace() {
         </div>
 
         <div className="flex-1">
-          <TabsContent value="overview" className="m-0">
-            <NovelOverview novel={novel} novelId={novelId} onTabChange={setActiveTab} />
-          </TabsContent>
           <TabsContent value="writing" className="m-0 h-full">
             <WritingRoom novelId={novelId} novel={novel} pendingOpenChapter={pendingOpenChapter} onPendingOpenChapterConsumed={() => setPendingOpenChapter(null)} />
           </TabsContent>
