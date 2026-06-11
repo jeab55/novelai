@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Sparkles, Loader2, CheckCircle2, BookOpen, Star, Zap } from "lucide-react";
 import { toast } from "sonner";
 import CopyButton from "@/components/ui/CopyButton";
-import { useSafeAction } from "@/hooks/useSafeAction";
 
 const BLURB_TYPES = [
   {
@@ -78,32 +77,27 @@ export default function NovelBlurbDialog({ open, onClose, novel, novelId, chapte
   const queryClient = useQueryClient();
 
   const contentChapters = chapters.filter((c) => c.content && (c.word_count || 0) > 0);
-
-  const { run: saveBlurb, isPending: saving } = useSafeAction({
-    action: "บันทึกคำโปรย",
-    entity: "Novel",
-    fn: async ({ blurbText, summaryText }) => {
-      await base44.entities.Novel.update(novelId, {
-        blurb: blurbText,
-        full_summary: summaryText || undefined,
-      });
-      // verify
-      const all = await base44.entities.Novel.list();
-      const updated = all.find((n) => String(n.id) === String(novelId));
-      if (!updated?.blurb) throw new Error("blurb ยังว่างหลังบันทึก");
-      return updated;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["novels"] });
-      queryClient.invalidateQueries({ queryKey: ["novel", novelId] });
-    },
-  });
+  const [saving, setSaving] = useState(false);
 
   const handleSaveBlurb = async () => {
     if (!selectedBlurb || !blurbs) return;
     const blurbText = blurbs[selectedBlurb];
     if (!blurbText) return;
-    await saveBlurb({ blurbText, summaryText: summary });
+    setSaving(true);
+    try {
+      await base44.entities.Novel.update(novelId, {
+        blurb: blurbText,
+        ...(summary ? { full_summary: summary } : {}),
+      });
+      queryClient.invalidateQueries({ queryKey: ["novels"] });
+      queryClient.invalidateQueries({ queryKey: ["novel", novelId] });
+      toast.success("บันทึกคำโปรยสำเร็จ");
+      onClose();
+    } catch (err) {
+      toast.error(`บันทึกไม่สำเร็จ — ${err?.message || "ลองใหม่อีกครั้ง"}`);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleGenerate = async () => {
