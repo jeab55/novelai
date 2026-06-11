@@ -6,11 +6,26 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Plus, X, Sparkles, Loader2, ChevronDown, ChevronUp, Check, Users, BookOpen, Feather } from "lucide-react";
+import { Plus, X, Sparkles, Loader2, ChevronDown, ChevronUp, Check, Users, BookOpen, Feather, Heart } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { toast } from "sonner";
 
 const GENRES = ["โรแมนติก", "แฟนตาซี", "อิงประวัติศาสตร์", "จีนย้อนยุค", "วาย", "สยองขวัญ", "ลึกลับ", "แอ็คชั่น", "ดราม่า", "อื่นๆ"];
+
+const WRITING_STYLES = [
+  {
+    value: "ทั่วไป",
+    label: "ทั่วไป",
+    desc: "เขียนตามแนวที่เลือก ไม่มีกฎพิเศษ",
+    icon: null,
+  },
+  {
+    value: "รอมแพง",
+    label: "รอมแพง",
+    desc: "โรแมนติกคอมเมดี้อิงประวัติศาสตร์ จบสุข (HEA) — ตัวเอกคนยุคปัจจุบันหลุดไปในโลกย้อนยุค มุขตลกจากช่องว่างวัฒนธรรม บทเกี้ยวละเมียด สอดแทรกประวัติศาสตร์ผ่านวิถีชีวิต",
+    icon: Heart,
+  },
+];
 const CHAR_ROLES = ["ตัวเอก", "ตัวรอง", "ตัวร้าย", "ตัวประกอบ"];
 const emptyChar = () => ({ name: "", role: "ตัวเอก", age: "", occupation: "", personality: "", background: "", wound: "", desire: "" });
 
@@ -225,6 +240,36 @@ function Step1({ form, setForm, chars }) {
         <Input placeholder="เช่น กรุงศรีอยุธยาตอนปลาย พ.ศ. 2310" value={form.era} onChange={(e) => setForm({ ...form, era: e.target.value })} />
       </div>
       <div>
+        <label className="text-sm font-medium mb-1.5 block">สไตล์การเขียน</label>
+        <div className="grid grid-cols-1 gap-2">
+          {WRITING_STYLES.map((s) => {
+            const active = form.writing_style === s.value;
+            const Icon = s.icon;
+            return (
+              <button
+                key={s.value}
+                type="button"
+                onClick={() => setForm({ ...form, writing_style: s.value })}
+                className={`flex items-start gap-3 rounded-xl border px-4 py-3 text-left transition-all ${
+                  active ? "border-primary bg-primary/5 ring-1 ring-primary/20" : "border-border/60 hover:border-primary/30 hover:bg-muted/30"
+                }`}
+              >
+                <div className={`mt-0.5 w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${active ? "border-primary bg-primary" : "border-muted-foreground/30"}`}>
+                  {active && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className={`text-sm font-medium ${active ? "text-primary" : ""}`}>{s.label}</span>
+                    {Icon && <Icon className="w-3.5 h-3.5 text-rose-500 shrink-0" />}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{s.desc}</p>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      <div>
         <label className="text-sm font-medium mb-1.5 block">จำนวนตอนที่ต้องการ</label>
         <Select value={form.target_chapters.toString()} onValueChange={(v) => setForm({ ...form, target_chapters: v })}>
           <SelectTrigger><SelectValue placeholder="เลือกจำนวนตอน" /></SelectTrigger>
@@ -324,6 +369,7 @@ function Step3({ form, setForm, chars, activeWriters }) {
         <div className="px-4 py-3 space-y-2 text-sm">
           <SummaryRow label="ชื่อเรื่อง" value={form.title} bold />
           <SummaryRow label="แนวนิยาย" value={form.genre} />
+          <SummaryRow label="สไตล์การเขียน" value={form.writing_style} />
           <SummaryRow label="ยุคสมัย" value={form.era} />
           <SummaryRow label="จำนวนตอน" value={form.target_chapters ? `${form.target_chapters} ตอน` : null} />
           <SummaryRow label="นักเขียน AI" value={writer?.name} highlight />
@@ -364,7 +410,7 @@ function SummaryRow({ label, value, bold, highlight }) {
 // ─── Main Wizard ──────────────────────────────────────────────────────────
 export default function CreateNovelWizard({ open, onOpenChange, activeWriters, onCreated }) {
   const [step, setStep] = useState(1);
-  const [form, setForm] = useState({ title: "", genre: "", synopsis: "", era: "", writer_id: "", target_chapters: "10" });
+  const [form, setForm] = useState({ title: "", genre: "", synopsis: "", era: "", writer_id: "", target_chapters: "10", writing_style: "ทั่วไป" });
   const [chars, setChars] = useState([emptyChar()]);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
@@ -374,7 +420,7 @@ export default function CreateNovelWizard({ open, onOpenChange, activeWriters, o
     if (!v) {
       setTimeout(() => {
         setStep(1);
-        setForm({ title: "", genre: "", synopsis: "", era: "", writer_id: "", target_chapters: "10" });
+        setForm({ title: "", genre: "", synopsis: "", era: "", writer_id: "", target_chapters: "10", writing_style: "ทั่วไป" });
         setChars([emptyChar()]);
         setError("");
       }, 300);

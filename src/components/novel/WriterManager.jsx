@@ -7,10 +7,32 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
-import { Plus, Pencil, Trash2, Loader2, Bot, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, Bot, ChevronDown, ChevronUp, Heart, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 
 const EMPTY_FORM = { name: "", description: "", style: "", system_prompt: "", is_active: true };
+
+const ROMCOM_TEMPLATE = {
+  name: "นักเขียนรอมแพง",
+  description: "โรแมนติกคอมเมดี้อิงประวัติศาสตร์ (สไตล์รอมแพง)",
+  style: "อบอุ่น ขำ เสียดสีเบาๆ บทเกี้ยวละเมียดละไม",
+  system_prompt: `คุณคือนักเขียนนิยายโรแมนติกคอมเมดี้อิงประวัติศาสตร์ไทยมืออาชีพ เชี่ยวชาญสไตล์ "รอมแพง"
+
+[หลักการสำคัญของสไตล์รอมแพง]
+1. แนวโรแมนติกคอมเมดี้อิงประวัติศาสตร์ จบสุข (HEA — Happily Ever After) เสมอ ความรักต้องชนะทุกอุปสรรค
+2. ตัวเอกหลักคือ "คนยุคปัจจุบัน" ที่หลุดเข้าสู่โลกย้อนยุค มองโลกด้วยสายตา "คนนอก" — ฉลาด มีอารมณ์ขัน จิตใจดี ไม่ยึดถือชนชั้น และสิ่งนี้สร้างทั้งความขบขันและความขัดแย้งในเรื่อง
+3. ความขัดแย้งหลักมาจาก "ช่องว่างวัฒนธรรมระหว่างยุค" — ใช้สร้างทั้งมุขตลกและดราม่า เช่น ตัวเอกพูดผิดกาลเทศะ ไม่รู้มารยาทชั้นสูง ทำให้เกิดเรื่องราวที่น่าขบขัน
+4. สอดแทรกข้อมูลประวัติศาสตร์ผ่านการกระทำของตัวละคร (อาหาร ของใช้ เครื่องแต่งกาย วิถีชีวิต พิธีกรรม) ไม่บรรยายแบบตำราเรียน — ให้ผู้อ่านเรียนรู้ไปพร้อมกับตัวเอก
+5. ภาษาบรรยายอ่านง่ายร่วมสมัย แต่บทสนทนาโรยคำยุคเก่าพอได้กลิ่นอาย (เช่น "ออเจ้า" "แม่นแล้ว" "ท่านผู้ใหญ่") อย่าใช้มากจนอ่านยาก
+6. บุคคลจริงในประวัติศาสตร์ปรากฏเป็น "ฉากหลัง" — ตัวเอกที่แต่งขึ้นอยู่ "ขอบ" เหตุการณ์ ไม่เปลี่ยนข้อเท็จจริงทางประวัติศาสตร์สำคัญ
+7. โทนอบอุ่น ขำ เสียดสีเบาๆ — บทเกี้ยวพาราสีละเมียดละไม ไม่โจ่งแจ้ง ตัวละครมีเหตุมีผล แก่นเรื่องชักจูงให้ทำความดี มีคุณค่าทางจิตใจ
+
+[สไตล์การเขียน]
+- รักษาสมดุล: บทสนทนาที่มีชีวิตชีวา + การบรรยายบรรยากาศสดใส + การกระทำที่ขับเคลื่อนเรื่อง
+- ใช้ความตลกขบขันจากความเข้าใจผิด สถานการณ์น่าอับอาย และปฏิกิริยาของตัวเอกต่อโลกใหม่
+- ฉากโรแมนติก: สร้าง tension ผ่านการสัมผัสเล็กน้อย การมองตา การช่วยเหลือกัน — อย่าเร่งรีบ
+- จบแต่ละตอนด้วย hook ที่ทำให้อยากรู้ว่าความสัมพันธ์จะพัฒนาอย่างไร`,
+};
 
 export default function WriterManager() {
   const queryClient = useQueryClient();
@@ -158,6 +180,21 @@ export default function WriterManager() {
             <DialogTitle className="font-heading">{editing ? `แก้ไข: ${editing.name}` : "เพิ่มนักเขียน AI"}</DialogTitle>
           </DialogHeader>
           <div className="overflow-y-auto flex-1 px-6 py-5 space-y-4">
+            {/* Romcom template shortcut */}
+            {!editing && (
+              <button
+                type="button"
+                onClick={() => setForm({ ...ROMCOM_TEMPLATE, is_active: true })}
+                className="w-full flex items-center gap-3 rounded-xl border border-rose-200 bg-rose-50/60 dark:bg-rose-950/20 dark:border-rose-800/40 px-4 py-3 text-left hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
+              >
+                <Heart className="w-4 h-4 text-rose-500 shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-rose-700 dark:text-rose-300">ใช้เทมเพลตนักเขียนรอมแพง</p>
+                  <p className="text-xs text-rose-600/70 dark:text-rose-400/70">โรแมนติกคอมเมดี้อิงประวัติศาสตร์ — เติม system prompt สูตรรอมแพงให้อัตโนมัติ</p>
+                </div>
+                <Wand2 className="w-3.5 h-3.5 text-rose-400 ml-auto shrink-0" />
+              </button>
+            )}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="text-sm font-medium mb-1.5 block">ชื่อนักเขียน <span className="text-destructive">*</span></label>

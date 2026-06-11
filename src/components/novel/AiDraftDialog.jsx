@@ -25,9 +25,22 @@ const DEFAULT_WRITER_PROMPT = `คุณคือนักเขียนนิ�
 function buildDraftSystemPrompt(novel, characters, worldEntries, plotEvents, chapters, currentChapter, writerPrompt, linkedEvent) {
   let ctx = `[บทบาท]\n${writerPrompt || DEFAULT_WRITER_PROMPT}\n\n`;
 
+  // Inject romcom style rules if applicable
+  if (novel.writing_style === "รอมแพง") {
+    ctx += `[สไตล์การเขียน: รอมแพง — โรแมนติกคอมเมดี้อิงประวัติศาสตร์]\n`;
+    ctx += `1. จบสุข (HEA) เสมอ ความรักต้องชนะทุกอุปสรรค\n`;
+    ctx += `2. ตัวเอกคือ "คนยุคปัจจุบัน" ในโลกย้อนยุค มองโลกเป็น "คนนอก" — ฉลาด ขำ ดี ไม่ถือชนชั้น ใช้สร้างมุขตลกและดราม่า\n`;
+    ctx += `3. ความขัดแย้งหลักมาจากช่องว่างวัฒนธรรมระหว่างยุค\n`;
+    ctx += `4. สอดแทรกข้อมูลประวัติศาสตร์ผ่านการกระทำ (อาหาร ของใช้ วิถีชีวิต) ไม่บรรยายแบบตำรา\n`;
+    ctx += `5. ภาษาบรรยายร่วมสมัย บทสนทนาโรยคำโบราณพอได้กลิ่นอาย (เช่น "ออเจ้า") อย่าใช้มากจนอ่านยาก\n`;
+    ctx += `6. บุคคลจริงในประวัติศาสตร์เป็นฉากหลัง ตัวเอกอยู่ "ขอบ" เหตุการณ์ ไม่เปลี่ยนข้อเท็จจริงใหญ่\n`;
+    ctx += `7. โทนอบอุ่น ขำ เสียดสีเบาๆ บทเกี้ยวพาราสีละเมียดละไม ตัวละครมีเหตุมีผล แก่นเรื่องชักจูงให้ทำความดี\n\n`;
+  }
+
   ctx += `[บริบทเรื่อง]\n`;
   ctx += `ชื่อเรื่อง: ${novel.title}\n`;
   if (novel.genre) ctx += `แนว: ${novel.genre}\n`;
+  if (novel.writing_style && novel.writing_style !== "ทั่วไป") ctx += `สไตล์การเขียน: ${novel.writing_style}\n`;
   if (novel.era) ctx += `ยุคสมัย/ฉากหลัง: ${novel.era}\n`;
   if (novel.synopsis) ctx += `เรื่องย่อ: ${novel.synopsis}\n`;
 
