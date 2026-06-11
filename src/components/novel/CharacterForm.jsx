@@ -6,7 +6,6 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { saveVersion } from "@/lib/saveVersion";
-import { useSafeAction } from "@/hooks/useSafeAction";
 import { Sparkles, Loader2, ChevronDown, ChevronUp } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 
@@ -29,10 +28,8 @@ export default function CharacterForm({ novelId, character, onDone, novelIdForVe
   const [analysisOpen, setAnalysisOpen] = useState(true);
   const queryClient = useQueryClient();
 
-  const { run: saveChar, isPending: isSaving } = useSafeAction({
-    action: character ? "แก้ไขตัวละคร" : "สร้างตัวละคร",
-    entity: "Character",
-    fn: async (data) => {
+  const mutation = useMutation({
+    mutationFn: async (data) => {
       if (character) {
         await saveVersion({
           entityType: "character",
@@ -102,7 +99,7 @@ ${charDesc}
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    saveChar(form);
+    mutation.mutate(form);
   };
 
   return (
@@ -178,8 +175,8 @@ ${charDesc}
           </div>
         )}
 
-        <Button type="submit" className="w-full" disabled={!form.name || isSaving}>
-          {isSaving ? <><Loader2 className="w-4 h-4 animate-spin mr-1" />กำลังบันทึก...</> : character ? "อัปเดต" : "เพิ่มตัวละคร"}
+        <Button type="submit" className="w-full" disabled={!form.name || mutation.isPending}>
+          {mutation.isPending ? "กำลังบันทึก..." : character ? "อัปเดต" : "เพิ่มตัวละคร"}
         </Button>
       </div>
     </form>

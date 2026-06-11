@@ -3,10 +3,8 @@ import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Save, Loader2, Download, Copy, MoreHorizontal, Maximize2, Minimize2, Sparkles, Clock, X, RefreshCw, Volume2, History, PieChart, FileText, StickyNote, CheckCircle2, Settings2 } from "lucide-react";
+import { ArrowLeft, Save, Loader2, Download, Copy, MoreHorizontal, Maximize2, Minimize2, Sparkles, Clock, X, RefreshCw, Volume2, History, PieChart, FileText, StickyNote, CheckCircle2, Type, AlignJustify } from "lucide-react";
 import AiDraftDialog from "./AiDraftDialog";
-import ReadingSettingsPanel from "./ReadingSettingsPanel";
-import { useReadingSettings } from "@/hooks/useReadingSettings";
 import EditorReviewPanel from "./EditorReviewPanel";
 import TextToSpeechPanel from "./TextToSpeechPanel";
 import VersionHistoryDialog from "./VersionHistoryDialog";
@@ -14,9 +12,7 @@ import ChapterBalanceMeter from "./ChapterBalanceMeter";
 import SceneTemplateDialog from "./SceneTemplateDialog";
 import QuickNotesPanel from "./QuickNotesPanel";
 import AiEditorReviewPanel from "./AiEditorReviewPanel";
-import ActivityLogPanel from "./ActivityLogPanel";
 import { saveVersion } from "@/lib/saveVersion";
-import { useSafeAction } from "@/hooks/useSafeAction";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
@@ -62,8 +58,8 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
   const [templateOpen, setTemplateOpen] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
   const [autoSaveStatus, setAutoSaveStatus] = useState("saved"); // "saving" | "saved"
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const { settings, update, fontSizePx, fontCss, FONT_SIZES, LINE_HEIGHTS, FONT_FAMILIES } = useReadingSettings();
+  const [fontSize, setFontSize] = useState(19);
+  const [contentWidth, setContentWidth] = useState(720);
   const queryClient = useQueryClient();
 
   const { data: plotEvents = [] } = useQuery({
@@ -85,10 +81,9 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
     return () => window.removeEventListener("keydown", handleKey);
   }, [focusMode]);
 
-  const { run: saveChapter, isPending: isSavingChapter } = useSafeAction({
-    action: "บันทึกตอน",
-    entity: "Chapter",
-    fn: async (data) => {
+  const saveMutation = useMutation({
+    mutationFn: async (data) => {
+      // snapshot ก่อนบันทึก
       await saveVersion({
         entityType: "chapter",
         entityId: chapter.id,
@@ -100,6 +95,7 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["chapters", novelId] });
+      toast.success("บันทึกแล้ว");
       setSaving(false);
     },
     onError: () => setSaving(false),
@@ -107,7 +103,7 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
 
   const handleSave = () => {
     setSaving(true);
-    saveChapter({ title, content, status, word_count: wordCount, plot_event_id: plotEventId, plot_event_title: plotEventTitle, plot_event_description: plotEventDescription, plot_event_order: plotEventOrder });
+    saveMutation.mutate({ title, content, status, word_count: wordCount, plot_event_id: plotEventId, plot_event_title: plotEventTitle, plot_event_description: plotEventDescription, plot_event_order: plotEventOrder });
   };
 
   const handleBindEvent = () => {
@@ -178,17 +174,23 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
         <span className="text-xs text-muted-foreground tabular-nums border-l border-border/50 pl-2">
           {wordCount.toLocaleString()} คำ
         </span>
-        {/* Reading settings button */}
-        <Button
-          variant="outline"
-          size="sm"
-          className={`gap-1.5 h-8 text-xs ${settingsOpen ? "border-primary text-primary bg-primary/5" : "border-border/60 text-muted-foreground"}`}
-          onClick={() => setSettingsOpen((v) => !v)}
-          title="ตั้งค่าการอ่าน"
-        >
-          <Settings2 className="w-3.5 h-3.5" />
-          ตั้งค่าการอ่าน
-        </Button>
+        {/* Font size control */}
+        <div className="flex items-center gap-1 border border-border/50 rounded-lg px-2 h-8">
+          <Type className="w-3 h-3 text-muted-foreground" />
+          <button onClick={() => setFontSize(v => Math.max(14, v - 1))} className="text-muted-foreground hover:text-foreground text-xs px-0.5">−</button>
+          <span className="text-xs tabular-nums w-5 text-center">{fontSize}</span>
+          <button onClick={() => setFontSize(v => Math.min(28, v + 1))} className="text-muted-foreground hover:text-foreground text-xs px-0.5">+</button>
+        </div>
+        {/* Content width control */}
+        <div className="flex items-center gap-1 border border-border/50 rounded-lg px-2 h-8">
+          <AlignJustify className="w-3 h-3 text-muted-foreground" />
+          {[600, 720, 900].map(w => (
+            <button key={w} onClick={() => setContentWidth(w)}
+              className={`text-[10px] px-1 rounded transition-colors ${contentWidth === w ? "text-primary font-bold" : "text-muted-foreground hover:text-foreground"}`}>
+              {w === 600 ? "S" : w === 720 ? "M" : "L"}
+            </button>
+          ))}
+        </div>
 
         {/* TTS button */}
         <Button
@@ -296,16 +298,7 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
               }}
             >
               <Copy className="w-3.5 h-3.5 mr-2" />
-              คัดลอกทั้งตอน (เนื้อหา + ชื่อ)
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={async () => {
-                await navigator.clipboard.writeText(content);
-                toast.success("คัดลอกแล้ว");
-              }}
-            >
-              <Copy className="w-3.5 h-3.5 mr-2" />
-              คัดลอกเฉพาะเนื้อหา
+              คัดลอกทั้งตอน
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -322,8 +315,8 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
             </SelectContent>
           </Select>
         )}
-        <Button size="sm" className="gap-1.5" onClick={handleSave} disabled={saving || isSavingChapter}>
-          {(saving || isSavingChapter) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+        <Button size="sm" className="gap-1.5" onClick={handleSave} disabled={saving}>
+          {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
           บันทึก
         </Button>
       </div>
@@ -371,19 +364,10 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
   // โหมดโฟกัส: fullscreen overlay
   if (focusMode) {
     return (
-      <div className="fixed inset-0 z-50 bg-[hsl(35,30%,97%)] dark:bg-background flex flex-col">
+      <div className="fixed inset-0 z-50 bg-[hsl(35,30%,97%)] flex flex-col">
         {toolbar}
-        {settingsOpen && (
-          <ReadingSettingsPanel
-            settings={settings}
-            update={update}
-            FONT_SIZES={FONT_SIZES}
-            LINE_HEIGHTS={LINE_HEIGHTS}
-            FONT_FAMILIES={FONT_FAMILIES}
-          />
-        )}
         <div className="flex-1 overflow-auto">
-          <div className="mx-auto px-8 py-12" style={{ maxWidth: "680px" }}>
+          <div className="mx-auto px-8 py-12" style={{ maxWidth: `${contentWidth}px` }}>
             <textarea
               autoFocus
               value={content}
@@ -395,9 +379,9 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
               placeholder="เริ่มเขียนเรื่องราวของคุณที่นี่..."
               className="w-full min-h-[80vh] bg-transparent border-none outline-none resize-none placeholder:text-muted-foreground/40"
               style={{
-                fontFamily: fontCss,
-                fontSize: `${fontSizePx}px`,
-                lineHeight: settings.lineHeight,
+                fontFamily: "'Sarabun', 'Noto Sans Thai', sans-serif",
+                fontSize: `${fontSize}px`,
+                lineHeight: "1.95",
                 color: "hsl(var(--foreground))",
               }}
             />
@@ -488,15 +472,6 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
 
     <div className="flex flex-col h-[calc(100vh-7rem)]">
       {toolbar}
-      {settingsOpen && (
-        <ReadingSettingsPanel
-          settings={settings}
-          update={update}
-          FONT_SIZES={FONT_SIZES}
-          LINE_HEIGHTS={LINE_HEIGHTS}
-          FONT_FAMILIES={FONT_FAMILIES}
-        />
-      )}
       {timelineBanner}
       {ttsOpen && (
         <TextToSpeechPanel
@@ -548,10 +523,9 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
           queryClient.invalidateQueries({ queryKey: ["chapters", novelId] });
         }}
       />
-      <ActivityLogPanel />
       <div className="flex flex-1 overflow-hidden">
         <div className="flex-1 overflow-auto bg-background">
-          <div className="mx-auto px-8 py-10" style={{ maxWidth: "680px" }}>
+          <div className="mx-auto px-8 py-10" style={{ maxWidth: `${contentWidth}px` }}>
             <textarea
               value={content}
               onChange={(e) => {
@@ -562,9 +536,9 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
               placeholder="เริ่มเขียนเรื่องราวของคุณที่นี่..."
               className="w-full min-h-[65vh] bg-transparent border-none outline-none resize-none placeholder:text-muted-foreground/40"
               style={{
-                fontFamily: fontCss,
-                fontSize: `${fontSizePx}px`,
-                lineHeight: settings.lineHeight,
+                fontFamily: "'Sarabun', 'Noto Sans Thai', sans-serif",
+                fontSize: `${fontSize}px`,
+                lineHeight: "1.95",
                 color: "hsl(var(--foreground))",
               }}
             />

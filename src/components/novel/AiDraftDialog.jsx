@@ -88,12 +88,6 @@ function buildDraftSystemPrompt(novel, characters, worldEntries, plotEvents, cha
   ctx += `- ใช้ภาษาไทยที่อ่านลื่น เหมาะกับยุคสมัยของเรื่อง หลีกเลี่ยงคำทับศัพท์สมัยใหม่ถ้าเป็นเรื่องย้อนยุค\n`;
   ctx += `- รักษาสมดุล 4 ส่วน: บทสนทนา (~25%), บทบรรยายภาพ/บรรยากาศ/ประสาทสัมผัส (~25%), บทดำเนินเรื่อง/การกระทำ (~30%), บทอธิบายข้อมูล/ปูมหลัง (~20%) อย่าให้บทอธิบายล้นจนหนืด สอดแทรกอย่างเป็นธรรมชาติ\n`;
   ctx += `- ใช้ชื่อตัวละครตรงตามคลังตัวละครเสมอ: ${characters.map(c => c.name).join(", ")} ห้ามเปลี่ยนชื่อหรือเรียกต่างไปในตอนเดียวกัน\n`;
-  ctx += `\n[กฎบทสนทนา — สำคัญมาก]\n`;
-  ctx += `- ทุกบทสนทนาต้องระบุผู้พูดให้ชัดเจนก่อนหรือหลังบทพูดเสมอ ห้ามมีบทพูดลอยโดยไม่รู้ว่าใครพูด\n`;
-  ctx += `- ใช้กริยาบอกน้ำเสียงที่หลากหลาย เช่น กล่าวอย่างเฉียบขาด / ตะโกนขัด / กระซิบอย่างอ่อนโยน / ตอบห้วน / อธิบายอย่างระมัดระวัง แทนคำว่า "พูด" ซ้ำๆ\n`;
-  ctx += `- เพิ่มภาษากาย ท่าทาง และการแสดงออกทางอารมณ์ควบคู่กับบทพูดเสมอ เช่น [ชื่อตัวละคร] กำมือแน่น "...", ริมฝีปากของ[ชื่อ]สั่นเล็กน้อย "..."\n`;
-  ctx += `- เมื่อตัวละครหลายคนอยู่ในฉากเดียวกัน ต้องสลับให้ชัดว่าใครตอบสนองต่อใคร ใช้ชื่อหรือสรรพนามที่ชัดเจน ไม่ใช้ "เขา/เธอ" ซ้อนกันจนสับสน\n`;
-  ctx += `- บทพูดที่แสดงอารมณ์รุนแรง (โกรธ กลัว รัก) ต้องมีปฏิกิริยาร่างกายที่เห็นได้ชัดประกอบด้วยเสมอ\n`;
   ctx += `- ผลลัพธ์: เฉพาะเนื้อหาตอน ไม่ต้องมีคำนำหรืออธิบาย\n`;
 
   return ctx;
@@ -113,7 +107,7 @@ function buildDraftPrompt(form, systemPrompt, wordTarget) {
 
 // ขัดเกลาสำนวน
 function buildPolishPrompt(draft, systemPrompt) {
-  return `${systemPrompt}\n\n[งาน: ขัดเกลาสำนวนและบทสนทนา]\nนำเนื้อหาต่อไปนี้มาขัดเกลาสำนวนให้อ่านลื่นและมีพลังขึ้น รักษาโครงเรื่องและเนื้อหาเดิมทั้งหมดไว้ ปรับเฉพาะภาษาและจังหวะประโยค\n\nโดยเฉพาะ: ตรวจสอบบทสนทนาทุกตอนให้ระบุผู้พูดชัดเจน เพิ่มภาษากายและน้ำเสียงที่สื่ออารมณ์ถ้ายังขาดอยู่ และปรับกริยาบอกน้ำเสียงให้หลากหลายกว่าเดิม:\n\n${draft}`;
+  return `${systemPrompt}\n\n[งาน: ขัดเกลาสำนวน]\nนำเนื้อหาต่อไปนี้มาขัดเกลาสำนวนให้อ่านลื่นและมีพลังขึ้น รักษาโครงเรื่องและเนื้อหาเดิมทั้งหมดไว้ ปรับเฉพาะภาษาและจังหวะประโยค:\n\n${draft}`;
 }
 
 // Step 1: form, Step 2: review draft
@@ -216,27 +210,11 @@ export default function AiDraftDialog({ open, onClose, chapter, novel, novelId, 
     const sysPrompt = getSystemPrompt();
     const prompt = buildDraftPrompt(form, sysPrompt, form.wordTarget);
     const result = await base44.integrations.Core.InvokeLLM({ prompt, model: "claude_sonnet_4_6" });
+    // Strip code fences before using result
     let text = typeof result === "string" ? result : (result?.text || "");
     text = text.replace(/^```[\w]*\n?/m, "").replace(/\n?```$/m, "").trim();
     setDraft(text);
     setStep(2);
-
-    // Auto-save immediately after draft is complete
-    setLoadingType("saving");
-    const saveResult = await saveChapterContent({
-      novelId,
-      chapterId: chapter?.id,
-      title: form.chapterTitle || chapter?.title,
-      order: chapter?.order,
-      content: text,
-      status: "ร่าง",
-    });
-    if (saveResult.success) {
-      queryClient.invalidateQueries({ queryKey: ["chapters", novelId] });
-      toast.success("บันทึกร่างอัตโนมัติแล้ว ✓");
-    } else {
-      setSaveError(saveResult.error || "บันทึกอัตโนมัติไม่สำเร็จ กรุณากด 'ใส่ลง editor' เพื่อบันทึกอีกครั้ง");
-    }
     setLoading(false);
     setLoadingType("");
   };
@@ -307,12 +285,8 @@ export default function AiDraftDialog({ open, onClose, chapter, novel, novelId, 
   };
 
   const handleClose = () => {
-    if (loading) {
-      if (!window.confirm("AI กำลังร่างอยู่ ถ้าปิดตอนนี้ร่างที่ยังไม่เสร็จจะหาย ต้องการปิดจริงหรือไม่?")) return;
-    }
     setStep(1);
     setDraft("");
-    setSaveError("");
     setLinkedPlotEventId("");
     setForm({ chapterTitle: chapter?.title || "", summary: "", characters: "", tone: "", wordTarget: 1200 });
     onClose();

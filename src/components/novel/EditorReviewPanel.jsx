@@ -10,7 +10,6 @@ import {
   ChevronDown, ChevronUp, BookOpen, Loader2, Wand2, RotateCcw,
   Plus, Trash2, Pencil, Check, X
 } from "lucide-react";
-import CopyButton from "@/components/ui/CopyButton";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { th } from "date-fns/locale";
@@ -264,21 +263,20 @@ export default function EditorReviewPanel({ chapter, novel, novelId, onContentUp
                     </div>
 
                     {editingId !== r.id && (
-                    <div className="flex gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-                      <CopyButton size="xs" text={`[${r.reviewer_name}] ${r.content}`} />
-                      <button
-                        onClick={() => { setEditingId(r.id); setEditContent(r.content); }}
-                        className="p-1 rounded hover:bg-muted/60 text-muted-foreground hover:text-foreground transition-colors"
-                      >
-                        <Pencil className="w-3 h-3" />
-                      </button>
-                      <button
-                        onClick={() => deleteMutation.mutate(r.id)}
-                        className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </button>
-                    </div>
+                      <div className="flex gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          onClick={() => { setEditingId(r.id); setEditContent(r.content); }}
+                          className="p-1 rounded hover:bg-muted/60 text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                          <Pencil className="w-3 h-3" />
+                        </button>
+                        <button
+                          onClick={() => deleteMutation.mutate(r.id)}
+                          className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>

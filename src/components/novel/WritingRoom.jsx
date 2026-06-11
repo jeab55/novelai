@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, FileText, Loader2, Trash2, Download, Copy, MoreHorizontal, Clock, Sparkles, Scan } from "lucide-react";
+import { Plus, FileText, Loader2, Trash2, Download, Copy, MoreHorizontal, Clock, Sparkles } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { motion, AnimatePresence } from "framer-motion";
 import ChapterEditor from "./ChapterEditor";
@@ -15,11 +15,7 @@ import { downloadChapterTxt, downloadChapterMd, copyChapterToClipboard, download
 import { toast } from "sonner";
 import AiChapterGeneratorDialog from "./AiChapterGeneratorDialog";
 import AiDraftDialog from "./AiDraftDialog";
-import BulkDraftDialog from "./BulkDraftDialog";
 import ContinuityChecker from "./ContinuityChecker";
-import NovelContinuityDialog from "./NovelContinuityDialog";
-import PublishExportDialog from "./PublishExportDialog";
-import NovelBlurbDialog from "./NovelBlurbDialog";
 
 const statusColors = {
   "ร่าง": "bg-amber-50 text-amber-700 border border-amber-200",
@@ -36,10 +32,6 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
   const [aiChapterGeneratorOpen, setAiChapterGeneratorOpen] = useState(false);
   const [aiDraftOpen, setAiDraftOpen] = useState(false);
   const [draftChapter, setDraftChapter] = useState(null);
-  const [bulkDraftOpen, setBulkDraftOpen] = useState(false);
-  const [continuityOpen, setContinuityOpen] = useState(false);
-  const [publishExportOpen, setPublishExportOpen] = useState(false);
-  const [blurbOpen, setBlurbOpen] = useState(false);
   const queryClient = useQueryClient();
 
   // Handle chapter navigation from other tabs (e.g. AiPlotDialog draft)
@@ -104,32 +96,6 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
       novel={novel}
       novelId={novelId}
     />
-    <BulkDraftDialog
-      open={bulkDraftOpen}
-      onClose={() => setBulkDraftOpen(false)}
-      novel={novel}
-      novelId={novelId}
-    />
-    <NovelContinuityDialog
-      open={continuityOpen}
-      onClose={() => setContinuityOpen(false)}
-      novel={novel}
-      novelId={novelId}
-    />
-    <PublishExportDialog
-      open={publishExportOpen}
-      onClose={() => setPublishExportOpen(false)}
-      novel={novel}
-      novelId={novelId}
-      chapters={chapters}
-    />
-    <NovelBlurbDialog
-      open={blurbOpen}
-      onClose={() => setBlurbOpen(false)}
-      novel={novel}
-      novelId={novelId}
-      chapters={chapters}
-    />
     {draftChapter && (
       <AiDraftDialog
         open={aiDraftOpen}
@@ -167,52 +133,15 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
             <Sparkles className="w-3.5 h-3.5" />
             AI สร้างตอน
           </Button>
-          {chapters.filter(ch => !ch.word_count || ch.word_count === 0).length > 0 && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5 text-primary border-primary/30 bg-primary/5 hover:bg-primary/10"
-              onClick={() => setBulkDraftOpen(true)}
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              ร่างทุกตอน
-            </Button>
-          )}
-          {(() => {
-            const withContent = chapters.filter(c => c.content && (c.word_count || 0) > 0).length;
-            const threshold = Math.ceil(chapters.length * 0.8);
-            return withContent >= threshold && chapters.length >= 2;
-          })() && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5 text-primary border-primary/30 bg-primary/5 hover:bg-primary/10"
-              onClick={() => setBlurbOpen(true)}
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              สรุป+คำโปรย
-            </Button>
-          )}
-          {chapters.filter(c => c.content && (c.word_count || 0) > 0).length >= 2 && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5 text-violet-600 border-violet-200 hover:bg-violet-50"
-              onClick={() => setContinuityOpen(true)}
-            >
-              <Scan className="w-3.5 h-3.5" />
-              ตรวจความต่อเนื่อง
-            </Button>
-          )}
           {chapters.length > 0 && (
             <Button
               variant="outline"
               size="sm"
               className="gap-1.5 text-muted-foreground"
-              onClick={() => setPublishExportOpen(true)}
+              onClick={() => downloadAllChaptersMd(novel?.title || "novel", chapters)}
             >
               <Download className="w-3.5 h-3.5" />
-              ส่งออก / ลงแพลตฟอร์ม
+              ส่งออกทั้งเรื่อง
             </Button>
           )}
           <Dialog open={newChapterOpen} onOpenChange={setNewChapterOpen}>

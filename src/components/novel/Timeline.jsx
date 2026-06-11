@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { base44 } from "@/api/base44Client";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -10,8 +10,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Plus, Clock, Trash2, Edit2, BookOpen, Landmark, Loader2, Sparkles, History, Calendar, List, MapPin, ExternalLink, Globe } from "lucide-react";
-import { useSafeAction } from "@/hooks/useSafeAction";
-import CopyButton from "@/components/ui/CopyButton";
 import VersionHistoryDialog from "./VersionHistoryDialog";
 import { saveVersion } from "@/lib/saveVersion";
 import { motion } from "framer-motion";
@@ -69,10 +67,8 @@ export default function Timeline({ novelId, novel, onOpenChapter, onNavigateToWo
     return map;
   })();
 
-  const { run: saveEvent, isPending: isSavingEvent } = useSafeAction({
-    action: editing ? "แก้ไขเหตุการณ์" : "สร้างเหตุการณ์",
-    entity: "PlotEvent",
-    fn: async (data) => {
+  const saveMutation = useMutation({
+    mutationFn: async (data) => {
       if (editing) {
         await saveVersion({
           entityType: "plot_event",
@@ -92,10 +88,8 @@ export default function Timeline({ novelId, novel, onOpenChapter, onNavigateToWo
     },
   });
 
-  const { run: deleteEvent, isPending: isDeletingEvent } = useSafeAction({
-    action: "ลบเหตุการณ์",
-    entity: "PlotEvent",
-    fn: (id) => base44.entities.PlotEvent.update(id, { is_deleted: true }),
+  const deleteMutation = useMutation({
+    mutationFn: (id) => base44.entities.PlotEvent.update(id, { is_deleted: true }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["plotEvents", novelId] }),
   });
 
@@ -232,8 +226,8 @@ export default function Timeline({ novelId, novel, onOpenChapter, onNavigateToWo
                 <Switch checked={form.is_historical} onCheckedChange={(v) => setForm({ ...form, is_historical: v })} />
                 <label className="text-sm">เป็นเหตุการณ์ประวัติศาสตร์จริง</label>
               </div>
-              <Button className="w-full" onClick={() => saveEvent(form)} disabled={!form.title || isSavingEvent}>
-                {isSavingEvent ? <><Loader2 className="w-4 h-4 animate-spin mr-1" />กำลังบันทึก...</> : editing ? "อัปเดต" : "เพิ่ม"}
+              <Button className="w-full" onClick={() => saveMutation.mutate(form)} disabled={!form.title || saveMutation.isPending}>
+                {saveMutation.isPending ? "กำลังบันทึก..." : editing ? "อัปเดต" : "เพิ่ม"}
               </Button>
             </div>
           </DialogContent>
@@ -284,7 +278,7 @@ export default function Timeline({ novelId, novel, onOpenChapter, onNavigateToWo
           events={events}
           linkedChaptersByEvent={linkedChaptersByEvent}
           onEdit={openEdit}
-          onDelete={(id) => deleteEvent(id)}
+          onDelete={(id) => deleteMutation.mutate(id)}
           onVersionHistory={(ev) => setVersionEvent(ev)}
         />
       ) : (
@@ -340,24 +334,14 @@ export default function Timeline({ novelId, novel, onOpenChapter, onNavigateToWo
                         </p>
                       )}
                     </div>
-                    <div className="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity items-center">
-                      <CopyButton
-                        size="xs"
-                        text={[
-                          `#${ev.order} ${ev.title}`,
-                          ev.time_period && `ช่วงเวลา: ${ev.time_period}`,
-                          ev.location && `สถานที่: ${ev.location}`,
-                          ev.description && `รายละเอียด: ${ev.description}`,
-                          ev.characters_involved && `ตัวละคร: ${ev.characters_involved}`,
-                        ].filter(Boolean).join("\n")}
-                      />
+                    <div className="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                       <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" title="ประวัติเวอร์ชัน" onClick={() => setVersionEvent(ev)}>
                         <History className="w-3 h-3" />
                       </Button>
                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(ev)}>
                         <Edit2 className="w-3 h-3" />
                       </Button>
-                      <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" disabled={isDeletingEvent} onClick={() => deleteEvent(ev.id)}>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => deleteMutation.mutate(ev.id)}>
                         <Trash2 className="w-3 h-3" />
                       </Button>
                     </div>

@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ShieldCheck, Loader2, ChevronDown, ChevronUp, Clock, History, Wand2, Save, X } from "lucide-react";
-import CopyButton from "@/components/ui/CopyButton";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { th } from "date-fns/locale";
@@ -150,10 +149,7 @@ function ReviewReport({ review, checkedKeys, onToggle }) {
     <div className="space-y-3">
       {review.overall_summary && (
         <div className="bg-primary/5 border border-primary/15 rounded-lg px-3 py-2.5 text-xs text-foreground/80 leading-relaxed">
-          <div className="flex items-center justify-between mb-0.5">
-            <span className="font-semibold text-primary/80">ภาพรวม</span>
-            <CopyButton size="xs" text={review.overall_summary} />
-          </div>
+          <span className="font-semibold text-primary/80 block mb-0.5">ภาพรวม</span>
           {review.overall_summary}
         </div>
       )}
