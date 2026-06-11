@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { base44 } from "@/api/base44Client";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Plus, Users, Trash2, Edit2, User, Loader2, History, Network } from "lucide-react";
+import { useSafeAction } from "@/hooks/useSafeAction";
 import CopyButton from "@/components/ui/CopyButton";
 import VersionHistoryDialog from "./VersionHistoryDialog";
 import { motion, AnimatePresence } from "framer-motion";
@@ -37,8 +38,10 @@ export default function CharacterBible({ novelId }) {
     },
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: (id) => base44.entities.Character.update(id, { is_deleted: true }),
+  const { run: deleteChar, isPending: isDeleting } = useSafeAction({
+    action: "ลบตัวละคร",
+    entity: "Character",
+    fn: (id) => base44.entities.Character.update(id, { is_deleted: true }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["characters", novelId] }),
   });
 
@@ -177,7 +180,7 @@ export default function CharacterBible({ novelId }) {
                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleOpenEdit(char); }}>
                     <Edit2 className="w-3.5 h-3.5" />
                   </Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={(e) => { e.stopPropagation(); deleteMutation.mutate(char.id); }}>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" disabled={isDeleting} onClick={(e) => { e.stopPropagation(); deleteChar(char.id); }}>
                     <Trash2 className="w-3.5 h-3.5" />
                   </Button>
                 </div>

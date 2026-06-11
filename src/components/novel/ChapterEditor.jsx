@@ -14,7 +14,9 @@ import ChapterBalanceMeter from "./ChapterBalanceMeter";
 import SceneTemplateDialog from "./SceneTemplateDialog";
 import QuickNotesPanel from "./QuickNotesPanel";
 import AiEditorReviewPanel from "./AiEditorReviewPanel";
+import ActivityLogPanel from "./ActivityLogPanel";
 import { saveVersion } from "@/lib/saveVersion";
+import { useSafeAction } from "@/hooks/useSafeAction";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
@@ -83,9 +85,10 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
     return () => window.removeEventListener("keydown", handleKey);
   }, [focusMode]);
 
-  const saveMutation = useMutation({
-    mutationFn: async (data) => {
-      // snapshot ก่อนบันทึก
+  const { run: saveChapter, isPending: isSavingChapter } = useSafeAction({
+    action: "บันทึกตอน",
+    entity: "Chapter",
+    fn: async (data) => {
       await saveVersion({
         entityType: "chapter",
         entityId: chapter.id,
@@ -97,7 +100,6 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["chapters", novelId] });
-      toast.success("บันทึกแล้ว");
       setSaving(false);
     },
     onError: () => setSaving(false),
@@ -105,7 +107,7 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
 
   const handleSave = () => {
     setSaving(true);
-    saveMutation.mutate({ title, content, status, word_count: wordCount, plot_event_id: plotEventId, plot_event_title: plotEventTitle, plot_event_description: plotEventDescription, plot_event_order: plotEventOrder });
+    saveChapter({ title, content, status, word_count: wordCount, plot_event_id: plotEventId, plot_event_title: plotEventTitle, plot_event_description: plotEventDescription, plot_event_order: plotEventOrder });
   };
 
   const handleBindEvent = () => {
@@ -320,8 +322,8 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
             </SelectContent>
           </Select>
         )}
-        <Button size="sm" className="gap-1.5" onClick={handleSave} disabled={saving}>
-          {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+        <Button size="sm" className="gap-1.5" onClick={handleSave} disabled={saving || isSavingChapter}>
+          {(saving || isSavingChapter) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
           บันทึก
         </Button>
       </div>
@@ -546,6 +548,7 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
           queryClient.invalidateQueries({ queryKey: ["chapters", novelId] });
         }}
       />
+      <ActivityLogPanel />
       <div className="flex flex-1 overflow-hidden">
         <div className="flex-1 overflow-auto bg-background">
           <div className="mx-auto px-8 py-10" style={{ maxWidth: "680px" }}>

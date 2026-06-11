@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { base44 } from "@/api/base44Client";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -15,6 +15,7 @@ import {
 import CopyButton from "@/components/ui/CopyButton";
 import VersionHistoryDialog from "./VersionHistoryDialog";
 import { saveVersion } from "@/lib/saveVersion";
+import { useSafeAction } from "@/hooks/useSafeAction";
 import { motion, AnimatePresence } from "framer-motion";
 import { ERA_TEMPLATES } from "./EraTemplates";
 import WorldCategoryManager, { getColorClasses } from "./WorldCategoryManager";
@@ -82,8 +83,10 @@ export default function WorldBible({ novelId, onNavigateToTimeline, novel }) {
   const allCategories = customCategories.length > 0 ? customCategories : DEFAULT_CATEGORIES;
   const categoryNames = allCategories.map((c) => c.name);
 
-  const saveMutation = useMutation({
-    mutationFn: async (data) => {
+  const { run: saveEntry, isPending: isSavingEntry } = useSafeAction({
+    action: editing ? "แก้ไขโลก/ฉาก" : "สร้างโลก/ฉาก",
+    entity: "WorldEntry",
+    fn: async (data) => {
       if (editing) {
         await saveVersion({
           entityType: "world_entry",
@@ -105,8 +108,10 @@ export default function WorldBible({ novelId, onNavigateToTimeline, novel }) {
     },
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: (id) => base44.entities.WorldEntry.update(id, { is_deleted: true }),
+  const { run: deleteEntry, isPending: isDeletingEntry } = useSafeAction({
+    action: "ลบโลก/ฉาก",
+    entity: "WorldEntry",
+    fn: (id) => base44.entities.WorldEntry.update(id, { is_deleted: true }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["worldEntries", novelId] }),
   });
 
@@ -216,8 +221,8 @@ export default function WorldBible({ novelId, onNavigateToTimeline, novel }) {
                   <label className="text-sm font-medium mb-1.5 block">รายละเอียด</label>
                   <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={5} placeholder="อธิบายรายละเอียด..." />
                 </div>
-                <Button className="w-full" onClick={() => saveMutation.mutate(form)} disabled={!form.title || saveMutation.isPending}>
-                  {saveMutation.isPending ? "กำลังบันทึก..." : editing ? "อัปเดต" : "เพิ่ม"}
+                <Button className="w-full" onClick={() => saveEntry(form)} disabled={!form.title || isSavingEntry}>
+                  {isSavingEntry ? <><Loader2 className="w-4 h-4 animate-spin mr-1" />กำลังบันทึก...</> : editing ? "อัปเดต" : "เพิ่ม"}
                 </Button>
               </div>
             </DialogContent>
@@ -369,35 +374,35 @@ export default function WorldBible({ novelId, onNavigateToTimeline, novel }) {
                        expanded={expandedId === entry.id}
                        onToggle={() => setExpandedId(expandedId === entry.id ? null : entry.id)}
                        onEdit={() => openEdit(entry)}
-                       onDelete={() => deleteMutation.mutate(entry.id)}
+                       onDelete={() => deleteEntry(entry.id)}
                        onHistory={() => setVersionEntry(entry)}
                        linkedEvents={eventsByWorldEntry[entry.id] || []}
                        onNavigateToTimeline={onNavigateToTimeline}
-                      />
-                    ))}
-                  </AnimatePresence>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      ) : (
-        /* Flat view for filtered/searched */
-        <div className="grid gap-3 sm:grid-cols-2">
-          <AnimatePresence>
-            {filtered.map((entry, i) => {
-              const cat = allCategories.find((c) => c.name === entry.category);
-              const colors = cat ? getColorClasses(cat.color) : getColorClasses("เทา");
-              return (
-                <WorldEntryCard
-                  key={entry.id}
-                  entry={entry}
-                  index={i}
-                  colors={colors}
-                  expanded={expandedId === entry.id}
-                  onToggle={() => setExpandedId(expandedId === entry.id ? null : entry.id)}
-                  onEdit={() => openEdit(entry)}
-                  onDelete={() => deleteMutation.mutate(entry.id)}
+                       />
+                        ))}
+                       </AnimatePresence>
+                       </div>
+                       </div>
+                       );
+                       })}
+                       </div>
+                       ) : (
+                       /* Flat view for filtered/searched */
+                       <div className="grid gap-3 sm:grid-cols-2">
+                       <AnimatePresence>
+                       {filtered.map((entry, i) => {
+                       const cat = allCategories.find((c) => c.name === entry.category);
+                       const colors = cat ? getColorClasses(cat.color) : getColorClasses("เทา");
+                       return (
+                       <WorldEntryCard
+                       key={entry.id}
+                       entry={entry}
+                       index={i}
+                       colors={colors}
+                       expanded={expandedId === entry.id}
+                       onToggle={() => setExpandedId(expandedId === entry.id ? null : entry.id)}
+                       onEdit={() => openEdit(entry)}
+                       onDelete={() => deleteEntry(entry.id)}
                   onHistory={() => setVersionEntry(entry)}
                   search={search}
                   linkedEvents={eventsByWorldEntry[entry.id] || []}
