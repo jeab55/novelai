@@ -19,6 +19,7 @@ import BulkDraftDialog from "./BulkDraftDialog";
 import ContinuityChecker from "./ContinuityChecker";
 import NovelContinuityDialog from "./NovelContinuityDialog";
 import PublishExportDialog from "./PublishExportDialog";
+import NovelBlurbDialog from "./NovelBlurbDialog";
 
 const statusColors = {
   "ร่าง": "bg-amber-50 text-amber-700 border border-amber-200",
@@ -38,6 +39,7 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
   const [bulkDraftOpen, setBulkDraftOpen] = useState(false);
   const [continuityOpen, setContinuityOpen] = useState(false);
   const [publishExportOpen, setPublishExportOpen] = useState(false);
+  const [blurbOpen, setBlurbOpen] = useState(false);
   const queryClient = useQueryClient();
 
   // Handle chapter navigation from other tabs (e.g. AiPlotDialog draft)
@@ -121,6 +123,13 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
       novelId={novelId}
       chapters={chapters}
     />
+    <NovelBlurbDialog
+      open={blurbOpen}
+      onClose={() => setBlurbOpen(false)}
+      novel={novel}
+      novelId={novelId}
+      chapters={chapters}
+    />
     {draftChapter && (
       <AiDraftDialog
         open={aiDraftOpen}
@@ -167,6 +176,21 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
             >
               <Sparkles className="w-3.5 h-3.5" />
               ร่างทุกตอน
+            </Button>
+          )}
+          {(() => {
+            const withContent = chapters.filter(c => c.content && (c.word_count || 0) > 0).length;
+            const threshold = Math.ceil(chapters.length * 0.8);
+            return withContent >= threshold && chapters.length >= 2;
+          })() && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5 text-primary border-primary/30 bg-primary/5 hover:bg-primary/10"
+              onClick={() => setBlurbOpen(true)}
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              สรุป+คำโปรย
             </Button>
           )}
           {chapters.filter(c => c.content && (c.word_count || 0) > 0).length >= 2 && (

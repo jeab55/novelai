@@ -154,6 +154,13 @@ export default function PublishExportDialog({ open, onClose, novel, novelId, cha
   const checklist = buildChecklist(novel, chapters, tagline);
   const checklistPassed = checklist.filter((i) => i.done).length;
 
+  // Pre-fill tagline from saved blurb when dialog opens
+  React.useEffect(() => {
+    if (open && novel?.blurb && !tagline) {
+      setTagline(novel.blurb);
+    }
+  }, [open, novel?.blurb]);
+
   const generateTagline = async () => {
     if (!novel?.synopsis && !novel?.title) return;
     setGeneratingTagline(true);
@@ -277,7 +284,12 @@ export default function PublishExportDialog({ open, onClose, novel, novelId, cha
               {/* Tagline */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <label className="text-sm font-medium">คำโปรยขายปม (Tagline)</label>
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm font-medium">คำโปรยขายปม (Tagline)</label>
+                    {novel?.blurb && tagline === novel.blurb && (
+                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-primary border-primary/30 bg-primary/5">จาก AI Blurb</Badge>
+                    )}
+                  </div>
                   <Button
                     size="sm"
                     variant="outline"
