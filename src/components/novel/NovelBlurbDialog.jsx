@@ -4,10 +4,10 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Badge } from "@/components/ui/badge";
 import { Sparkles, Loader2, CheckCircle2, BookOpen, Star, Zap } from "lucide-react";
 import { toast } from "sonner";
 import CopyButton from "@/components/ui/CopyButton";
+import { useSafeAction } from "@/hooks/useSafeAction";
 
 const BLURB_TYPES = [
   {
@@ -81,12 +81,35 @@ function buildSummaryPrompt(novel, chapters) {
 export default function NovelBlurbDialog({ open, onClose, novel, novelId, chapters }) {
   const [loading, setLoading] = useState(false);
   const [summary, setSummary] = useState("");
-  const [blurbs, setBlurbs] = useState(null); // { main_conflict, character_conflict, tagline }
-  const [selectedBlurb, setSelectedBlurb] = useState(null); // id of selected blurb type
-  const [saving, setSaving] = useState(false);
+  const [blurbs, setBlurbs] = useState(null);
+  const [selectedBlurb, setSelectedBlurb] = useState(null);
   const queryClient = useQueryClient();
 
   const contentChapters = chapters.filter((c) => c.content && (c.word_count || 0) > 0);
+
+  const { run: saveBlurb, isPending: saving } = useSafeAction({
+    action: "บันทึกคำโปรย",
+    entity: "Novel",
+    fn: async (text) => {
+      await base44.entities.Novel.update(novelId, { blurb: text });
+      // verify by re-fetching
+      const all = await base44.entities.Novel.list();
+      const updated = all.find((n) => String(n.id) === String(novelId));
+      if (!updated?.blurb) throw new Error("blurb ยังว่างหลังบันทึก");
+      return updated;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["novels"] });
+      queryClient.invalidateQueries({ queryKey: ["novel", novelId] });
+    },
+  });
+
+  const handleSaveBlurb = async () => {
+    if (!selectedBlurb || !blurbs) return;
+    const text = blurbs[selectedBlurb];
+    if (!text) return;
+    await saveBlurb(text);
+  };
 
   const handleGenerate = async () => {
     setLoading(true);
@@ -94,7 +117,6 @@ export default function NovelBlurbDialog({ open, onClose, novel, novelId, chapte
     setBlurbs(null);
     setSelectedBlurb(null);
 
-    // Run both in parallel
     const [blurbResult, summaryResult] = await Promise.all([
       base44.integrations.Core.InvokeLLM({
         prompt: buildBlurbPrompt(novel, contentChapters),
@@ -120,17 +142,6 @@ export default function NovelBlurbDialog({ open, onClose, novel, novelId, chapte
     summaryText = summaryText.replace(/^```[\w]*\n?/m, "").replace(/\n?```$/m, "").trim();
     setSummary(summaryText);
     setLoading(false);
-  };
-
-  const handleSaveBlurb = async () => {
-    if (!selectedBlurb || !blurbs) return;
-    const text = blurbs[selectedBlurb];
-    if (!text) return;
-    setSaving(true);
-    await base44.entities.Novel.update(novelId, { blurb: text });
-    queryClient.invalidateQueries({ queryKey: ["novel", novelId] });
-    toast.success("บันทึกคำโปรยลงเรื่องแล้ว");
-    setSaving(false);
   };
 
   return (
