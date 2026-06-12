@@ -88,12 +88,13 @@ function buildSystemPrompt(novel, characters, worldEntries, plotEvents, prevChap
 export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
   const queryClient = useQueryClient();
   const { startJob, updateJob, finishJob } = useBulkWrite();
-  const [step, setStep] = useState("settings"); // "settings" | "running" | "done"
+  const [step, setStep] = useState("settings"); // "settings" | "confirm" | "running" | "done"
   const [wordTarget, setWordTarget] = useState(1200);
   const [progress, setProgress] = useState({ current: 0, total: 0 });
   const [log, setLog] = useState([]);
   const [currentMsg, setCurrentMsg] = useState("");
   const [overwritePrompt, setOverwritePrompt] = useState(null);
+  const [confirmData, setConfirmData] = useState(null); // { chaptersToCreate, totalCredits, creditPerChapter }
   const cancelledRef = useRef(false);
   const doneCountRef = useRef(0);
   const errorCountRef = useRef(0);
@@ -140,6 +141,16 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
     enabled: open && !!novel?.writer_id,
     select: (data) => data.find((w) => String(w.id) === String(novel?.writer_id)),
   });
+
+  const { data: user } = useQuery({
+    queryKey: ["user"],
+    queryFn: () => base44.auth.me(),
+    enabled: open,
+  });
+
+  const creditPerChapter = 30; // 6 seconds × 5 credits/second
+  const chaptersWithoutContent = chapters.filter((c) => !c.content?.trim()).length;
+  const totalEstimatedCredits = chaptersWithoutContent * creditPerChapter;
 
   const askOverwrite = (order, title) =>
     new Promise((resolve) => setOverwritePrompt({ order, title, resolve }));
@@ -191,6 +202,25 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
   };
 
   const handleStart = async () => {
+    // Calculate chapters to create and show confirmation
+    const target = novel?.target_chapters || 10;
+    const chaptersToCreate = [];
+    for (let i = 1; i <= target; i++) {
+      const existing = chapters.find((c) => c.order === i);
+      if (!existing || !existing.content?.trim()) {
+        chaptersToCreate.push({ order: i, title: existing?.title || `ตอนที่ ${i}` });
+      }
+    }
+    const totalCredits = chaptersToCreate.length * creditPerChapter;
+    setConfirmData({
+      chaptersToCreate,
+      totalCredits,
+      creditPerChapter,
+    });
+    setStep("confirm");
+  };
+
+  const handleConfirmStart = async () => {
     const target = novel?.target_chapters || 10;
     cancelledRef.current = false;
     doneCountRef.current = 0;
@@ -378,6 +408,10 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
                   {chapters.filter((c) => c.content?.trim()).length} ตอน
                 </span>
               </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">ตอนที่ต้องสร้าง</span>
+                <span className="font-semibold text-primary">{chaptersWithoutContent} ตอน</span>
+              </div>
             </div>
 
             <div>
@@ -397,6 +431,78 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
                     {wt.label}
                   </button>
                 ))}
+              </div>
+            </div>
+
+            {/* Credit estimate preview */}
+            <div className="rounded-xl border border-amber-200 dark:border-amber-800/50 bg-amber-50/50 dark:bg-amber-950/20 p-4 space-y-2 text-sm">
+              <div className="flex items-center gap-2 text-amber-800 dark:text-amber-200">
+                <AlertTriangle className="w-4 h-4" />
+                <span className="font-semibold">ประมาณการเครดิต</span>
+              </div>
+              <div className="flex justify-between text-amber-700 dark:text-amber-300">
+                <span>ตอนที่ต้องสร้าง</span>
+                <span className="font-medium">{chaptersWithoutContent} ตอน</span>
+              </div>
+              <div className="flex justify-between text-amber-700 dark:text-amber-300">
+                <span>เครดิตต่อตอน</span>
+                <span className="font-medium">{creditPerChapter} เครดิต</span>
+              </div>
+              <div className="flex justify-between text-amber-800 dark:text-amber-200 font-semibold border-t border-amber-200 dark:border-amber-800/50 pt-2">
+                <span>รวมประมาณการ</span>
+                <span>{totalEstimatedCredits} เครดิต</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Confirmation */}
+        {step === "confirm" && confirmData && (
+          <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
+            <div className="rounded-xl border border-primary/20 bg-primary/5 p-5 space-y-3">
+              <div className="flex items-start gap-3">
+                <Sparkles className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                <div>
+                  <h3 className="font-heading font-semibold text-foreground">ยืนยันการสร้างตอน</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    ระบบจะสร้างตอนที่ไม่มีเนื้อหาทั้งหมด {confirmData.chaptersToCreate.length} ตอน
+                  </p>
+                </div>
+              </div>
+              
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">จำนวนตอนที่จะสร้าง</span>
+                  <span className="font-semibold">{confirmData.chaptersToCreate.length} ตอน</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">เครดิตต่อตอน</span>
+                  <span className="font-semibold">{confirmData.creditPerChapter} เครดิต</span>
+                </div>
+                <div className="flex justify-between text-primary font-semibold border-t border-primary/20 pt-2">
+                  <span>เครดิตทั้งหมดที่ใช้</span>
+                  <span>{confirmData.totalCredits} เครดิต</span>
+                </div>
+                {user?.credits !== undefined && (
+                  <div className="flex justify-between text-xs text-muted-foreground mt-2 pt-2 border-t border-border/30">
+                    <span>เครดิตคงเหลือ</span>
+                    <span className="font-medium">{user.credits.toLocaleString()} เครดิต</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="bg-muted/40 rounded-lg p-3 text-xs text-muted-foreground">
+                <p className="font-medium mb-1">ตอนที่จะสร้าง:</p>
+                <div className="max-h-32 overflow-y-auto space-y-1">
+                  {confirmData.chaptersToCreate.slice(0, 10).map((ch) => (
+                    <div key={ch.order} className="flex justify-between">
+                      <span>ตอนที่ {ch.order}: {ch.title}</span>
+                    </div>
+                  ))}
+                  {confirmData.chaptersToCreate.length > 10 && (
+                    <p className="text-xs text-muted-foreground italic">...และอีก {confirmData.chaptersToCreate.length - 10} ตอน</p>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -531,7 +637,18 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
               </Button>
               <Button onClick={handleStart} className="gap-2">
                 <Sparkles className="w-4 h-4" />
-                เริ่มสร้างทั้งหมด {target} ตอน
+                ถัดไป
+              </Button>
+            </>
+          )}
+          {step === "confirm" && (
+            <>
+              <Button variant="ghost" onClick={() => setStep("settings")} size="sm">
+                กลับไปแก้ไข
+              </Button>
+              <Button onClick={handleConfirmStart} className="gap-2 bg-primary hover:bg-primary/90">
+                <Sparkles className="w-4 h-4" />
+                ยืนยันสร้าง ({confirmData?.totalCredits} เครดิต)
               </Button>
             </>
           )}
