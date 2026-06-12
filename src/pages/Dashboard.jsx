@@ -352,8 +352,8 @@ export default function Dashboard() {
 
                     {/* Success badge */}
                     {(novel.auto_written || jobs[novel.id]?.status === "done") && jobs[novel.id]?.status !== "running" && (
-                      <div className="absolute top-3 left-3 z-10 flex items-center gap-1 bg-emerald-500 text-white text-[11px] font-semibold px-2 py-0.5 rounded-full shadow-sm">
-                        <CheckCircle2 className="w-3 h-3" />
+                      <div className="absolute top-3 left-3 z-10 flex items-center gap-1 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 text-[11px] font-semibold px-2 py-0.5 rounded-full border border-emerald-500/30 shadow-sm">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-500" />
                         สำเร็จ
                       </div>
                     )}

@@ -160,8 +160,8 @@ export default function NovelWorkspace() {
               <div className="flex items-center gap-2">
                 <h1 className="font-heading font-semibold text-base truncate">{novel.title}</h1>
                 {(novel.auto_written || (jobs[novelId]?.status === "done")) && (
-                  <span className="inline-flex items-center gap-1 bg-emerald-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm shrink-0">
-                    <CheckCircle2 className="w-2.5 h-2.5" />
+                  <span className="inline-flex items-center gap-1 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-500/30 shadow-sm shrink-0">
+                    <CheckCircle2 className="w-2.5 h-2.5 text-emerald-500" />
                     สร้างเสร็จ
                   </span>
                 )}
