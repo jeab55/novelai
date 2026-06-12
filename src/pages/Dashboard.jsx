@@ -65,8 +65,8 @@ export default function Dashboard() {
   const activeWriters = writers.filter((w) => w.is_active !== false);
 
   const { data: chapters = [] } = useQuery({
-    queryKey: ["chapters"],
-    queryFn: () => base44.entities.Chapter.filter({ is_deleted: false }),
+    queryKey: ["chapters-all"],
+    queryFn: () => base44.entities.Chapter.list(),
     staleTime: 0,
   });
 
@@ -338,9 +338,9 @@ export default function Dashboard() {
 
                     {/* Progress overlay - always show */}
                     {(() => {
-                      const novelChapters = chapters.filter(c => c.novel_id === novel.id);
+                      const novelChapters = (chapters || []).filter(c => c.novel_id === novel.id && !c.is_deleted);
                       const completed = novelChapters.filter(c => c.status === "เขียนเสร็จ").length;
-                      const target = novel.target_chapters || 0;
+                      const target = novel.target_chapters || 10;
                       const pct = target > 0 ? Math.round((completed / target) * 100) : 0;
                       const isWriting = jobs[novel.id]?.status === "running";
                       const currentJob = jobs[novel.id];
