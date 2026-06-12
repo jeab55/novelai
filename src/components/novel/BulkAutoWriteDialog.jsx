@@ -12,9 +12,28 @@ const DEFAULT_WRITER_PROMPT = `คุณคือนักเขียนนิ�
 คุณต้องร่างเนื้อหาตอนที่สมบูรณ์ตามโครงที่ได้รับ รักษาสำนวนและโทนของเรื่อง ใช้ภาษาไทยที่อ่านลื่น`;
 
 function buildSystemPrompt(novel, characters, worldEntries, plotEvents, prevChapters, writerPrompt) {
+  const isOneShot = novel.novel_type === "เรื่องสั้น";
   let ctx = `[บทบาท]\n${writerPrompt || DEFAULT_WRITER_PROMPT}\n\n`;
 
-  if (novel.writing_style === "รอมแพง") {
+  if (isOneShot) {
+    ctx += `[รูปแบบ: เรื่องสั้นจบในตอนเดียว (One-shot)]\n`;
+    ctx += `1. เขียนเรื่องสั้นสมบูรณ์ในตัวเอง — มีเปิดเรื่อง ปมกลางเรื่อง และจุดพีคตอนจบ\n`;
+    ctx += `2. แก่นเดียว อารมณ์เดียว — ทุกฉากต้องรับใช้แก่นหลักของเรื่อง\n`;
+    ctx += `3. ตัวละครหลักไม่เกิน 3 คน — โฟกัสที่ความสัมพันธ์และปมหลัก\n`;
+    ctx += `4. เปิดเรื่องกลางสถานการณ์ทันที (in media res) — ไม่ต้องเกริ่นนำยาว\n`;
+    ctx += `5. โครง 3 องก์บีบอัด: เปิดปม 20% / บีบให้ตึง 60% / คลายด้วยจุดพีคเดียว 20%\n`;
+    if (novel.ending_type === "จบหักมุม (Twist)") {
+      ctx += `6. จบหักมุม — โปรยเบาะแสแฟร์ๆ ไว้ก่อนแล้วพลิกตอนท้าย ให้ผู้อ่านคาดไม่ถึงแต่สมเหตุสมผล\n`;
+    } else if (novel.ending_type === "จบสุข (HEA)") {
+      ctx += `6. จบสุข — ตัวละครได้สิ่งที่ต้องการหรือค้นพบสิ่งที่จำเป็นต่อหัวใจ\n`;
+    } else if (novel.ending_type === "จบเศร้า (HFE)") {
+      ctx += `6. จบเศร้า — ตัวละครสูญเสียหรือพ่ายแพ้ ทิ้งความรู้สึกสะเทือนใจ\n`;
+    } else if (novel.ending_type === "จบเปิด (Open Ending)") {
+      ctx += `6. จบเปิด — ไม่ฟันธงผลลัพธ์ ทิ้งให้ผู้อ่านตีความต่อ\n`;
+    }
+    ctx += `7. ประโยคสุดท้ายต้องคมและค้างใจ — ให้ผู้อ่านนึกถึงต่อหลังอ่านจบ\n`;
+    ctx += `8. ใช้ภาษากระชับ แต่ยังคงความสละสลวยและเห็นภาพ\n\n`;
+  } else if (novel.writing_style === "รอมแพง") {
     ctx += `[สไตล์การเขียน: รอมแพง — โรแมนติกคอมเมดี้อิงประวัติศาสตร์]\n`;
     ctx += `1. จบสุข (HEA) เสมอ ความรักต้องชนะทุกอุปสรรค\n`;
     ctx += `2. ตัวเอกคือ "คนยุคปัจจุบัน" ในโลกย้อนยุค มองโลกเป็น "คนนอก" — ฉลาด ขำ ดี ไม่ถือชนชั้น\n`;
@@ -72,9 +91,16 @@ function buildSystemPrompt(novel, characters, worldEntries, plotEvents, prevChap
     });
   }
 
-  ctx += `\n[คำสั่งสำคัญ]\n`;
-  ctx += `- ร่างเนื้อหาตอนนี้ให้ครบตามความยาวที่กำหนด อย่าตัดจบกลางคัน\n`;
-  ctx += `- ผลลัพธ์: เฉพาะเนื้อหาตอน ไม่ต้องมีคำนำหรืออธิบาย\n`;
+  if (isOneShot) {
+    ctx += `\n[คำสั่งสำคัญ]\n`;
+    ctx += `- เขียนเรื่องสั้นสมบูรณ์จบในตอนเดียว ความยาวประมาณ ${novel.word_count_target || 3000} คำ\n`;
+    ctx += `- ต้องมีจุดพีคและตอนจบที่สมบูรณ์ในตัวเอง\n`;
+    ctx += `- ผลลัพธ์: เฉพาะเนื้อหาเรื่องสั้น ไม่ต้องมีคำนำหรืออธิบาย\n`;
+  } else {
+    ctx += `\n[คำสั่งสำคัญ]\n`;
+    ctx += `- ร่างเนื้อหาตอนนี้ให้ครบตามความยาวที่กำหนด อย่าตัดจบกลางคัน\n`;
+    ctx += `- ผลลัพธ์: เฉพาะเนื้อหาตอน ไม่ต้องมีคำนำหรืออธิบาย\n`;
+  }
   return ctx;
 }
 
@@ -144,10 +170,11 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
   const wordTarget = novel?.word_count_target || 1500;
   const target = novel?.target_chapters || 10;
   
+  const isOneShot = novel?.novel_type === "เรื่องสั้น";
   // นับตอนที่มีเนื้อหาจริง (word_count >= 500)
   const chaptersWithRealContent = chapters.filter((c) => (c.word_count || 0) >= 500).length;
   // ตอนที่ต้องสร้าง = เป้าหมาย ลบด้วย ตอนที่มีเนื้อหาจริง
-  const chaptersToCreateCount = Math.max(0, target - chaptersWithRealContent);
+  const chaptersToCreateCount = isOneShot ? (chaptersWithRealContent > 0 ? 0 : 1) : Math.max(0, target - chaptersWithRealContent);
   const totalEstimatedCredits = chaptersToCreateCount * creditPerChapter;
 
   const askOverwrite = (order, title) =>
@@ -350,34 +377,57 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
     const chaptersToCreate = [];
     const shortChapters = []; // ตอนที่มีอยู่แต่สั้น (<500 คำ)
     
-    // ตรวจสอบทุกตอนว่าต้องมี record ครบตามเป้า
-    for (let i = 1; i <= target; i++) {
-      const existing = chapters.find((c) => c.order === i);
-      const wordCount = existing?.word_count || 0;
-      
-      if (!existing) {
-        // ไม่มี record เลย — ต้องสร้างใหม่
-        chaptersToCreate.push({ order: i, title: `ตอนที่ ${i}`, needsCreation: true });
-      } else if (wordCount < 500) {
-        // มี record แต่สั้นเกินไป — นับว่าต้องสร้าง (จะถามผู้ใช้ก่อนเขียนทับ)
-        shortChapters.push({ order: i, title: existing.title || `ตอนที่ ${i}`, existingId: existing.id });
+    if (isOneShot) {
+      // สำหรับเรื่องสั้น: เช็คแค่ว่ามี chapter ที่มีเนื้อหายังไม่ได้
+      const existing = chapters[0]; // เรื่องสั้นมีแค่ตอนเดียว order = 1
+      if (existing && (existing.word_count || 0) >= 500) {
+        // มีเนื้อหาพอแล้ว — ไม่ต้องสร้าง
+        setConfirmData({
+          chaptersToCreate: [],
+          totalCredits: 0,
+          creditPerChapter,
+          shortChapters: [],
+        });
+      } else {
+        // ไม่มี หรือสั้นเกินไป — ต้องสร้าง
+        setConfirmData({
+          chaptersToCreate: [{ order: 1, title: existing?.title || "เรื่องสั้น", needsCreation: !existing }],
+          totalCredits: creditPerChapter,
+          creditPerChapter,
+          shortChapters: existing && (existing.word_count || 0) < 500 ? [existing] : [],
+        });
       }
-      // ถ้า word_count >= 500 ไม่นับว่าต้องสร้าง
+    } else {
+      // สำหรับนิยายยาว: ใช้ logic เดิม
+      for (let i = 1; i <= target; i++) {
+        const existing = chapters.find((c) => c.order === i);
+        const wordCount = existing?.word_count || 0;
+        
+        if (!existing) {
+          // ไม่มี record เลย — ต้องสร้างใหม่
+          chaptersToCreate.push({ order: i, title: `ตอนที่ ${i}`, needsCreation: true });
+        } else if (wordCount < 500) {
+          // มี record แต่สั้นเกินไป — นับว่าต้องสร้าง (จะถามผู้ใช้ก่อนเขียนทับ)
+          shortChapters.push({ order: i, title: existing.title || `ตอนที่ ${i}`, existingId: existing.id });
+        }
+        // ถ้า word_count >= 500 ไม่นับว่าต้องสร้าง
+      }
+      
+      // รวมตอนที่ต้องสร้าง (ทั้งที่ไม่มี record และมีแต่สั้น)
+      const allChaptersToCreate = [
+        ...chaptersToCreate,
+        ...shortChapters.map((ch) => ({ ...ch, needsCreation: false })),
+      ];
+      
+      const totalCredits = allChaptersToCreate.length * creditPerChapter;
+      setConfirmData({
+        chaptersToCreate: allChaptersToCreate,
+        totalCredits,
+        creditPerChapter,
+        shortChapters, // เก็บไว้แสดงให้ผู้ใช้รู้
+      });
     }
     
-    // รวมตอนที่ต้องสร้าง (ทั้งที่ไม่มี record และมีแต่สั้น)
-    const allChaptersToCreate = [
-      ...chaptersToCreate,
-      ...shortChapters.map((ch) => ({ ...ch, needsCreation: false })),
-    ];
-    
-    const totalCredits = allChaptersToCreate.length * creditPerChapter;
-    setConfirmData({
-      chaptersToCreate: allChaptersToCreate,
-      totalCredits,
-      creditPerChapter,
-      shortChapters, // เก็บไว้แสดงให้ผู้ใช้รู้
-    });
     setStep("confirm");
   };
 
@@ -386,48 +436,68 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
     cancelledRef.current = false;
     doneCountRef.current = 0;
     errorCountRef.current = 0;
-    setProgress({ current: 0, total: target });
+    setProgress({ current: 0, total: isOneShot ? 1 : target });
     setLog([]);
     setCurrentMsg("");
     setStep("running");
-    startJob(novelId, target);
+    startJob(novelId, isOneShot ? 1 : target);
 
     const writerPrompt = novelWriter?.system_prompt || "";
     const writtenSoFar = [];
 
-    for (let i = 1; i <= target; i++) {
+    // สำหรับเรื่องสั้น: ถ้ามีเนื้อหาอยู่แล้ว >= 500 คำ ให้ข้าม
+    if (isOneShot && chaptersWithRealContent > 0) {
+      setProgress({ current: 1, total: 1 });
+      setLog([{ order: 1, title: chapters[0]?.title || "เรื่องสั้น", status: "skip", wordCount: chapters[0]?.word_count }]);
+      finishJob(novelId, { doneCount: 0, errorCount: 0 });
+      setStep("done");
+      toast.info("เรื่องสั้นมีเนื้อหาอยู่แล้ว");
+      return;
+    }
+
+    for (let i = 1; i <= (isOneShot ? 1 : target); i++) {
       if (cancelledRef.current) break;
 
-      setProgress({ current: i, total: target });
-      updateJob(novelId, { current: i, total: target });
+      setProgress({ current: i, total: isOneShot ? 1 : target });
+      updateJob(novelId, { current: i, total: isOneShot ? 1 : target });
 
       const existing = chapters.find((c) => c.order === i);
-      let chapterTitle = existing?.title || `ตอนที่ ${i}`;
+      let chapterTitle = existing?.title || (isOneShot ? "เรื่องสั้น" : `ตอนที่ ${i}`);
       const existingWordCount = existing?.word_count || 0;
 
-      // ถ้าไม่มี record เลย — ต้องสร้างใหม่ (ไม่ต้องถาม)
-      if (!existing) {
-        // จะสร้าง record ด้านล่าง
-      } else if (existingWordCount < 500 && existing.content?.trim()) {
-        // มีเนื้อหาแต่สั้น — ถามก่อนเขียนทับ
-        setCurrentMsg(`⚠️ ตอนที่ ${i} "${chapterTitle}" สั้นเกินไป (${existingWordCount} คำ) — จะเขียนทับ`);
-        const decision = await askOverwrite(i, chapterTitle);
-        setOverwritePrompt(null);
+      // สำหรับเรื่องสั้น: ถ้ามีเนื้อหาพอแล้ว ให้ข้าม
+      if (isOneShot && existingWordCount >= 500) {
+        writtenSoFar.push(existing);
+        setLog((l) => [...l, { order: 1, title: chapterTitle, status: "skip", wordCount: existingWordCount }]);
+        setCurrentMsg("");
+        continue;
+      }
 
-        if (cancelledRef.current) break;
+      // สำหรับนิยายยาว: เช็คตามเงื่อนไขเดิม
+      if (!isOneShot) {
+        if (!existing) {
+          // จะสร้าง record ด้านล่าง
+        } else if (existingWordCount < 500 && existing.content?.trim()) {
+          // มีเนื้อหาแต่สั้น — ถามก่อนเขียนทับ
+          setCurrentMsg(`⚠️ ตอนที่ ${i} "${chapterTitle}" สั้นเกินไป (${existingWordCount} คำ) — จะเขียนทับ`);
+          const decision = await askOverwrite(i, chapterTitle);
+          setOverwritePrompt(null);
 
-        if (decision === "skip") {
+          if (cancelledRef.current) break;
+
+          if (decision === "skip") {
+            writtenSoFar.push(existing);
+            setLog((l) => [...l, { order: i, title: chapterTitle, status: "skip" }]);
+            setCurrentMsg("");
+            continue;
+          }
+        } else if (existingWordCount >= 500) {
+          // มีเนื้อหาพอแล้ว — ข้าม
           writtenSoFar.push(existing);
           setLog((l) => [...l, { order: i, title: chapterTitle, status: "skip" }]);
           setCurrentMsg("");
           continue;
         }
-      } else if (existingWordCount >= 500) {
-        // มีเนื้อหาพอแล้ว — ข้าม
-        writtenSoFar.push(existing);
-        setLog((l) => [...l, { order: i, title: chapterTitle, status: "skip" }]);
-        setCurrentMsg("");
-        continue;
       }
 
       const linkedEvent = plotEvents.find((e) => e.order === i);
@@ -531,7 +601,7 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
         await base44.entities.Chapter.update(existing.id, {
           content: finalContent,
           word_count: finalWordCount,
-          status: "ร่าง",
+          status: isOneShot ? "เขียนเสร็จ" : "ร่าง",
           title: chapterTitle, // อัพเดทชื่อตอนด้วย
         });
         writtenSoFar.push({ ...existing, content: finalContent, order: i, title: chapterTitle });
@@ -540,7 +610,7 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
           novel_id: novelId,
           title: chapterTitle,
           order: i,
-          status: "ร่าง",
+          status: isOneShot ? "เขียนเสร็จ" : "ร่าง",
           content: finalContent,
           word_count: finalWordCount,
         });
@@ -548,7 +618,7 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
       }
 
       doneCountRef.current += 1;
-      updateJob(novelId, { current: i, total: target, doneCount: doneCountRef.current, errorCount: errorCountRef.current });
+      updateJob(novelId, { current: i, total: isOneShot ? 1 : target, doneCount: doneCountRef.current, errorCount: errorCountRef.current });
       setLog((l) => [...l, { order: i, title: chapterTitle, status: "done", wordCount: finalWordCount }]);
       setCurrentMsg("");
     }
@@ -557,9 +627,9 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
     finishJob(novelId, { doneCount: doneCountRef.current, errorCount: errorCountRef.current });
     setStep("done");
     if (!cancelledRef.current) {
-      toast.success("สร้างตอนทั้งหมดเสร็จแล้ว!");
+      toast.success(isOneShot ? "สร้างเรื่องสั้นเสร็จแล้ว!" : "สร้างตอนทั้งหมดเสร็จแล้ว!");
       if (errorCountRef.current === 0) {
-        await base44.entities.Novel.update(novelId, { auto_written: true });
+        await base44.entities.Novel.update(novelId, { auto_written: true, status: isOneShot ? "เขียนเสร็จ" : "กำลังเขียน" });
         queryClient.invalidateQueries({ queryKey: ["novels"] });
       }
     } else {
@@ -599,15 +669,16 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
         <DialogHeader className="px-6 pt-5 pb-4 border-b border-border/60 shrink-0">
           <DialogTitle className="font-heading flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-primary" />
-            AI สร้างตอนทั้งหมด
+            AI {isOneShot ? "สร้างเรื่องสั้น" : "สร้างตอนทั้งหมด"}
           </DialogTitle>
           <p className="text-xs text-muted-foreground mt-0.5">
-            สร้างทีละตอนตามลำดับจนครบ{" "}
-            <span className="font-semibold text-foreground">{target} ตอน</span>{" "}
-            อิงโครงเรื่อง ไทม์ไลน์ และตัวละคร
+            {isOneShot 
+              ? "สร้างเรื่องสั้นจบในตอนเดียวแบบเต็มรูปแบบ"
+              : `สร้างทีละตอนตามลำดับจนครบ ${target} ตอน อิงโครงเรื่อง ไทม์ไลน์ และตัวละคร`
+            }
             <br />
             <span className="text-amber-600 font-medium">
-              ใช้ Claude Sonnet — integration credits สูงมาก ({target} ครั้ง)
+              ใช้ Claude Sonnet — integration credits สูงมาก ({isOneShot ? "1" : target} ครั้ง)
             </span>
           </p>
         </DialogHeader>
@@ -616,14 +687,33 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
         {step === "settings" && (
           <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
             <div className="rounded-xl border border-border/50 bg-muted/20 p-4 space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">จำนวนตอนเป้าหมาย</span>
-                <span className="font-semibold">{target} ตอน</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">จำนวนคำเป้าหมายต่อตอน</span>
-                <span className="font-semibold">{wordTarget.toLocaleString()} คำ</span>
-              </div>
+              {isOneShot ? (
+                <>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">ประเภท</span>
+                    <span className="font-semibold text-primary">เรื่องสั้นจบในตอนเดียว</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">ความยาวเป้าหมาย</span>
+                    <span className="font-semibold">{wordTarget.toLocaleString()} คำ</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">รูปแบบตอนจบ</span>
+                    <span className="font-semibold">{novel?.ending_type || "-"}</span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">จำนวนตอนเป้าหมาย</span>
+                    <span className="font-semibold">{target} ตอน</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">จำนวนคำเป้าหมายต่อตอน</span>
+                    <span className="font-semibold">{wordTarget.toLocaleString()} คำ</span>
+                  </div>
+                </>
+              )}
               {novelWriter && (
                 <div className="flex justify-between items-center">
                   <span className="text-muted-foreground">นักเขียน AI</span>
@@ -811,8 +901,15 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
               <div className="mx-6 mb-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/50 px-4 py-3 flex items-center gap-3 shrink-0">
                 <CheckCircle2 className="w-6 h-6 text-emerald-500 shrink-0" />
                 <div>
-                  <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-200">สร้างนิยายครบทุกตอนแล้ว!</p>
-                  <p className="text-xs text-emerald-700 dark:text-emerald-300">{doneCount} ตอน · {log.reduce((s, e) => s + (e.wordCount || 0), 0).toLocaleString()} คำ</p>
+                  <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-200">
+                    {isOneShot ? "สร้างเรื่องสั้นเสร็จแล้ว!" : "สร้างนิยายครบทุกตอนแล้ว!"}
+                  </p>
+                  <p className="text-xs text-emerald-700 dark:text-emerald-300">
+                    {isOneShot 
+                      ? `${log.reduce((s, e) => s + (e.wordCount || 0), 0).toLocaleString()} คำ`
+                      : `${doneCount} ตอน · ${log.reduce((s, e) => s + (e.wordCount || 0), 0).toLocaleString()} คำ`
+                    }
+                  </p>
                 </div>
               </div>
             )}

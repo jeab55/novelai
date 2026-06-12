@@ -30,7 +30,7 @@ const CHAR_ROLES = ["ตัวเอก", "ตัวรอง", "ตัวร้
 const emptyChar = () => ({ name: "", role: "ตัวเอก", age: "", occupation: "", personality: "", background: "", wound: "", desire: "" });
 
 const STEPS = [
-  { id: 1, label: "ข้อมูลเรื่อง", icon: BookOpen },
+  { id: 1, label: "ประเภทและข้อมูล", icon: BookOpen },
   { id: 2, label: "ตัวละครหลัก", icon: Users },
   { id: 3, label: "นักเขียน & ยืนยัน", icon: Feather },
 ];
@@ -182,16 +182,20 @@ function Step1({ form, setForm, chars }) {
     setDraftError("");
     setDrafting(true);
     const namedChars = chars.filter((c) => c.name.trim());
+    const isOneShot = form.novel_type === "เรื่องสั้น";
     const contextParts = [
       `ชื่อเรื่อง: ${form.title}`,
+      `ประเภท: ${isOneShot ? "เรื่องสั้นจบในตอนเดียว" : "นิยายยาวหลายตอน"}`,
       form.genre && `แนวนิยาย: ${form.genre}`,
       form.era && `ยุคสมัยและฉากหลัง: ${form.era}`,
-      form.target_chapters && `จำนวนตอน: ${form.target_chapters} ตอน`,
+      isOneShot 
+        ? `ความยาวเป้าหมาย: ${form.word_count_target || 3000} คำ`
+        : form.target_chapters && `จำนวนตอน: ${form.target_chapters} ตอน`,
       namedChars.length > 0 && `ตัวละครหลัก: ${namedChars.map((c) => `${c.name} (${c.role})`).join(", ")}`,
     ].filter(Boolean).join("\n");
 
     const result = await base44.integrations.Core.InvokeLLM({
-      prompt: `คุณคือนักเขียนนิยายมืออาชีพ ช่วยร่างเรื่องย่อนิยายเรื่องนี้:\n\n${contextParts}\n\nเขียนเรื่องย่อภาษาไทย 3-5 ประโยค กระชับ น่าสนใจ ดึงดูดให้อยากอ่าน เหมาะกับแนว${form.genre || "นิยาย"}ที่เลือก อย่าเพิ่งเปิดเผยปมสำคัญทั้งหมด ให้รู้สึกอยากติดตาม ตอบเฉพาะเรื่องย่อ ไม่ต้องมีหัวข้อหรือคำอธิบายเพิ่มเติม`,
+      prompt: `คุณคือนักเขียนนิยายมืออาชีพ ช่วยร่างเรื่องย่อ${isOneShot ? "เรื่องสั้น" : "นิยาย"}เรื่องนี้:\n\n${contextParts}\n\nเขียนเรื่องย่อภาษาไทย 3-5 ประโยค กระชับ น่าสนใจ ดึงดูดให้อยากอ่าน เหมาะกับแนว${form.genre || "นิยาย"}ที่เลือก อย่าเพิ่งเปิดเผยปมสำคัญทั้งหมด ให้รู้สึกอยากติดตาม ตอบเฉพาะเรื่องย่อ ไม่ต้องมีหัวข้อหรือคำอธิบายเพิ่มเติม`,
     });
 
     // Strip code fences
@@ -222,8 +226,48 @@ function Step1({ form, setForm, chars }) {
     handleDraftSynopsis(false);
   };
 
+  const isOneShot = form.novel_type === "เรื่องสั้น";
+
   return (
     <div className="space-y-4">
+      {/* ประเภทงาน */}
+      <div>
+        <label className="text-sm font-medium mb-2 block">ประเภทงาน <span className="text-destructive">*</span></label>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => setForm({ ...form, novel_type: "นิยายยาว", target_chapters: "10", word_count_target: "1500" })}
+            className={`flex flex-col items-start gap-1.5 rounded-xl border px-4 py-3 text-left transition-all ${
+              !isOneShot ? "border-primary bg-primary/5 ring-1 ring-primary/20" : "border-border/60 hover:border-primary/30 hover:bg-muted/30"
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${!isOneShot ? "border-primary bg-primary" : "border-muted-foreground/30"}`}>
+                {!isOneShot && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+              </div>
+              <span className={`text-sm font-medium ${!isOneShot ? "text-primary" : ""}`}>นิยายหลายตอน</span>
+            </div>
+            <p className="text-xs text-muted-foreground ml-6">10-40 ตอน แบ่งเป็นตอนย่อย</p>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setForm({ ...form, novel_type: "เรื่องสั้น", target_chapters: "1", word_count_target: "3000" })}
+            className={`flex flex-col items-start gap-1.5 rounded-xl border px-4 py-3 text-left transition-all ${
+              isOneShot ? "border-primary bg-primary/5 ring-1 ring-primary/20" : "border-border/60 hover:border-primary/30 hover:bg-muted/30"
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${isOneShot ? "border-primary bg-primary" : "border-muted-foreground/30"}`}>
+                {isOneShot && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+              </div>
+              <span className={`text-sm font-medium ${isOneShot ? "text-primary" : ""}`}>เรื่องสั้นจบในตอนเดียว</span>
+            </div>
+            <p className="text-xs text-muted-foreground ml-6">One-shot จบสมบูรณ์ใน 1 ตอน</p>
+          </button>
+        </div>
+      </div>
+
       <div>
         <label className="text-sm font-medium mb-1.5 block">ชื่อเรื่อง <span className="text-destructive">*</span></label>
         <Input placeholder="เช่น ลับแลลายเมฆ" value={form.title} onChange={(e) => { setForm({ ...form, title: e.target.value }); setDraftError(""); }} autoFocus />
@@ -269,30 +313,65 @@ function Step1({ form, setForm, chars }) {
           })}
         </div>
       </div>
-      <div>
-        <label className="text-sm font-medium mb-1.5 block">จำนวนตอนที่ต้องการ</label>
-        <Select value={form.target_chapters.toString()} onValueChange={(v) => setForm({ ...form, target_chapters: v })}>
-          <SelectTrigger><SelectValue placeholder="เลือกจำนวนตอน" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="10">10 ตอน</SelectItem>
-            <SelectItem value="20">20 ตอน</SelectItem>
-            <SelectItem value="30">30 ตอน</SelectItem>
-            <SelectItem value="40">40 ตอน</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-      <div>
-        <label className="text-sm font-medium mb-1.5 block">จำนวนคำเป้าหมายต่อตอน</label>
-        <Select value={form.word_count_target.toString()} onValueChange={(v) => setForm({ ...form, word_count_target: v })}>
-          <SelectTrigger><SelectValue placeholder="เลือกจำนวนคำ" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="1000">~1,000 คำ</SelectItem>
-            <SelectItem value="1500">~1,500 คำ</SelectItem>
-            <SelectItem value="2000">~2,000 คำ</SelectItem>
-            <SelectItem value="3000">~3,000 คำ</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      {!isOneShot && (
+        <div>
+          <label className="text-sm font-medium mb-1.5 block">จำนวนตอนที่ต้องการ</label>
+          <Select value={form.target_chapters.toString()} onValueChange={(v) => setForm({ ...form, target_chapters: v })}>
+            <SelectTrigger><SelectValue placeholder="เลือกจำนวนตอน" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="10">10 ตอน</SelectItem>
+              <SelectItem value="20">20 ตอน</SelectItem>
+              <SelectItem value="30">30 ตอน</SelectItem>
+              <SelectItem value="40">40 ตอน</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      {isOneShot && (
+        <div>
+          <label className="text-sm font-medium mb-1.5 block">ความยาวเป้าหมาย (จำนวนคำ)</label>
+          <Select value={form.word_count_target.toString()} onValueChange={(v) => setForm({ ...form, word_count_target: v })}>
+            <SelectTrigger><SelectValue placeholder="เลือกความยาว" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="3000">~3,000 คำ</SelectItem>
+              <SelectItem value="5000">~5,000 คำ</SelectItem>
+              <SelectItem value="8000">~8,000 คำ</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      {isOneShot && (
+        <div>
+          <label className="text-sm font-medium mb-1.5 block">รูปแบบตอนจบ</label>
+          <Select value={form.ending_type || "จบตามจริง"} onValueChange={(v) => setForm({ ...form, ending_type: v })}>
+            <SelectTrigger><SelectValue placeholder="เลือกตอนจบ" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="จบสุข (HEA)">จบสุข (HEA)</SelectItem>
+              <SelectItem value="จบเศร้า (HFE)">จบเศร้า (HFE)</SelectItem>
+              <SelectItem value="จบเปิด (Open Ending)">จบเปิด (Open Ending)</SelectItem>
+              <SelectItem value="จบหักมุม (Twist)">จบหักมุม (Twist)</SelectItem>
+              <SelectItem value="จบตามจริง">จบตามจริง</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      {!isOneShot && (
+        <div>
+          <label className="text-sm font-medium mb-1.5 block">จำนวนคำเป้าหมายต่อตอน</label>
+          <Select value={form.word_count_target.toString()} onValueChange={(v) => setForm({ ...form, word_count_target: v })}>
+            <SelectTrigger><SelectValue placeholder="เลือกจำนวนคำ" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="1000">~1,000 คำ</SelectItem>
+              <SelectItem value="1500">~1,500 คำ</SelectItem>
+              <SelectItem value="2000">~2,000 คำ</SelectItem>
+              <SelectItem value="3000">~3,000 คำ</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      )}
       <div>
         <div className="flex items-center justify-between mb-1.5">
           <label className="text-sm font-medium">เรื่องย่อ</label>
@@ -383,8 +462,18 @@ function Step3({ form, setForm, chars, activeWriters }) {
           <SummaryRow label="แนวนิยาย" value={form.genre} />
           <SummaryRow label="สไตล์การเขียน" value={form.writing_style} />
           <SummaryRow label="ยุคสมัย" value={form.era} />
-          <SummaryRow label="จำนวนตอน" value={form.target_chapters ? `${form.target_chapters} ตอน` : null} />
-          <SummaryRow label="จำนวนคำต่อตอน" value={form.word_count_target ? `${form.word_count_target.toLocaleString()} คำ` : null} />
+          {form.novel_type === "เรื่องสั้น" ? (
+            <>
+              <SummaryRow label="ประเภท" value="เรื่องสั้นจบในตอนเดียว" highlight />
+              <SummaryRow label="ความยาวเป้าหมาย" value={`${form.word_count_target.toLocaleString()} คำ`} />
+              <SummaryRow label="ตอนจบ" value={form.ending_type} />
+            </>
+          ) : (
+            <>
+              <SummaryRow label="จำนวนตอน" value={form.target_chapters ? `${form.target_chapters} ตอน` : null} />
+              <SummaryRow label="จำนวนคำต่อตอน" value={form.word_count_target ? `${form.word_count_target.toLocaleString()} คำ` : null} />
+            </>
+          )}
           <SummaryRow label="นักเขียน AI" value={writer?.name} highlight />
           {form.synopsis && (
             <div className="pt-1">
@@ -423,7 +512,7 @@ function SummaryRow({ label, value, bold, highlight }) {
 // ─── Main Wizard ──────────────────────────────────────────────────────────
 export default function CreateNovelWizard({ open, onOpenChange, activeWriters, onCreated }) {
   const [step, setStep] = useState(1);
-  const [form, setForm] = useState({ title: "", genre: "", synopsis: "", era: "", writer_id: "", target_chapters: "10", writing_style: "ทั่วไป", word_count_target: "1500" });
+  const [form, setForm] = useState({ title: "", genre: "", synopsis: "", era: "", writer_id: "", novel_type: "นิยายยาว", target_chapters: "10", writing_style: "ทั่วไป", word_count_target: "1500", ending_type: "จบตามจริง" });
   const [chars, setChars] = useState([emptyChar()]);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
@@ -433,7 +522,7 @@ export default function CreateNovelWizard({ open, onOpenChange, activeWriters, o
     if (!v) {
       setTimeout(() => {
         setStep(1);
-        setForm({ title: "", genre: "", synopsis: "", era: "", writer_id: "", target_chapters: "10", word_count_target: "1500", writing_style: "ทั่วไป" });
+        setForm({ title: "", genre: "", synopsis: "", era: "", writer_id: "", novel_type: "นิยายยาว", target_chapters: "10", word_count_target: "1500", writing_style: "ทั่วไป", ending_type: "จบตามจริง" });
         setChars([emptyChar()]);
         setError("");
       }, 300);

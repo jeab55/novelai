@@ -364,9 +364,17 @@ export default function Dashboard() {
                       );
                     })()}
 
+                    {/* One-shot badge */}
+                    {novel.novel_type === "เรื่องสั้น" && (
+                      <div className="absolute top-3 left-3 z-10 flex items-center gap-1 bg-sky-500/15 text-sky-700 dark:text-sky-300 text-[11px] font-semibold px-2 py-0.5 rounded-full border border-sky-500/30 shadow-sm">
+                        <BookOpen className="w-3 h-3 text-sky-500" />
+                        เรื่องสั้น
+                      </div>
+                    )}
+
                     {/* Success badge */}
                     {(novel.auto_written || jobs[novel.id]?.status === "done") && jobs[novel.id]?.status !== "running" && (
-                      <div className="absolute top-3 left-3 z-10 flex items-center gap-1 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 text-[11px] font-semibold px-2 py-0.5 rounded-full border border-emerald-500/30 shadow-sm">
+                      <div className={`absolute z-10 flex items-center gap-1 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 text-[11px] font-semibold px-2 py-0.5 rounded-full border border-emerald-500/30 shadow-sm ${novel.novel_type === "เรื่องสั้น" ? "top-3 right-3" : "top-3 left-3"}`}>
                         <CheckCircle2 className="w-3 h-3 text-emerald-500" />
                         สำเร็จ
                       </div>
