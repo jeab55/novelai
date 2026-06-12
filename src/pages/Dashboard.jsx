@@ -341,9 +341,11 @@ export default function Dashboard() {
                       const novelChapters = (chapters || []).filter(c => c.novel_id === novel.id && !c.is_deleted);
                       const completed = novelChapters.filter(c => c.status === "เขียนเสร็จ").length;
                       const target = novel.target_chapters || 10;
-                      const pct = target > 0 ? Math.round((completed / target) * 100) : 0;
                       const isWriting = jobs[novel.id]?.status === "running";
                       const currentJob = jobs[novel.id];
+                      // ใช้จำนวนตอนที่กำลังเขียนถ้ากำลังเขียน มิฉะนั้นใช้ตอนที่เสร็จแล้ว
+                      const currentCount = isWriting ? (currentJob?.current || 0) : completed;
+                      const pct = target > 0 ? Math.round((currentCount / target) * 100) : 0;
                       return (
                         <div className="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-background/95 to-background/60 px-4 py-3">
                           <div className="flex items-center justify-between text-xs font-medium mb-1.5">
