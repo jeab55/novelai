@@ -33,18 +33,6 @@ export default function NovelWorkspace() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  // โหลดจำนวนตอนที่เขียนเสร็จ
-  const { data: chapters } = useQuery({
-    queryKey: ["chapters", novelId],
-    queryFn: () => base44.entities.Chapter.filter({ novel_id: novelId, is_deleted: false }),
-    enabled: !!novelId,
-  });
-
-  const completedCount = chapters?.filter(c => c.status === "เขียนเสร็จ").length || 0;
-  const targetCount = novel?.target_chapters || 0;
-  const progressPct = targetCount > 0 ? Math.round((completedCount / targetCount) * 100) : 0;
-  const isBulkWriting = jobs[novelId]?.status === "running";
-
   const { data: novel, isLoading } = useQuery({
     queryKey: ["novel", novelId],
     queryFn: async () => {
@@ -53,6 +41,18 @@ export default function NovelWorkspace() {
     },
     enabled: !!novelId,
   });
+
+  // โหลดจำนวนตอนที่เขียนเสร็จ
+  const { data: chapters } = useQuery({
+    queryKey: ["chapters", novelId],
+    queryFn: () => base44.entities.Chapter.filter({ novel_id: novelId, is_deleted: false }),
+    enabled: !!novelId && !!novel,
+  });
+
+  const completedCount = chapters?.filter(c => c.status === "เขียนเสร็จ").length || 0;
+  const targetCount = novel?.target_chapters || 0;
+  const progressPct = targetCount > 0 ? Math.round((completedCount / targetCount) * 100) : 0;
+  const isBulkWriting = jobs[novelId]?.status === "running";
 
   const { data: novelWriter } = useQuery({
     queryKey: ["writers-all"],
