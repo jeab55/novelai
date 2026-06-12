@@ -369,7 +369,7 @@ export default function Dashboard() {
                         สำเร็จ
                       </div>
                     )}
-                    <div className="p-6 flex flex-col flex-1">
+                    <div className="p-6 pb-12 flex flex-col flex-1">
                       {/* Action buttons */}
                       <div className="absolute top-3 right-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
                         <button
@@ -423,7 +423,7 @@ export default function Dashboard() {
                       )}
 
                       {/* Footer */}
-                      <div className="mt-4 pt-4 border-t border-border/40 flex items-center justify-between">
+                      <div className="mt-auto pt-4 border-t border-border/40 flex items-center justify-between">
                         {novel.status === "เขียนเสร็จ" ? (
                           <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 text-xs font-bold border border-emerald-500/30">
                             <CheckCircle2 className="w-3 h-3 mr-1 text-emerald-500" />
