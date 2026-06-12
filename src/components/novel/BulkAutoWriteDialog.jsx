@@ -150,7 +150,7 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
 
   const expandContent = async (currentContent, targetWords, chapterTitle, order, linkedEvent, novelContext) => {
     const minWords = Math.floor(targetWords * 0.9);
-    const absoluteMinWords = 1000; // ห้ามบันทึกถ้าสั้นกว่า 1000 คำ
+    const absoluteMinWords = 1000;
     let content = currentContent;
     let attempts = 0;
     const maxAttempts = 3;
@@ -158,34 +158,38 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
     while (attempts < maxAttempts) {
       const wordCount = content.split(/\s+/).filter(Boolean).length;
       if (wordCount >= minWords && wordCount >= absoluteMinWords) {
-        return { content, wordCount };
+        break;
       }
 
       attempts += 1;
-      const remainingWords = targetWords - wordCount;
-      let expandPrompt = `[บทขยายเนื้อหา]\nเนื้อหาปัจจุบันมี ${wordCount} คำ แต่ต้องการ ${targetWords} คำ (ขั้นต่ำ 1000 คำ)\n`;
-      expandPrompt += `โปรดขยายเนื้อหาโดยเพิ่ม:\n`;
-      expandPrompt += `- ฉากหรือบรรยากาศเพิ่มเติม\n`;
-      expandPrompt += `- บทสนทนาระหว่างตัวละคร\n`;
-      expandPrompt += `- รายละเอียดการกระทำหรือความคิดของตัวละคร\n`;
-      expandPrompt += `- ความขัดแย้งหรืออารมณ์เพิ่มเติม\n\n`;
-      expandPrompt += `[ตอนที่ต้องขยาย]\n`;
-      expandPrompt += `ชื่อตอน: ${chapterTitle}\n`;
-      expandPrompt += `ลำดับตอน: ${order}\n`;
+      const remainingWords = Math.max(targetWords - wordCount, 300);
+      
+      let expandPrompt = `[ขยายเนื้อหา — เขียนต่อจากเดิม]\n`;
+      expandPrompt += `เนื้อหาปัจจุบันมี ${wordCount} คำ แต่ต้องการอย่างน้อย ${targetWords} คำ\n`;
+      expandPrompt += `โปรดเขียนเนื้อหาต่อจากเนื้อหาด้านล่าง เพิ่มอีกอย่างน้อย ${remainingWords} คำ\n\n`;
+      expandPrompt += `[คำสั่ง]\n`;
+      expandPrompt += `- เขียนต่อจากเนื้อหาเดิมทันที ไม่ต้องมีคำนำ\n`;
+      expandPrompt += `- เพิ่มฉากใหม่ บทสนทนา รายละเอียดการกระทำและความคิดของตัวละคร\n`;
+      expandPrompt += `- ขยายความขัดแย้ง อารมณ์ และบรรยากาศให้เห็นภาพชัดเจน\n`;
+      expandPrompt += `- รักษาโทนและสไตล์ของเรื่องให้สม่ำเสมอ\n\n`;
+      expandPrompt += `[ตอน: "${chapterTitle}" ลำดับที่ ${order}]\n`;
       if (linkedEvent) {
         expandPrompt += `เหตุการณ์หลัก: ${linkedEvent.title}\n`;
-        if (linkedEvent.description) expandPrompt += `  ${linkedEvent.description}\n`;
+        if (linkedEvent.description) expandPrompt += `${linkedEvent.description}\n`;
       }
-      expandPrompt += `\n[บริบทเรื่อง]\n`;
-      expandPrompt += `ชื่อเรื่อง: ${novelContext.title}\n`;
-      if (novelContext.genre) expandPrompt += `แนว: ${novelContext.genre}\n`;
-      expandPrompt += `\n[เนื้อหาปัจจุบัน]\n${content.substring(0, 2000)}${content.length > 2000 ? "\n...(ต่อ)" : ""}\n\n`;
-      expandPrompt += `ขยายเนื้อหาให้ครบ ${remainingWords} คำ โดยเขียนต่อจากเนื้อหาเดิม:`;
+      expandPrompt += `\n[เนื้อหาปัจจุบัน — เขียนต่อจากบรรทัดสุดท้าย]\n`;
+      expandPrompt += `${content.substring(0, 2500)}${content.length > 2500 ? "\n...(ต่อ)" : ""}\n\n`;
+      expandPrompt += `[เขียนต่อจากนี้ — อย่างน้อย ${remainingWords} คำ]:\n`;
 
       try {
         const result = await base44.integrations.Core.InvokeLLM({ prompt: expandPrompt, model: "claude_sonnet_4_6" });
         let expansion = typeof result === "string" ? result : (result?.text || "");
         expansion = expansion.replace(/^```[\w]*\n?/m, "").replace(/\n?```$/m, "").trim();
+        
+        if (!expansion || expansion.length < 50) {
+          break;
+        }
+        
         content = content + "\n\n" + expansion;
       } catch {
         break;
@@ -264,17 +268,20 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
     const linkedEvent = plotEvents.find((e) => e.order === order);
     const sysPrompt = buildSystemPrompt(novel, chars, world, plotEvents, contextChapters, writerPrompt);
     let taskPrompt = sysPrompt;
-    taskPrompt += `\n\n[โจทย์ตอนที่ต้องร่าง]\n`;
-    taskPrompt += `ชื่อตอน: ${entry.title}\n`;
+    taskPrompt += `\n\n[โจทย์ตอนที่ต้องร่าง — เขียนเนื้อหาเต็ม]\n`;
+    taskPrompt += `ชื่อตอน: "${entry.title}"\n`;
     taskPrompt += `ลำดับตอน: ${order} จาก ${target} ตอน\n`;
     const targetWords = novel?.word_count_target || 1500;
-    taskPrompt += `ความยาวที่ต้องการ: ประมาณ ${targetWords} คำ\n`;
+    taskPrompt += `\n[คำสั่งสำคัญ]\n`;
+    taskPrompt += `- เขียนเนื้อหาเต็มตอนเป็นร้อยแก้วนิยายภาษาไทย ความยาวอย่างน้อย ${targetWords} คำ\n`;
+    taskPrompt += `- ต้องมีหลายฉาก ทั้งบทบรรยายและบทสนทนาที่ยาวพอสมควร\n`;
+    taskPrompt += `- เขียนเป็นเนื้อเรื่องต่อเนื่อง ไม่ใช่เค้าโครงหรือสรุปย่อ\n`;
+    taskPrompt += `- ห้ามสั้นกว่า 1000 คำ\n\n`;
     if (linkedEvent) {
-      taskPrompt += `\nเหตุการณ์หลัก:\n• ${linkedEvent.title}`;
-      if (linkedEvent.description) taskPrompt += `\n  ${linkedEvent.description}`;
-      taskPrompt += `\n`;
+      taskPrompt += `เหตุการณ์หลัก: ${linkedEvent.title}\n`;
+      if (linkedEvent.description) taskPrompt += `${linkedEvent.description}\n`;
     }
-    taskPrompt += `\nร่างตอนนี้ให้ครบ ${targetWords} คำ:\n`;
+    taskPrompt += `\n[เริ่มเขียนเนื้อหาตอนนี้ — อย่างน้อย ${targetWords} คำ]:\n`;
     try {
       const result = await base44.integrations.Core.InvokeLLM({ prompt: taskPrompt, model: "claude_sonnet_4_6" });
       let text = typeof result === "string" ? result : (result?.text || "");
@@ -385,17 +392,24 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
       const sysPrompt = buildSystemPrompt(novel, characters, worldEntries, plotEvents, contextChapters, writerPrompt);
 
       let taskPrompt = sysPrompt;
-      taskPrompt += `\n\n[โจทย์ตอนที่ต้องร่าง]\n`;
+      taskPrompt += `\n\n[โจทย์ตอนที่ต้องร่าง — เขียนเนื้อหาเต็มตอน]\n`;
       taskPrompt += `ชื่อตอน: "${chapterTitle}"\n`;
       taskPrompt += `ลำดับตอน: ${i} จาก ${target} ตอน\n`;
-      taskPrompt += `ความยาวที่ต้องการ: ประมาณ ${wordTarget} คำ (ขั้นต่ำ 1000 คำ)\n`;
+      taskPrompt += `ความยาวที่ต้องการ: อย่างน้อย ${wordTarget} คำ (ขั้นต่ำ 1000 คำ)\n\n`;
+      taskPrompt += `[คำสั่งสำคัญ — ต้องปฏิบัติตาม]\n`;
+      taskPrompt += `1. เขียนเนื้อหาเต็มตอนเป็นร้อยแก้วนิยายภาษาไทย ความยาวอย่างน้อย ${wordTarget} คำ\n`;
+      taskPrompt += `2. ประกอบด้วยหลายฉาก มีทั้งบทบรรยายและบทสนทนาที่ลื่นไหล\n`;
+      taskPrompt += `3. ห้ามเขียนเป็นเค้าโครง สรุปย่อ หรือรายการสั้นๆ — ต้องเป็นนิยายเต็มรูปแบบ\n`;
+      taskPrompt += `4. ใช้ภาษาไทยที่สละสลวย อ่านแล้วเห็นภาพ มีอารมณ์และจังหวะการเล่าเรื่อง\n`;
+      taskPrompt += `5. รักษาความต่อเนื่องกับตอนก่อนหน้า — ตัวละคร เหตุการณ์ และโทนเรื่องต้องสอดคล้องกัน\n\n`;
       if (linkedEvent) {
-        taskPrompt += `\nเหตุการณ์หลักที่ตอนนี้ต้องบรรยาย:\n• ${linkedEvent.title}`;
+        taskPrompt += `[เหตุการณ์หลักที่ตอนนี้ต้องบรรยาย]\n`;
+        taskPrompt += `• ${linkedEvent.title}`;
         if (linkedEvent.description) taskPrompt += `\n  ${linkedEvent.description}`;
         if (linkedEvent.time_period) taskPrompt += `\n  ช่วงเวลา: ${linkedEvent.time_period}`;
-        taskPrompt += `\n`;
+        taskPrompt += `\n\n`;
       }
-      taskPrompt += `\nร่างตอนนี้ให้ครบ ${wordTarget} คำ:\n`;
+      taskPrompt += `[เริ่มเขียนตอนนี้เลย — ความยาวอย่างน้อย ${wordTarget} คำ]:\n`;
 
       let generatedContent = "";
       try {

@@ -21,6 +21,64 @@ const WORD_TARGETS = [
 const DEFAULT_WRITER_PROMPT = `คุณคือนักเขียนนิยายภาษาไทยมืออาชีพที่กำลังร่างตอนใหม่ให้ผู้เขียน
 คุณต้องร่างเนื้อหาตอนที่สมบูรณ์ตามโครงที่ได้รับ รักษาสำนวนและโทนของเรื่อง ใช้ภาษาไทยที่อ่านลื่น`;
 
+// นับคำภาษาไทย (ประมาณการ)
+function countThaiWords(text) {
+  if (!text) return 0;
+  // ใช้ split ด้วยช่องว่างและตัวอักษรไทยที่ติดกัน
+  const words = text.split(/\s+/).filter(Boolean);
+  return words.length;
+}
+
+// ขยายเนื้อหาอัตโนมัติ
+async function expandContentAutomatically(currentContent, targetWords, chapterTitle, form, systemPrompt) {
+  const minWords = Math.floor(targetWords * 0.9);
+  const absoluteMinWords = 1000;
+  let content = currentContent;
+  let attempts = 0;
+  const maxAttempts = 3;
+
+  while (attempts < maxAttempts) {
+    const wordCount = countThaiWords(content);
+    if (wordCount >= minWords && wordCount >= absoluteMinWords) {
+      break;
+    }
+
+    attempts += 1;
+    const remainingWords = Math.max(targetWords - wordCount, 300);
+    
+    let expandPrompt = `[ขยายเนื้อหา — เขียนต่อจากเดิม]\n`;
+    expandPrompt += `เนื้อหาปัจจุบันมี ${wordCount} คำ แต่ต้องการอย่างน้อย ${targetWords} คำ\n`;
+    expandPrompt += `โปรดเขียนเนื้อหาต่อจากเนื้อหาด้านล่าง เพิ่มอีกอย่างน้อย ${remainingWords} คำ\n\n`;
+    expandPrompt += `[คำสั่ง]\n`;
+    expandPrompt += `- เขียนต่อจากเนื้อหาเดิมทันที ไม่ต้องมีคำนำ\n`;
+    expandPrompt += `- เพิ่มฉากใหม่ บทสนทนา รายละเอียดการกระทำและความคิดของตัวละคร\n`;
+    expandPrompt += `- ขยายความขัดแย้ง อารมณ์ และบรรยากาศให้เห็นภาพชัดเจน\n`;
+    expandPrompt += `- รักษาโทนและสไตล์ของเรื่องให้สม่ำเสมอ\n\n`;
+    expandPrompt += `[ตอน: "${chapterTitle}"]\n`;
+    if (form.summary) expandPrompt += `สิ่งที่ต้องเกิด: ${form.summary}\n`;
+    if (form.characters) expandPrompt += `ตัวละคร: ${form.characters}\n`;
+    expandPrompt += `\n[เนื้อหาปัจจุบัน — เขียนต่อจากบรรทัดสุดท้าย]\n`;
+    expandPrompt += `${content.substring(0, 2500)}${content.length > 2500 ? "\n...(ต่อ)" : ""}\n\n`;
+    expandPrompt += `[เขียนต่อจากนี้ — อย่างน้อย ${remainingWords} คำ]:\n`;
+
+    try {
+      const result = await base44.integrations.Core.InvokeLLM({ prompt: expandPrompt, model: "claude_sonnet_4_6" });
+      let expansion = typeof result === "string" ? result : (result?.text || "");
+      expansion = expansion.replace(/^```[\w]*\n?/m, "").replace(/\n?```$/m, "").trim();
+      
+      if (!expansion || expansion.length < 50) {
+        break;
+      }
+      
+      content = content + "\n\n" + expansion;
+    } catch {
+      break;
+    }
+  }
+
+  return { content, wordCount: countThaiWords(content) };
+}
+
 // สร้าง system prompt สำหรับร่างตอน
 function buildDraftSystemPrompt(novel, characters, worldEntries, plotEvents, chapters, currentChapter, writerPrompt, linkedEvent) {
   let ctx = `[บทบาท]\n${writerPrompt || DEFAULT_WRITER_PROMPT}\n\n`;
@@ -103,13 +161,19 @@ function buildDraftSystemPrompt(novel, characters, worldEntries, plotEvents, cha
 
 function buildDraftPrompt(form, systemPrompt, wordTarget) {
   let prompt = systemPrompt;
-  prompt += `\n\n[โจทย์ตอนที่ต้องร่าง]\n`;
-  prompt += `ชื่อตอน: ${form.chapterTitle}\n`;
-  prompt += `ความยาวที่ต้องการ: ประมาณ ${wordTarget} คำ\n`;
-  if (form.summary) prompt += `\nสิ่งที่ต้องเกิดในตอนนี้:\n${form.summary}\n`;
-  if (form.characters) prompt += `\nตัวละครในตอน: ${form.characters}\n`;
-  if (form.tone) prompt += `\nโทน/มุมมองการเขียน: ${form.tone}\n`;
-  prompt += `\nร่างตอนนี้ให้ครบ ${wordTarget} คำ:\n`;
+  prompt += `\n\n[โจทย์ตอนที่ต้องร่าง — เขียนเนื้อหาเต็มตอน]\n`;
+  prompt += `ชื่อตอน: "${form.chapterTitle}"\n`;
+  prompt += `ความยาวที่ต้องการ: อย่างน้อย ${wordTarget} คำ (ขั้นต่ำ 1000 คำ)\n\n`;
+  prompt += `[คำสั่งสำคัญ — ต้องปฏิบัติตาม]\n`;
+  prompt += `1. เขียนเนื้อหาเต็มตอนเป็นร้อยแก้วนิยายภาษาไทย ความยาวอย่างน้อย ${wordTarget} คำ\n`;
+  prompt += `2. ต้องประกอบด้วยหลายฉาก มีทั้งบทบรรยายและบทสนทนาที่ยาวพอสมควร\n`;
+  prompt += `3. เขียนเป็นเนื้อเรื่องต่อเนื่อง ไม่ใช่เค้าโครง ไม่ใช่สรุปย่อ ไม่ใช้ bullet points\n`;
+  prompt += `4. ใช้ภาษาไทยที่สละสลวย อ่านลื่น เห็นภาพ มีอารมณ์และจังหวะการเล่าเรื่อง\n`;
+  prompt += `5. ห้ามเขียนสั้นกว่า 1000 คำ — ถ้าสั้นกว่านี้ระบบจะขยายอัตโนมัติแต่จะเสียเครดิตเพิ่ม\n\n`;
+  if (form.summary) prompt += `[สิ่งที่ต้องเกิดในตอนนี้]:\n${form.summary}\n\n`;
+  if (form.characters) prompt += `[ตัวละครในตอน]: ${form.characters}\n\n`;
+  if (form.tone) prompt += `[โทน/มุมมอง]: ${form.tone}\n\n`;
+  prompt += `[เริ่มเขียนเนื้อหาตอนนี้เลย — ความยาวอย่างน้อย ${wordTarget} คำ]:\n`;
   return prompt;
 }
 
@@ -218,9 +282,19 @@ export default function AiDraftDialog({ open, onClose, chapter, novel, novelId, 
     const sysPrompt = getSystemPrompt();
     const prompt = buildDraftPrompt(form, sysPrompt, form.wordTarget);
     const result = await base44.integrations.Core.InvokeLLM({ prompt, model: "claude_sonnet_4_6" });
-    // Strip code fences before using result
     let text = typeof result === "string" ? result : (result?.text || "");
     text = text.replace(/^```[\w]*\n?/m, "").replace(/\n?```$/m, "").trim();
+    
+    // นับคำและขยายอัตโนมัติถ้าสั้นเกินไป
+    const initialWordCount = countThaiWords(text);
+    const minWords = Math.floor(form.wordTarget * 0.9);
+    
+    if (initialWordCount < minWords || initialWordCount < 1000) {
+      setLoadingType("expanding");
+      const expanded = await expandContentAutomatically(text, form.wordTarget, form.chapterTitle, form, sysPrompt);
+      text = expanded.content;
+    }
+    
     setDraft(text);
     setStep(2);
     setLoading(false);
