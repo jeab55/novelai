@@ -77,7 +77,7 @@ export default function Dashboard() {
       return all.filter((n) => {
         if (n.is_deleted) return false;
         if (isAdmin) return true;
-        if (n.created_by_id === user?.id) return true;
+        if (String(n.created_by_id) === String(user?.id)) return true;
         if (Array.isArray(n.shared_with) && n.shared_with.includes(user?.email)) return true;
         return false;
       });
@@ -389,7 +389,7 @@ export default function Dashboard() {
                         >
                           <Pencil className="w-3 h-3" />
                         </button>
-                        {(isAdmin || novel.created_by_id === user?.id) && (
+                        {(isAdmin || String(novel.created_by_id) === String(user?.id)) && (
                           <button
                             onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShareDialog({ open: true, novel }); }}
                             className="w-7 h-7 rounded-lg bg-background/90 shadow-sm border border-border/60 hover:bg-primary/10 hover:text-primary flex items-center justify-center transition-all"
@@ -398,7 +398,7 @@ export default function Dashboard() {
                             <Share2 className="w-3 h-3" />
                           </button>
                         )}
-                        {(isAdmin || novel.created_by_id === user?.id) && (
+                        {(isAdmin || String(novel.created_by_id) === String(user?.id)) && (
                           <button
                             onClick={(e) => { e.preventDefault(); e.stopPropagation(); setDeleteDialog({ open: true, novel }); }}
                             className="w-7 h-7 rounded-lg bg-background/90 shadow-sm border border-border/60 hover:bg-destructive/10 hover:text-destructive flex items-center justify-center transition-all"

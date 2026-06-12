@@ -102,7 +102,8 @@ export default function NovelWorkspace() {
 
   // ตรวจสิทธิ์: เจ้าของ, collaborator, หรือ admin
   const isCollaborator = Array.isArray(novel?.shared_with) && novel.shared_with.includes(user?.email);
-  const canAccess = isAdmin || novel?.created_by_id === user?.id || isCollaborator;
+  const isOwner = String(novel?.created_by_id) === String(user?.id);
+  const canAccess = isAdmin || isOwner || isCollaborator;
 
   if (!novel || !canAccess) {
     return (

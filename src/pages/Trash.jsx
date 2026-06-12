@@ -35,7 +35,7 @@ export default function Trash() {
     queryFn: async () => {
       const all = isAdmin
         ? await base44.entities.Novel.list("-deleted_at")
-        : await base44.entities.Novel.filter({ created_by_id: user?.id }, "-deleted_at");
+        : await base44.entities.Novel.filter({ created_by_id: String(user?.id) }, "-deleted_at");
       return all.filter((n) => n.is_deleted === true);
     },
     enabled: !!user,
@@ -75,7 +75,7 @@ export default function Trash() {
     },
   });
 
-  const canAct = (novel) => isAdmin || novel.created_by_id === user?.id;
+  const canAct = (novel) => isAdmin || String(novel.created_by_id) === String(user?.id);
 
   const openDialog = (e, novel, mode) => {
     e.preventDefault();
