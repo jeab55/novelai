@@ -15,6 +15,7 @@ import ShareNovelDialog from "@/components/novel/ShareNovelDialog";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { useAuth } from "@/lib/AuthContext";
+import { useBulkWrite } from "@/lib/BulkWriteContext";
 
 const GENRES = ["โรแมนติก", "แฟนตาซี", "อิงประวัติศาสตร์", "จีนย้อนยุค", "วาย", "สยองขวัญ", "ลึกลับ", "แอ็คชั่น", "ดราม่า", "อื่นๆ"]; // used in editForm
 
@@ -54,6 +55,7 @@ export default function Dashboard() {
   const queryClient = useQueryClient();
   const { user, logout } = useAuth();
   const isAdmin = user?.role === "admin";
+  const { jobs } = useBulkWrite();
 
   const { data: writers = [] } = useQuery({
     queryKey: ["writers"],
@@ -327,6 +329,34 @@ export default function Dashboard() {
                     {/* Decorative top stripe by genre */}
                     <div className={`h-1.5 w-full ${genreColors[novel.genre] ? "opacity-100" : "opacity-30"}`}
                       style={{ background: "linear-gradient(90deg, hsl(var(--primary)/0.6), hsl(var(--accent)))" }} />
+
+                    {/* Bulk-write progress overlay */}
+                    {jobs[novel.id]?.status === "running" && (() => {
+                      const job = jobs[novel.id];
+                      const pct = job.total > 0 ? Math.round((job.current / job.total) * 100) : 0;
+                      return (
+                        <div className="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-background/95 to-background/60 px-4 py-3 pointer-events-none">
+                          <div className="flex items-center justify-between text-xs font-medium mb-1.5">
+                            <span className="text-primary">✍️ กำลังสร้างตอนที่ {job.current}/{job.total}</span>
+                            <span className="text-muted-foreground">{pct}%</span>
+                          </div>
+                          <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
+                            <div
+                              className="bg-primary h-1.5 rounded-full transition-all duration-500"
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Success badge */}
+                    {(novel.auto_written || jobs[novel.id]?.status === "done") && jobs[novel.id]?.status !== "running" && (
+                      <div className="absolute top-3 left-3 z-10 flex items-center gap-1 bg-emerald-500 text-white text-[11px] font-semibold px-2 py-0.5 rounded-full shadow-sm">
+                        <CheckCircle2 className="w-3 h-3" />
+                        สำเร็จ
+                      </div>
+                    )}
                     <div className="p-6 flex flex-col flex-1">
                       {/* Action buttons */}
                       <div className="absolute top-3 right-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
@@ -357,20 +387,12 @@ export default function Dashboard() {
                         )}
                       </div>
 
-                      {/* Genre + auto-written badge */}
-                      <div className="flex flex-wrap gap-1.5 mb-3">
-                        {novel.genre && (
-                          <Badge className={`${genreColors[novel.genre] || "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"} text-xs w-fit`}>
-                            {novel.genre}
-                          </Badge>
-                        )}
-                        {novel.auto_written && (
-                          <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs w-fit flex items-center gap-1">
-                            <CheckCircle2 className="w-3 h-3" />
-                            สร้างครบทุกตอน
-                          </Badge>
-                        )}
-                      </div>
+                      {/* Genre badge */}
+                      {novel.genre && (
+                        <Badge className={`${genreColors[novel.genre] || "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"} text-xs mb-3 w-fit`}>
+                          {novel.genre}
+                        </Badge>
+                      )}
 
                       {/* Title */}
                       <h3 className="font-heading font-bold text-lg leading-tight group-hover:text-primary transition-colors mb-2 pr-8">

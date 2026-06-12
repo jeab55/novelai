@@ -95,6 +95,8 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
   const [currentMsg, setCurrentMsg] = useState("");
   const [overwritePrompt, setOverwritePrompt] = useState(null);
   const cancelledRef = useRef(false);
+  const doneCountRef = useRef(0);
+  const errorCountRef = useRef(0);
 
   const { data: chapters = [] } = useQuery({
     queryKey: ["chapters", novelId],
@@ -142,13 +144,62 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
   const askOverwrite = (order, title) =>
     new Promise((resolve) => setOverwritePrompt({ order, title, resolve }));
 
+  const retryChapter = async (order) => {
+    const entry = log.find((l) => l.order === order);
+    if (!entry) return;
+    setLog((l) => l.map((e) => e.order === order ? { ...e, status: "retrying" } : e));
+    const target = novel?.target_chapters || 10;
+    const writerPrompt = novelWriter?.system_prompt || "";
+    const allChapters = await base44.entities.Chapter.filter({ novel_id: novelId }, "order");
+    const contextChapters = allChapters
+      .filter((c) => !c.is_deleted && c.order < order && c.content)
+      .sort((a, b) => a.order - b.order);
+    const plotEvents = await base44.entities.PlotEvent.filter({ novel_id: novelId }, "order");
+    const chars = await base44.entities.Character.filter({ novel_id: novelId });
+    const world = await base44.entities.WorldEntry.filter({ novel_id: novelId });
+    const linkedEvent = plotEvents.find((e) => e.order === order);
+    const sysPrompt = buildSystemPrompt(novel, chars, world, plotEvents, contextChapters, writerPrompt);
+    let taskPrompt = sysPrompt;
+    taskPrompt += `\n\n[โจทย์ตอนที่ต้องร่าง]\n`;
+    taskPrompt += `ชื่อตอน: ${entry.title}\n`;
+    taskPrompt += `ลำดับตอน: ${order} จาก ${target} ตอน\n`;
+    taskPrompt += `ความยาวที่ต้องการ: ประมาณ ${wordTarget} คำ\n`;
+    if (linkedEvent) {
+      taskPrompt += `\nเหตุการณ์หลัก:\n• ${linkedEvent.title}`;
+      if (linkedEvent.description) taskPrompt += `\n  ${linkedEvent.description}`;
+      taskPrompt += `\n`;
+    }
+    taskPrompt += `\nร่างตอนนี้ให้ครบ ${wordTarget} คำ:\n`;
+    try {
+      const result = await base44.integrations.Core.InvokeLLM({ prompt: taskPrompt, model: "claude_sonnet_4_6" });
+      let text = typeof result === "string" ? result : (result?.text || "");
+      text = text.replace(/^```[\w]*\n?/m, "").replace(/\n?```$/m, "").trim();
+      const wordCount = text.split(/\s+/).filter(Boolean).length;
+      const existing = allChapters.find((c) => !c.is_deleted && c.order === order);
+      if (existing) {
+        await base44.entities.Chapter.update(existing.id, { content: text, word_count: wordCount, status: "ร่าง" });
+      } else {
+        await base44.entities.Chapter.create({ novel_id: novelId, title: entry.title, order, status: "ร่าง", content: text, word_count: wordCount });
+      }
+      setLog((l) => l.map((e) => e.order === order ? { ...e, status: "done", wordCount } : e));
+      queryClient.invalidateQueries({ queryKey: ["chapters", novelId] });
+      toast.success(`ตอนที่ ${order} สร้างสำเร็จ`);
+    } catch {
+      setLog((l) => l.map((e) => e.order === order ? { ...e, status: "error" } : e));
+      toast.error(`ตอนที่ ${order} ล้มเหลวอีกครั้ง`);
+    }
+  };
+
   const handleStart = async () => {
     const target = novel?.target_chapters || 10;
     cancelledRef.current = false;
+    doneCountRef.current = 0;
+    errorCountRef.current = 0;
     setProgress({ current: 0, total: target });
     setLog([]);
     setCurrentMsg("");
     setStep("running");
+    startJob(novelId, target);
 
     const writerPrompt = novelWriter?.system_prompt || "";
     const writtenSoFar = [];
@@ -157,6 +208,7 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
       if (cancelledRef.current) break;
 
       setProgress({ current: i, total: target });
+      updateJob(novelId, { current: i, total: target });
 
       const existing = chapters.find((c) => c.order === i);
       const chapterTitle = existing?.title || `ตอนที่ ${i}`;
@@ -208,6 +260,7 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
         text = text.replace(/^```[\w]*\n?/m, "").replace(/\n?```$/m, "").trim();
         generatedContent = text;
       } catch (err) {
+        errorCountRef.current += 1;
         setLog((l) => [...l, { order: i, title: chapterTitle, status: "error" }]);
         setCurrentMsg("");
         continue;
@@ -236,14 +289,21 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
         writtenSoFar.push({ ...newCh, content: generatedContent, order: i });
       }
 
+      doneCountRef.current += 1;
+      updateJob(novelId, { current: i, total: target, doneCount: doneCountRef.current, errorCount: errorCountRef.current });
       setLog((l) => [...l, { order: i, title: chapterTitle, status: "done", wordCount }]);
       setCurrentMsg("");
     }
 
     queryClient.invalidateQueries({ queryKey: ["chapters", novelId] });
+    finishJob(novelId, { doneCount: doneCountRef.current, errorCount: errorCountRef.current });
     setStep("done");
     if (!cancelledRef.current) {
       toast.success("สร้างตอนทั้งหมดเสร็จแล้ว!");
+      if (errorCountRef.current === 0) {
+        await base44.entities.Novel.update(novelId, { auto_written: true });
+        queryClient.invalidateQueries({ queryKey: ["novels"] });
+      }
     } else {
       toast.info("หยุดการสร้างตอนกลางคัน");
     }
@@ -399,31 +459,52 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
               </div>
             )}
 
+            {/* Success banner */}
+            {step === "done" && errorCount === 0 && !cancelledRef.current && (
+              <div className="mx-6 mb-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/50 px-4 py-3 flex items-center gap-3 shrink-0">
+                <CheckCircle2 className="w-6 h-6 text-emerald-500 shrink-0" />
+                <div>
+                  <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-200">สร้างนิยายครบทุกตอนแล้ว!</p>
+                  <p className="text-xs text-emerald-700 dark:text-emerald-300">{doneCount} ตอน · {log.reduce((s, e) => s + (e.wordCount || 0), 0).toLocaleString()} คำ</p>
+                </div>
+              </div>
+            )}
+
             {/* Log */}
             <ScrollArea className="flex-1 px-6 py-4">
               <div className="space-y-2">
                 {log.map((entry, idx) => (
                   <div key={idx} className="flex items-center gap-2.5 text-sm">
-                    {entry.status === "done" && (
+                    {(entry.status === "done") && (
                       <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
                     )}
                     {entry.status === "skip" && (
                       <SkipForward className="w-4 h-4 text-muted-foreground shrink-0" />
                     )}
-                    {entry.status === "error" && (
-                      <X className="w-4 h-4 text-destructive shrink-0" />
+                    {(entry.status === "error" || entry.status === "retrying") && (
+                      entry.status === "retrying"
+                        ? <Loader2 className="w-4 h-4 animate-spin text-amber-500 shrink-0" />
+                        : <X className="w-4 h-4 text-destructive shrink-0" />
                     )}
-                    <span className={entry.status === "skip" ? "text-muted-foreground" : ""}>
+                    <span className={entry.status === "skip" ? "text-muted-foreground" : entry.status === "error" ? "text-destructive" : ""}>
                       ตอนที่ {entry.order}: {entry.title}
                     </span>
-                    <span className="ml-auto text-xs text-muted-foreground shrink-0">
+                    <span className="ml-auto flex items-center gap-1.5 text-xs text-muted-foreground shrink-0">
                       {entry.status === "done" && entry.wordCount
                         ? `${entry.wordCount.toLocaleString()} คำ`
                         : entry.status === "skip"
                         ? "ข้ามแล้ว"
                         : entry.status === "error"
-                        ? "ผิดพลาด"
-                        : ""}
+                        ? (
+                          <button
+                            onClick={() => retryChapter(entry.order)}
+                            className="flex items-center gap-1 text-xs text-destructive hover:text-destructive/80 border border-destructive/30 rounded px-1.5 py-0.5 hover:bg-destructive/5 transition-colors"
+                          >
+                            <RefreshCw className="w-3 h-3" />
+                            ลองใหม่
+                          </button>
+                        )
+                        : entry.status === "retrying" ? "กำลังลองใหม่..." : ""}
                     </span>
                   </div>
                 ))}
