@@ -142,8 +142,13 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
 
   const creditPerChapter = 30; // 6 seconds × 5 credits/second
   const wordTarget = novel?.word_count_target || 1500;
-  const chaptersWithoutContent = chapters.filter((c) => !c.content?.trim()).length;
-  const totalEstimatedCredits = chaptersWithoutContent * creditPerChapter;
+  const target = novel?.target_chapters || 10;
+  
+  // นับตอนที่มีเนื้อหาจริง (word_count >= 500)
+  const chaptersWithRealContent = chapters.filter((c) => (c.word_count || 0) >= 500).length;
+  // ตอนที่ต้องสร้าง = เป้าหมาย ลบด้วย ตอนที่มีเนื้อหาจริง
+  const chaptersToCreateCount = Math.max(0, target - chaptersWithRealContent);
+  const totalEstimatedCredits = chaptersToCreateCount * creditPerChapter;
 
   const askOverwrite = (order, title) =>
     new Promise((resolve) => setOverwritePrompt({ order, title, resolve }));
@@ -303,20 +308,37 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
   };
 
   const handleStart = async () => {
-    // Calculate chapters to create and show confirmation
     const target = novel?.target_chapters || 10;
     const chaptersToCreate = [];
+    const shortChapters = []; // ตอนที่มีอยู่แต่สั้น (<500 คำ)
+    
+    // ตรวจสอบทุกตอนว่าต้องมี record ครบตามเป้า
     for (let i = 1; i <= target; i++) {
       const existing = chapters.find((c) => c.order === i);
-      if (!existing || !existing.content?.trim()) {
-        chaptersToCreate.push({ order: i, title: existing?.title || `ตอนที่ ${i}` });
+      const wordCount = existing?.word_count || 0;
+      
+      if (!existing) {
+        // ไม่มี record เลย — ต้องสร้างใหม่
+        chaptersToCreate.push({ order: i, title: `ตอนที่ ${i}`, needsCreation: true });
+      } else if (wordCount < 500) {
+        // มี record แต่สั้นเกินไป — นับว่าต้องสร้าง (จะถามผู้ใช้ก่อนเขียนทับ)
+        shortChapters.push({ order: i, title: existing.title || `ตอนที่ ${i}`, existingId: existing.id });
       }
+      // ถ้า word_count >= 500 ไม่นับว่าต้องสร้าง
     }
-    const totalCredits = chaptersToCreate.length * creditPerChapter;
+    
+    // รวมตอนที่ต้องสร้าง (ทั้งที่ไม่มี record และมีแต่สั้น)
+    const allChaptersToCreate = [
+      ...chaptersToCreate,
+      ...shortChapters.map((ch) => ({ ...ch, needsCreation: false })),
+    ];
+    
+    const totalCredits = allChaptersToCreate.length * creditPerChapter;
     setConfirmData({
-      chaptersToCreate,
+      chaptersToCreate: allChaptersToCreate,
       totalCredits,
       creditPerChapter,
+      shortChapters, // เก็บไว้แสดงให้ผู้ใช้รู้
     });
     setStep("confirm");
   };
@@ -343,9 +365,14 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
 
       const existing = chapters.find((c) => c.order === i);
       let chapterTitle = existing?.title || `ตอนที่ ${i}`;
+      const existingWordCount = existing?.word_count || 0;
 
-      if (existing?.content?.trim()) {
-        setCurrentMsg(`⚠️ ตอนที่ ${i} "${chapterTitle}" มีเนื้อหาอยู่แล้ว — รอการตัดสินใจ`);
+      // ถ้าไม่มี record เลย — ต้องสร้างใหม่ (ไม่ต้องถาม)
+      if (!existing) {
+        // จะสร้าง record ด้านล่าง
+      } else if (existingWordCount < 500 && existing.content?.trim()) {
+        // มีเนื้อหาแต่สั้น — ถามก่อนเขียนทับ
+        setCurrentMsg(`⚠️ ตอนที่ ${i} "${chapterTitle}" สั้นเกินไป (${existingWordCount} คำ) — จะเขียนทับ`);
         const decision = await askOverwrite(i, chapterTitle);
         setOverwritePrompt(null);
 
@@ -357,6 +384,12 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
           setCurrentMsg("");
           continue;
         }
+      } else if (existingWordCount >= 500) {
+        // มีเนื้อหาพอแล้ว — ข้าม
+        writtenSoFar.push(existing);
+        setLog((l) => [...l, { order: i, title: chapterTitle, status: "skip" }]);
+        setCurrentMsg("");
+        continue;
       }
 
       const linkedEvent = plotEvents.find((e) => e.order === i);
@@ -509,7 +542,6 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
     onClose();
   };
 
-  const target = novel?.target_chapters || 10;
   const progressPct = progress.total > 0 ? Math.round((progress.current / progress.total) * 100) : 0;
   const doneCount = log.filter((l) => l.status === "done").length;
   const skipCount = log.filter((l) => l.status === "skip").length;
@@ -556,14 +588,12 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
                 </div>
               )}
               <div className="flex justify-between">
-                <span className="text-muted-foreground">ตอนที่มีเนื้อหาแล้ว</span>
-                <span className="font-semibold">
-                  {chapters.filter((c) => c.content?.trim()).length} ตอน
-                </span>
+                <span className="text-muted-foreground">ตอนที่มีเนื้อหาแล้ว (≥500 คำ)</span>
+                <span className="font-semibold">{chaptersWithRealContent} ตอน</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">ตอนที่ต้องสร้าง</span>
-                <span className="font-semibold text-primary">{chaptersWithoutContent} ตอน</span>
+                <span className="font-semibold text-primary">{chaptersToCreateCount} ตอน</span>
               </div>
             </div>
 
@@ -589,7 +619,7 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
               </div>
               <div className="flex justify-between text-amber-700 dark:text-amber-300">
                 <span>ตอนที่ต้องสร้าง</span>
-                <span className="font-medium">{chaptersWithoutContent} ตอน</span>
+                <span className="font-medium">{chaptersToCreateCount} ตอน</span>
               </div>
               <div className="flex justify-between text-amber-700 dark:text-amber-300">
                 <span>เครดิตต่อตอน</span>
@@ -638,17 +668,35 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
                 )}
               </div>
 
-              <div className="bg-muted/40 rounded-lg p-3 text-xs text-muted-foreground">
-                <p className="font-medium mb-1">ตอนที่จะสร้าง:</p>
-                <div className="max-h-32 overflow-y-auto space-y-1">
-                  {confirmData.chaptersToCreate.slice(0, 10).map((ch) => (
-                    <div key={ch.order} className="flex justify-between">
-                      <span>ตอนที่ {ch.order}: {ch.title}</span>
+              <div className="bg-muted/40 rounded-lg p-3 text-xs text-muted-foreground space-y-2">
+                {confirmData.shortChapters && confirmData.shortChapters.length > 0 && (
+                  <div>
+                    <p className="font-medium text-amber-700 dark:text-amber-300 mb-1 flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3" />
+                      ตอนที่มีอยู่แต่สั้น (&lt;500 คำ) — จะเขียนทับ:
+                    </p>
+                    <div className="max-h-24 overflow-y-auto space-y-1 pl-2 border-l-2 border-amber-300">
+                      {confirmData.shortChapters.map((ch) => (
+                        <div key={ch.order} className="flex justify-between">
+                          <span>ตอนที่ {ch.order}: {ch.title}</span>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                  {confirmData.chaptersToCreate.length > 10 && (
-                    <p className="text-xs text-muted-foreground italic">...และอีก {confirmData.chaptersToCreate.length - 10} ตอน</p>
-                  )}
+                  </div>
+                )}
+                
+                <div>
+                  <p className="font-medium mb-1">ตอนที่จะสร้างใหม่:</p>
+                  <div className="max-h-24 overflow-y-auto space-y-1">
+                    {confirmData.chaptersToCreate.filter((ch) => ch.needsCreation).slice(0, 10).map((ch) => (
+                      <div key={ch.order} className="flex justify-between">
+                        <span>ตอนที่ {ch.order}: {ch.title}</span>
+                      </div>
+                    ))}
+                    {confirmData.chaptersToCreate.filter((ch) => ch.needsCreation).length > 10 && (
+                      <p className="text-xs text-muted-foreground italic">...และอีก {confirmData.chaptersToCreate.filter((ch) => ch.needsCreation).length - 10} ตอน</p>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
