@@ -148,21 +148,22 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
   const askOverwrite = (order, title) =>
     new Promise((resolve) => setOverwritePrompt({ order, title, resolve }));
 
-  const expandContent = async (currentContent, targetWords, chapterTitle, order, linkedEvent) => {
+  const expandContent = async (currentContent, targetWords, chapterTitle, order, linkedEvent, novelContext) => {
     const minWords = Math.floor(targetWords * 0.9);
+    const absoluteMinWords = 1000; // ห้ามบันทึกถ้าสั้นกว่า 1000 คำ
     let content = currentContent;
     let attempts = 0;
     const maxAttempts = 3;
 
     while (attempts < maxAttempts) {
       const wordCount = content.split(/\s+/).filter(Boolean).length;
-      if (wordCount >= minWords) {
+      if (wordCount >= minWords && wordCount >= absoluteMinWords) {
         return { content, wordCount };
       }
 
       attempts += 1;
       const remainingWords = targetWords - wordCount;
-      let expandPrompt = `[บทขยายเนื้อหา]\nเนื้อหาปัจจุบันมี ${wordCount} คำ แต่ต้องการ ${targetWords} คำ\n`;
+      let expandPrompt = `[บทขยายเนื้อหา]\nเนื้อหาปัจจุบันมี ${wordCount} คำ แต่ต้องการ ${targetWords} คำ (ขั้นต่ำ 1000 คำ)\n`;
       expandPrompt += `โปรดขยายเนื้อหาโดยเพิ่ม:\n`;
       expandPrompt += `- ฉากหรือบรรยากาศเพิ่มเติม\n`;
       expandPrompt += `- บทสนทนาระหว่างตัวละคร\n`;
@@ -175,6 +176,9 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
         expandPrompt += `เหตุการณ์หลัก: ${linkedEvent.title}\n`;
         if (linkedEvent.description) expandPrompt += `  ${linkedEvent.description}\n`;
       }
+      expandPrompt += `\n[บริบทเรื่อง]\n`;
+      expandPrompt += `ชื่อเรื่อง: ${novelContext.title}\n`;
+      if (novelContext.genre) expandPrompt += `แนว: ${novelContext.genre}\n`;
       expandPrompt += `\n[เนื้อหาปัจจุบัน]\n${content.substring(0, 2000)}${content.length > 2000 ? "\n...(ต่อ)" : ""}\n\n`;
       expandPrompt += `ขยายเนื้อหาให้ครบ ${remainingWords} คำ โดยเขียนต่อจากเนื้อหาเดิม:`;
 
@@ -190,6 +194,58 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
 
     const finalWordCount = content.split(/\s+/).filter(Boolean).length;
     return { content, wordCount: finalWordCount };
+  };
+
+  const generateChapterTitle = async (novel, characters, plotEvents, prevChapters, order, linkedEvent, writerPrompt) => {
+    let titlePrompt = `[โจทย์ตั้งชื่อตอน]\nคุณคือนักเขียนนิยายมืออาชีพ กำลังตั้งชื่อตอนที่${order} ของเรื่อง\n\n`;
+    titlePrompt += `[บริบทเรื่อง]\n`;
+    titlePrompt += `ชื่อเรื่อง: ${novel.title}\n`;
+    if (novel.genre) titlePrompt += `แนว: ${novel.genre}\n`;
+    if (novel.synopsis) titlePrompt += `เรื่องย่อ: ${novel.synopsis.substring(0, 300)}\n`;
+    
+    if (linkedEvent) {
+      titlePrompt += `\n[เหตุการณ์หลักของตอนนี้]\n`;
+      titlePrompt += `ชื่อ: ${linkedEvent.title}\n`;
+      if (linkedEvent.description) titlePrompt += `รายละเอียด: ${linkedEvent.description}\n`;
+      if (linkedEvent.time_period) titlePrompt += `ช่วงเวลา: ${linkedEvent.time_period}\n`;
+    }
+
+    if (prevChapters.length > 0) {
+      titlePrompt += `\n[ตอนก่อนหน้า]\n`;
+      const lastChapter = prevChapters[prevChapters.length - 1];
+      titlePrompt += `ตอนที่ ${lastChapter.order}: "${lastChapter.title}"\n`;
+      const preview = (lastChapter.content || "").substring(0, 500);
+      if (preview) titlePrompt += `เนื้อหาโดยย่อ: ${preview}...\n`;
+    }
+
+    if (characters.length > 0) {
+      titlePrompt += `\n[ตัวละครหลัก]\n`;
+      characters.slice(0, 5).forEach((c) => {
+        titlePrompt += `• ${c.name} (${c.role || "ตัวประกอบ"})\n`;
+      });
+    }
+
+    titlePrompt += `\n[คำสั่ง]\n`;
+    titlePrompt += `ตั้งชื่อตอนที่${order} ให้สื่อถึงเนื้อหาหลักของตอน ใช้ภาษาไทยสละสลวย น่าอ่าน\n`;
+    titlePrompt += `ความยาว 3-8 คำ ไม่ต้องมีคำว่า "ตอนที่" นำหน้า\n`;
+    titlePrompt += `ชื่อตอนควร:\n`;
+    titlePrompt += `- สะท้อนเหตุการณ์สำคัญหรือจุดเปลี่ยนของตอน\n`;
+    titlePrompt += `- ดึงดูดความสนใจผู้อ่าน\n`;
+    titlePrompt += `- สอดคล้องกับโทนและแนวของเรื่อง\n\n`;
+    titlePrompt += `ตอบกลับด้วยชื่อตอนเพียงชื่อเดียว ไม่ต้องมีคำอธิบาย:`;
+
+    try {
+      const result = await base44.integrations.Core.InvokeLLM({ prompt: titlePrompt, model: "claude_sonnet_4_6" });
+      let title = typeof result === "string" ? result : (result?.text || "");
+      title = title.replace(/^```[\w]*\n?/m, "").replace(/\n?```$/m, "").trim();
+      title = title.replace(/^["']|["']$/g, "").trim(); // ลบเครื่องหมายคำ
+      if (!title || title.length < 3) {
+        title = `ตอนที่ ${order}`;
+      }
+      return title;
+    } catch {
+      return `ตอนที่ ${order}`;
+    }
   };
 
   const retryChapter = async (order) => {
@@ -279,7 +335,7 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
       updateJob(novelId, { current: i, total: target });
 
       const existing = chapters.find((c) => c.order === i);
-      const chapterTitle = existing?.title || `ตอนที่ ${i}`;
+      let chapterTitle = existing?.title || `ตอนที่ ${i}`;
 
       if (existing?.content?.trim()) {
         setCurrentMsg(`⚠️ ตอนที่ ${i} "${chapterTitle}" มีเนื้อหาอยู่แล้ว — รอการตัดสินใจ`);
@@ -297,6 +353,26 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
       }
 
       const linkedEvent = plotEvents.find((e) => e.order === i);
+      
+      // สร้างชื่อตอนอัตโนมัติถ้าไม่มีเนื้อหาเดิม
+      if (!existing || !existing.content?.trim()) {
+        setCurrentMsg(`📝 กำลังตั้งชื่อตอนที่ ${i}/${target}...`);
+        const contextChaptersForTitle = [
+          ...chapters.filter((c) => c.order < i && c.content && !c.is_deleted),
+          ...writtenSoFar.filter((c) => c.order < i),
+        ].sort((a, b) => a.order - b.order);
+        
+        chapterTitle = await generateChapterTitle(
+          novel, 
+          characters, 
+          plotEvents, 
+          contextChaptersForTitle, 
+          i, 
+          linkedEvent, 
+          writerPrompt
+        );
+      }
+
       setCurrentMsg(`✍️ กำลังร่างตอนที่ ${i}/${target}: "${chapterTitle}"...`);
 
       const contextChapters = [
@@ -310,9 +386,9 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
 
       let taskPrompt = sysPrompt;
       taskPrompt += `\n\n[โจทย์ตอนที่ต้องร่าง]\n`;
-      taskPrompt += `ชื่อตอน: ${chapterTitle}\n`;
+      taskPrompt += `ชื่อตอน: "${chapterTitle}"\n`;
       taskPrompt += `ลำดับตอน: ${i} จาก ${target} ตอน\n`;
-      taskPrompt += `ความยาวที่ต้องการ: ประมาณ ${wordTarget} คำ\n`;
+      taskPrompt += `ความยาวที่ต้องการ: ประมาณ ${wordTarget} คำ (ขั้นต่ำ 1000 คำ)\n`;
       if (linkedEvent) {
         taskPrompt += `\nเหตุการณ์หลักที่ตอนนี้ต้องบรรยาย:\n• ${linkedEvent.title}`;
         if (linkedEvent.description) taskPrompt += `\n  ${linkedEvent.description}`;
@@ -336,17 +412,26 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
 
       if (cancelledRef.current) break;
 
-      // ขยายเนื้อหาถ้าจำนวนคำต่ำกว่าเป้าหมายเกิน 10%
+      // ขยายเนื้อหาถ้าจำนวนคำต่ำกว่าเป้าหมายเกิน 10% หรือต่ำกว่า 1000 คำ
       const minWords = Math.floor(wordTarget * 0.9);
+      const absoluteMinWords = 1000;
       const initialWordCount = generatedContent.split(/\s+/).filter(Boolean).length;
       let finalContent = generatedContent;
       let finalWordCount = initialWordCount;
 
-      if (initialWordCount < minWords) {
+      if (initialWordCount < minWords || initialWordCount < absoluteMinWords) {
         setCurrentMsg(`📝 กำลังขยายตอนที่ ${i}/${target} ให้ครบ ${wordTarget.toLocaleString()} คำ...`);
-        const expanded = await expandContent(generatedContent, wordTarget, chapterTitle, i, linkedEvent);
+        const expanded = await expandContent(generatedContent, wordTarget, chapterTitle, i, linkedEvent, novel);
         finalContent = expanded.content;
         finalWordCount = expanded.wordCount;
+      }
+
+      // ตรวจสอบว่าผ่านขั้นต่ำ 1000 คำหรือไม่
+      if (finalWordCount < absoluteMinWords) {
+        errorCountRef.current += 1;
+        setLog((l) => [...l, { order: i, title: chapterTitle, status: "error", wordCount: finalWordCount }]);
+        setCurrentMsg(`⚠️ ตอนที่ ${i} สั้นเกินไป (${finalWordCount} คำ) — ข้าม`);
+        continue;
       }
 
       if (existing) {
@@ -354,8 +439,9 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
           content: finalContent,
           word_count: finalWordCount,
           status: "ร่าง",
+          title: chapterTitle, // อัพเดทชื่อตอนด้วย
         });
-        writtenSoFar.push({ ...existing, content: finalContent, order: i });
+        writtenSoFar.push({ ...existing, content: finalContent, order: i, title: chapterTitle });
       } else {
         const newCh = await base44.entities.Chapter.create({
           novel_id: novelId,
