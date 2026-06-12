@@ -412,9 +412,16 @@ export default function Dashboard() {
 
                       {/* Footer */}
                       <div className="mt-4 pt-4 border-t border-border/40 flex items-center justify-between">
-                        <Badge variant="outline" className="text-xs font-normal">
-                          {novel.status || "กำลังเขียน"}
-                        </Badge>
+                        {novel.status === "เขียนเสร็จ" ? (
+                          <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 text-xs font-bold border border-emerald-500/30">
+                            <CheckCircle2 className="w-3 h-3 mr-1 text-emerald-500" />
+                            เขียนเสร็จ
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-xs font-normal">
+                            {novel.status || "กำลังเขียน"}
+                          </Badge>
+                        )}
                         <div className="flex items-center gap-2">
                           {getWriterName(novel.writer_id) && (
                             <span className="text-[11px] text-primary/60 font-medium bg-primary/6 border border-primary/15 px-2 py-0.5 rounded-full">
