@@ -43,7 +43,7 @@ export default function WriterManager() {
 
   const { data: writers = [], isLoading } = useQuery({
     queryKey: ["writers"],
-    queryFn: () => base44.entities.Writer.list(),
+    queryFn: () => base44.entities.Writer.list("-updated_date"),
     staleTime: 0,
   });
 
