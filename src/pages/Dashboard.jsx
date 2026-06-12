@@ -64,6 +64,12 @@ export default function Dashboard() {
   });
   const activeWriters = writers.filter((w) => w.is_active !== false);
 
+  const { data: chapters = [] } = useQuery({
+    queryKey: ["chapters"],
+    queryFn: () => base44.entities.Chapter.filter({ is_deleted: false }),
+    staleTime: 0,
+  });
+
   const { data: novels = [], isLoading } = useQuery({
     queryKey: ["novels", user?.id],
     queryFn: async () => {
@@ -330,19 +336,25 @@ export default function Dashboard() {
                     <div className={`h-1.5 w-full ${genreColors[novel.genre] ? "opacity-100" : "opacity-30"}`}
                       style={{ background: "linear-gradient(90deg, hsl(var(--primary)/0.6), hsl(var(--accent)))" }} />
 
-                    {/* Bulk-write progress overlay */}
-                    {jobs[novel.id]?.status === "running" && (() => {
-                      const job = jobs[novel.id];
-                      const pct = job.total > 0 ? Math.round((job.current / job.total) * 100) : 0;
+                    {/* Progress overlay - always show */}
+                    {(() => {
+                      const novelChapters = chapters.filter(c => c.novel_id === novel.id);
+                      const completed = novelChapters.filter(c => c.status === "เขียนเสร็จ").length;
+                      const target = novel.target_chapters || 0;
+                      const pct = target > 0 ? Math.round((completed / target) * 100) : 0;
+                      const isWriting = jobs[novel.id]?.status === "running";
+                      const currentJob = jobs[novel.id];
                       return (
-                        <div className="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-background/95 to-background/60 px-4 py-3 pointer-events-none">
+                        <div className="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-background/95 to-background/60 px-4 py-3">
                           <div className="flex items-center justify-between text-xs font-medium mb-1.5">
-                            <span className="text-primary">✍️ กำลังสร้างตอนที่ {job.current}/{job.total}</span>
-                            <span className="text-muted-foreground">{pct}%</span>
+                            <span className={isWriting ? "text-primary" : "text-muted-foreground"}>
+                              {isWriting ? `✍️ กำลังสร้างตอนที่ ${currentJob?.current || 0}/${target}` : `เขียนแล้ว ${completed}/${target} ตอน`}
+                            </span>
+                            <span className={isWriting ? "text-primary font-semibold" : "text-muted-foreground"}>{pct}%</span>
                           </div>
                           <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
                             <div
-                              className="bg-primary h-1.5 rounded-full transition-all duration-500"
+                              className={`h-1.5 rounded-full transition-all duration-500 ${isWriting ? "bg-primary animate-pulse" : "bg-emerald-500"}`}
                               style={{ width: `${pct}%` }}
                             />
                           </div>
