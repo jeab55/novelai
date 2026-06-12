@@ -263,8 +263,17 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
                 {/* ชื่อ + คำ */}
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-[15px] truncate text-foreground">{ch.title}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
+                  <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-2">
                     <span className="font-medium text-primary/70">{(ch.word_count || 0).toLocaleString()}</span> คำ
+                    {novel?.word_count_target && (
+                      <span className={`text-xs ${
+                        (ch.word_count || 0) >= novel.word_count_target * 0.9
+                          ? "text-emerald-600 dark:text-emerald-400"
+                          : "text-amber-600 dark:text-amber-400"
+                      }`}>
+                        ({Math.round(((ch.word_count || 0) / novel.word_count_target) * 100)}% ของ {novel.word_count_target.toLocaleString()} คำ)
+                      </span>
+                    )}
                   </p>
                 </div>
                 <Badge className={`${statusColors[ch.status] || statusColors["ร่าง"]} text-xs font-medium px-2.5 py-0.5 rounded-full`}>

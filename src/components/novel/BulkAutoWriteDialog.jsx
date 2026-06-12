@@ -11,13 +11,6 @@ import { useBulkWrite } from "@/lib/BulkWriteContext";
 const DEFAULT_WRITER_PROMPT = `คุณคือนักเขียนนิยายภาษาไทยมืออาชีพที่กำลังร่างตอนใหม่ให้ผู้เขียน
 คุณต้องร่างเนื้อหาตอนที่สมบูรณ์ตามโครงที่ได้รับ รักษาสำนวนและโทนของเรื่อง ใช้ภาษาไทยที่อ่านลื่น`;
 
-const WORD_TARGETS = [
-  { label: "สั้น ~800 คำ", value: 800 },
-  { label: "กลาง ~1,200 คำ", value: 1200 },
-  { label: "ยาว ~2,000 คำ", value: 2000 },
-  { label: "ยาวมาก ~3,000 คำ", value: 3000 },
-];
-
 function buildSystemPrompt(novel, characters, worldEntries, plotEvents, prevChapters, writerPrompt) {
   let ctx = `[บทบาท]\n${writerPrompt || DEFAULT_WRITER_PROMPT}\n\n`;
 
@@ -89,7 +82,6 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
   const queryClient = useQueryClient();
   const { startJob, updateJob, finishJob } = useBulkWrite();
   const [step, setStep] = useState("settings"); // "settings" | "confirm" | "running" | "done"
-  const [wordTarget, setWordTarget] = useState(1200);
   const [progress, setProgress] = useState({ current: 0, total: 0 });
   const [log, setLog] = useState([]);
   const [currentMsg, setCurrentMsg] = useState("");
@@ -149,11 +141,56 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
   });
 
   const creditPerChapter = 30; // 6 seconds × 5 credits/second
+  const wordTarget = novel?.word_count_target || 1500;
   const chaptersWithoutContent = chapters.filter((c) => !c.content?.trim()).length;
   const totalEstimatedCredits = chaptersWithoutContent * creditPerChapter;
 
   const askOverwrite = (order, title) =>
     new Promise((resolve) => setOverwritePrompt({ order, title, resolve }));
+
+  const expandContent = async (currentContent, targetWords, chapterTitle, order, linkedEvent) => {
+    const minWords = Math.floor(targetWords * 0.9);
+    let content = currentContent;
+    let attempts = 0;
+    const maxAttempts = 3;
+
+    while (attempts < maxAttempts) {
+      const wordCount = content.split(/\s+/).filter(Boolean).length;
+      if (wordCount >= minWords) {
+        return { content, wordCount };
+      }
+
+      attempts += 1;
+      const remainingWords = targetWords - wordCount;
+      let expandPrompt = `[บทขยายเนื้อหา]\nเนื้อหาปัจจุบันมี ${wordCount} คำ แต่ต้องการ ${targetWords} คำ\n`;
+      expandPrompt += `โปรดขยายเนื้อหาโดยเพิ่ม:\n`;
+      expandPrompt += `- ฉากหรือบรรยากาศเพิ่มเติม\n`;
+      expandPrompt += `- บทสนทนาระหว่างตัวละคร\n`;
+      expandPrompt += `- รายละเอียดการกระทำหรือความคิดของตัวละคร\n`;
+      expandPrompt += `- ความขัดแย้งหรืออารมณ์เพิ่มเติม\n\n`;
+      expandPrompt += `[ตอนที่ต้องขยาย]\n`;
+      expandPrompt += `ชื่อตอน: ${chapterTitle}\n`;
+      expandPrompt += `ลำดับตอน: ${order}\n`;
+      if (linkedEvent) {
+        expandPrompt += `เหตุการณ์หลัก: ${linkedEvent.title}\n`;
+        if (linkedEvent.description) expandPrompt += `  ${linkedEvent.description}\n`;
+      }
+      expandPrompt += `\n[เนื้อหาปัจจุบัน]\n${content.substring(0, 2000)}${content.length > 2000 ? "\n...(ต่อ)" : ""}\n\n`;
+      expandPrompt += `ขยายเนื้อหาให้ครบ ${remainingWords} คำ โดยเขียนต่อจากเนื้อหาเดิม:`;
+
+      try {
+        const result = await base44.integrations.Core.InvokeLLM({ prompt: expandPrompt, model: "claude_sonnet_4_6" });
+        let expansion = typeof result === "string" ? result : (result?.text || "");
+        expansion = expansion.replace(/^```[\w]*\n?/m, "").replace(/\n?```$/m, "").trim();
+        content = content + "\n\n" + expansion;
+      } catch {
+        break;
+      }
+    }
+
+    const finalWordCount = content.split(/\s+/).filter(Boolean).length;
+    return { content, wordCount: finalWordCount };
+  };
 
   const retryChapter = async (order) => {
     const entry = log.find((l) => l.order === order);
@@ -174,13 +211,14 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
     taskPrompt += `\n\n[โจทย์ตอนที่ต้องร่าง]\n`;
     taskPrompt += `ชื่อตอน: ${entry.title}\n`;
     taskPrompt += `ลำดับตอน: ${order} จาก ${target} ตอน\n`;
-    taskPrompt += `ความยาวที่ต้องการ: ประมาณ ${wordTarget} คำ\n`;
+    const targetWords = novel?.word_count_target || 1500;
+    taskPrompt += `ความยาวที่ต้องการ: ประมาณ ${targetWords} คำ\n`;
     if (linkedEvent) {
       taskPrompt += `\nเหตุการณ์หลัก:\n• ${linkedEvent.title}`;
       if (linkedEvent.description) taskPrompt += `\n  ${linkedEvent.description}`;
       taskPrompt += `\n`;
     }
-    taskPrompt += `\nร่างตอนนี้ให้ครบ ${wordTarget} คำ:\n`;
+    taskPrompt += `\nร่างตอนนี้ให้ครบ ${targetWords} คำ:\n`;
     try {
       const result = await base44.integrations.Core.InvokeLLM({ prompt: taskPrompt, model: "claude_sonnet_4_6" });
       let text = typeof result === "string" ? result : (result?.text || "");
@@ -298,30 +336,41 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
 
       if (cancelledRef.current) break;
 
-      const wordCount = generatedContent.split(/\s+/).filter(Boolean).length;
+      // ขยายเนื้อหาถ้าจำนวนคำต่ำกว่าเป้าหมายเกิน 10%
+      const minWords = Math.floor(wordTarget * 0.9);
+      const initialWordCount = generatedContent.split(/\s+/).filter(Boolean).length;
+      let finalContent = generatedContent;
+      let finalWordCount = initialWordCount;
+
+      if (initialWordCount < minWords) {
+        setCurrentMsg(`📝 กำลังขยายตอนที่ ${i}/${target} ให้ครบ ${wordTarget.toLocaleString()} คำ...`);
+        const expanded = await expandContent(generatedContent, wordTarget, chapterTitle, i, linkedEvent);
+        finalContent = expanded.content;
+        finalWordCount = expanded.wordCount;
+      }
 
       if (existing) {
         await base44.entities.Chapter.update(existing.id, {
-          content: generatedContent,
-          word_count: wordCount,
+          content: finalContent,
+          word_count: finalWordCount,
           status: "ร่าง",
         });
-        writtenSoFar.push({ ...existing, content: generatedContent, order: i });
+        writtenSoFar.push({ ...existing, content: finalContent, order: i });
       } else {
         const newCh = await base44.entities.Chapter.create({
           novel_id: novelId,
           title: chapterTitle,
           order: i,
           status: "ร่าง",
-          content: generatedContent,
-          word_count: wordCount,
+          content: finalContent,
+          word_count: finalWordCount,
         });
-        writtenSoFar.push({ ...newCh, content: generatedContent, order: i });
+        writtenSoFar.push({ ...newCh, content: finalContent, order: i });
       }
 
       doneCountRef.current += 1;
       updateJob(novelId, { current: i, total: target, doneCount: doneCountRef.current, errorCount: errorCountRef.current });
-      setLog((l) => [...l, { order: i, title: chapterTitle, status: "done", wordCount }]);
+      setLog((l) => [...l, { order: i, title: chapterTitle, status: "done", wordCount: finalWordCount }]);
       setCurrentMsg("");
     }
 
@@ -393,6 +442,10 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
                 <span className="text-muted-foreground">จำนวนตอนเป้าหมาย</span>
                 <span className="font-semibold">{target} ตอน</span>
               </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">จำนวนคำเป้าหมายต่อตอน</span>
+                <span className="font-semibold">{wordTarget.toLocaleString()} คำ</span>
+              </div>
               {novelWriter && (
                 <div className="flex justify-between items-center">
                   <span className="text-muted-foreground">นักเขียน AI</span>
@@ -414,23 +467,17 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
               </div>
             </div>
 
-            <div>
-              <label className="text-sm font-medium mb-2 block">ความยาวต่อตอน</label>
-              <div className="grid grid-cols-2 gap-2">
-                {WORD_TARGETS.map((wt) => (
-                  <button
-                    key={wt.value}
-                    type="button"
-                    onClick={() => setWordTarget(wt.value)}
-                    className={`py-2.5 px-3 rounded-xl border text-sm font-medium transition-all ${
-                      wordTarget === wt.value
-                        ? "border-primary bg-primary/5 text-primary"
-                        : "border-border/60 hover:border-primary/30 hover:bg-muted/40"
-                    }`}
-                  >
-                    {wt.label}
-                  </button>
-                ))}
+            <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-2 text-sm">
+              <div className="flex items-start gap-2">
+                <Sparkles className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-medium text-primary mb-1">ระบบจะควบคุมจำนวนคำอัตโนมัติ</p>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    หลังสร้างเนื้อหาแต่ละตอน ระบบจะนับจำนวนคำ หากต่ำกว่าเป้าหมายเกิน 10% 
+                    AI จะเขียนขยายเพิ่มเติม (เพิ่มฉาก บทสนทนา รายละเอียด) 
+                    จนถึงจำนวนคำเป้าหมายก่อนค่อยบันทึก
+                  </p>
+                </div>
               </div>
             </div>
 

@@ -282,6 +282,18 @@ function Step1({ form, setForm, chars }) {
         </Select>
       </div>
       <div>
+        <label className="text-sm font-medium mb-1.5 block">จำนวนคำเป้าหมายต่อตอน</label>
+        <Select value={form.word_count_target.toString()} onValueChange={(v) => setForm({ ...form, word_count_target: v })}>
+          <SelectTrigger><SelectValue placeholder="เลือกจำนวนคำ" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="1000">~1,000 คำ</SelectItem>
+            <SelectItem value="1500">~1,500 คำ</SelectItem>
+            <SelectItem value="2000">~2,000 คำ</SelectItem>
+            <SelectItem value="3000">~3,000 คำ</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div>
         <div className="flex items-center justify-between mb-1.5">
           <label className="text-sm font-medium">เรื่องย่อ</label>
           {!confirmMode ? (
@@ -372,6 +384,7 @@ function Step3({ form, setForm, chars, activeWriters }) {
           <SummaryRow label="สไตล์การเขียน" value={form.writing_style} />
           <SummaryRow label="ยุคสมัย" value={form.era} />
           <SummaryRow label="จำนวนตอน" value={form.target_chapters ? `${form.target_chapters} ตอน` : null} />
+          <SummaryRow label="จำนวนคำต่อตอน" value={form.word_count_target ? `${form.word_count_target.toLocaleString()} คำ` : null} />
           <SummaryRow label="นักเขียน AI" value={writer?.name} highlight />
           {form.synopsis && (
             <div className="pt-1">
@@ -410,7 +423,7 @@ function SummaryRow({ label, value, bold, highlight }) {
 // ─── Main Wizard ──────────────────────────────────────────────────────────
 export default function CreateNovelWizard({ open, onOpenChange, activeWriters, onCreated }) {
   const [step, setStep] = useState(1);
-  const [form, setForm] = useState({ title: "", genre: "", synopsis: "", era: "", writer_id: "", target_chapters: "10", writing_style: "ทั่วไป" });
+  const [form, setForm] = useState({ title: "", genre: "", synopsis: "", era: "", writer_id: "", target_chapters: "10", writing_style: "ทั่วไป", word_count_target: "1500" });
   const [chars, setChars] = useState([emptyChar()]);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
@@ -420,7 +433,7 @@ export default function CreateNovelWizard({ open, onOpenChange, activeWriters, o
     if (!v) {
       setTimeout(() => {
         setStep(1);
-        setForm({ title: "", genre: "", synopsis: "", era: "", writer_id: "", target_chapters: "10", writing_style: "ทั่วไป" });
+        setForm({ title: "", genre: "", synopsis: "", era: "", writer_id: "", target_chapters: "10", word_count_target: "1500", writing_style: "ทั่วไป" });
         setChars([emptyChar()]);
         setError("");
       }, 300);
