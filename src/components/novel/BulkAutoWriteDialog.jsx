@@ -4,8 +4,9 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, Sparkles, X, CheckCircle2, SkipForward, AlertTriangle, Bot } from "lucide-react";
+import { Loader2, Sparkles, X, CheckCircle2, SkipForward, AlertTriangle, Bot, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
+import { useBulkWrite } from "@/lib/BulkWriteContext";
 
 const DEFAULT_WRITER_PROMPT = `คุณคือนักเขียนนิยายภาษาไทยมืออาชีพที่กำลังร่างตอนใหม่ให้ผู้เขียน
 คุณต้องร่างเนื้อหาตอนที่สมบูรณ์ตามโครงที่ได้รับ รักษาสำนวนและโทนของเรื่อง ใช้ภาษาไทยที่อ่านลื่น`;
@@ -86,6 +87,7 @@ function buildSystemPrompt(novel, characters, worldEntries, plotEvents, prevChap
 
 export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
   const queryClient = useQueryClient();
+  const { startJob, updateJob, finishJob } = useBulkWrite();
   const [step, setStep] = useState("settings"); // "settings" | "running" | "done"
   const [wordTarget, setWordTarget] = useState(1200);
   const [progress, setProgress] = useState({ current: 0, total: 0 });

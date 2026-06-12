@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Plus, BookOpen, Feather, Pencil, LogOut, Trash2, Share2, Moon, Sun } from "lucide-react";
+import { Plus, BookOpen, Feather, Pencil, LogOut, Trash2, Share2, Moon, Sun, CheckCircle2 } from "lucide-react";
 import DeleteNovelDialog from "@/components/novel/DeleteNovelDialog";
 import CreateNovelWizard from "@/components/novel/CreateNovelWizard";
 import ShareNovelDialog from "@/components/novel/ShareNovelDialog";
@@ -357,12 +357,20 @@ export default function Dashboard() {
                         )}
                       </div>
 
-                      {/* Genre badge */}
-                      {novel.genre && (
-                        <Badge className={`${genreColors[novel.genre] || "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"} text-xs mb-3 w-fit`}>
-                          {novel.genre}
-                        </Badge>
-                      )}
+                      {/* Genre + auto-written badge */}
+                      <div className="flex flex-wrap gap-1.5 mb-3">
+                        {novel.genre && (
+                          <Badge className={`${genreColors[novel.genre] || "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"} text-xs w-fit`}>
+                            {novel.genre}
+                          </Badge>
+                        )}
+                        {novel.auto_written && (
+                          <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs w-fit flex items-center gap-1">
+                            <CheckCircle2 className="w-3 h-3" />
+                            สร้างครบทุกตอน
+                          </Badge>
+                        )}
+                      </div>
 
                       {/* Title */}
                       <h3 className="font-heading font-bold text-lg leading-tight group-hover:text-primary transition-colors mb-2 pr-8">
