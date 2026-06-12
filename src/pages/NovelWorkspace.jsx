@@ -21,7 +21,7 @@ import Timeline from "@/components/novel/Timeline";
 import WriterManager from "@/components/novel/WriterManager";
 
 export default function NovelWorkspace() {
-  const novelId = window.location.pathname.split("/novel/")[1];
+  const novelId = window.location.pathname.split("/novel/")[1]?.split("/")[0];
   const [activeTab, setActiveTab] = useState("characters");
   const [pendingOpenChapter, setPendingOpenChapter] = useState(null);
   const [deleteDialog, setDeleteDialog] = useState(false);
