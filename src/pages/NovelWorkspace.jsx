@@ -33,6 +33,18 @@ export default function NovelWorkspace() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
+  // โหลดจำนวนตอนที่เขียนเสร็จ
+  const { data: chapters } = useQuery({
+    queryKey: ["chapters", novelId],
+    queryFn: () => base44.entities.Chapter.filter({ novel_id: novelId, is_deleted: false }),
+    enabled: !!novelId,
+  });
+
+  const completedCount = chapters?.filter(c => c.status === "เขียนเสร็จ").length || 0;
+  const targetCount = novel?.target_chapters || 0;
+  const progressPct = targetCount > 0 ? Math.round((completedCount / targetCount) * 100) : 0;
+  const isBulkWriting = jobs[novelId]?.status === "running";
+
   const { data: novel, isLoading } = useQuery({
     queryKey: ["novel", novelId],
     queryFn: async () => {
@@ -164,6 +176,21 @@ export default function NovelWorkspace() {
                     {novelWriter.name}
                   </span>
                 )}
+              </div>
+              {/* Progress bar */}
+              <div className="mt-2 space-y-1">
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className={isBulkWriting ? "text-primary font-medium" : "text-muted-foreground"}>
+                    {isBulkWriting ? `✍️ กำลังสร้างตอนที่ ${jobs[novelId]?.current || 0}/${targetCount}` : `เขียนแล้ว ${completedCount}/${targetCount} ตอน`}
+                  </span>
+                  <span className={isBulkWriting ? "text-primary font-semibold" : "text-muted-foreground"}>{progressPct}%</span>
+                </div>
+                <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
+                  <div
+                    className={`h-1.5 rounded-full transition-all duration-500 ${isBulkWriting ? "bg-primary animate-pulse" : "bg-emerald-500"}`}
+                    style={{ width: `${progressPct}%` }}
+                  />
+                </div>
               </div>
             </div>
           </div>
