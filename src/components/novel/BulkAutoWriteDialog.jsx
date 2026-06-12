@@ -153,24 +153,62 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
   const askOverwrite = (order, title) =>
     new Promise((resolve) => setOverwritePrompt({ order, title, resolve }));
 
-  const expandContent = async (currentContent, targetWords, chapterTitle, order, linkedEvent, novelContext) => {
-    const minWords = Math.floor(targetWords * 0.9);
-    const absoluteMinWords = 1000;
-    let content = currentContent;
-    let attempts = 0;
-    const maxAttempts = 3;
+  // นับคำไทยถูกต้องด้วย Intl.Segmenter
+  const countThaiWords = (text) => {
+    if (!text || typeof text !== "string") return 0;
+    // ใช้ segmenter สำหรับภาษาไทย
+    const segmenter = new Intl.Segmenter('th', { granularity: 'word' });
+    const segments = segmenter.segment(text);
+    let count = 0;
+    for (const { segment, isWordLike } of segments) {
+      if (isWordLike && segment.trim().length > 0) {
+        count += 1;
+      }
+    }
+    return count;
+  };
 
-    while (attempts < maxAttempts) {
-      const wordCount = content.split(/\s+/).filter(Boolean).length;
-      if (wordCount >= minWords && wordCount >= absoluteMinWords) {
+  // เรียก LLM พร้อม timeout 90 วินาที
+  const invokeLLMWithTimeout = async (prompt, timeoutMs = 90000) => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    
+    try {
+      const result = await Promise.race([
+        base44.integrations.Core.InvokeLLM({ prompt, model: "claude_sonnet_4_6" }),
+        new Promise((_, reject) => {
+          controller.signal.addEventListener('abort', () => reject(new Error('LLM timeout')));
+        })
+      ]);
+      clearTimeout(timeoutId);
+      return result;
+    } catch (err) {
+      clearTimeout(timeoutId);
+      throw err;
+    }
+  };
+
+  const expandContent = async (currentContent, targetWords, chapterTitle, order, linkedEvent, novelContext, onProgress) => {
+    let content = currentContent;
+    const maxAttempts = 2; // สูงสุด 2 รอบ แล้วออกเสมอ
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      const currentWordCount = countThaiWords(content);
+      
+      // แสดง progress
+      if (onProgress) {
+        onProgress({ attempt, maxAttempts, currentWordCount, targetWords });
+      }
+
+      // ถ้าถึง 90% ของเป้าแล้ว ให้หยุด
+      if (currentWordCount >= Math.floor(targetWords * 0.9)) {
         break;
       }
 
-      attempts += 1;
-      const remainingWords = Math.max(targetWords - wordCount, 300);
+      const remainingWords = Math.max(targetWords - currentWordCount, 300);
       
       let expandPrompt = `[ขยายเนื้อหา — เขียนต่อจากเดิม]\n`;
-      expandPrompt += `เนื้อหาปัจจุบันมี ${wordCount} คำ แต่ต้องการอย่างน้อย ${targetWords} คำ\n`;
+      expandPrompt += `เนื้อหาปัจจุบันมี ${currentWordCount} คำ แต่ต้องการอย่างน้อย ${targetWords} คำ\n`;
       expandPrompt += `โปรดเขียนเนื้อหาต่อจากเนื้อหาด้านล่าง เพิ่มอีกอย่างน้อย ${remainingWords} คำ\n\n`;
       expandPrompt += `[คำสั่ง]\n`;
       expandPrompt += `- เขียนต่อจากเนื้อหาเดิมทันที ไม่ต้องมีคำนำ\n`;
@@ -187,7 +225,7 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
       expandPrompt += `[เขียนต่อจากนี้ — อย่างน้อย ${remainingWords} คำ]:\n`;
 
       try {
-        const result = await base44.integrations.Core.InvokeLLM({ prompt: expandPrompt, model: "claude_sonnet_4_6" });
+        const result = await invokeLLMWithTimeout(expandPrompt, 90000);
         let expansion = typeof result === "string" ? result : (result?.text || "");
         expansion = expansion.replace(/^```[\w]*\n?/m, "").replace(/\n?```$/m, "").trim();
         
@@ -196,12 +234,13 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
         }
         
         content = content + "\n\n" + expansion;
-      } catch {
+      } catch (err) {
+        // Timeout หรือ error อื่นๆ — ออกเลย บันทึกเท่าที่มี
         break;
       }
     }
 
-    const finalWordCount = content.split(/\s+/).filter(Boolean).length;
+    const finalWordCount = countThaiWords(content);
     return { content, wordCount: finalWordCount };
   };
 
@@ -280,8 +319,7 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
     taskPrompt += `\n[คำสั่งสำคัญ]\n`;
     taskPrompt += `- เขียนเนื้อหาเต็มตอนเป็นร้อยแก้วนิยายภาษาไทย ความยาวอย่างน้อย ${targetWords} คำ\n`;
     taskPrompt += `- ต้องมีหลายฉาก ทั้งบทบรรยายและบทสนทนาที่ยาวพอสมควร\n`;
-    taskPrompt += `- เขียนเป็นเนื้อเรื่องต่อเนื่อง ไม่ใช่เค้าโครงหรือสรุปย่อ\n`;
-    taskPrompt += `- ห้ามสั้นกว่า 1000 คำ\n\n`;
+    taskPrompt += `- เขียนเป็นเนื้อเรื่องต่อเนื่อง ไม่ใช่เค้าโครงหรือสรุปย่อ\n\n`;
     if (linkedEvent) {
       taskPrompt += `เหตุการณ์หลัก: ${linkedEvent.title}\n`;
       if (linkedEvent.description) taskPrompt += `${linkedEvent.description}\n`;
@@ -291,7 +329,7 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
       const result = await base44.integrations.Core.InvokeLLM({ prompt: taskPrompt, model: "claude_sonnet_4_6" });
       let text = typeof result === "string" ? result : (result?.text || "");
       text = text.replace(/^```[\w]*\n?/m, "").replace(/\n?```$/m, "").trim();
-      const wordCount = text.split(/\s+/).filter(Boolean).length;
+      const wordCount = countThaiWords(text);
       const existing = allChapters.find((c) => !c.is_deleted && c.order === order);
       if (existing) {
         await base44.entities.Chapter.update(existing.id, { content: text, word_count: wordCount, status: "ร่าง" });
@@ -428,7 +466,7 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
       taskPrompt += `\n\n[โจทย์ตอนที่ต้องร่าง — เขียนเนื้อหาเต็มตอน]\n`;
       taskPrompt += `ชื่อตอน: "${chapterTitle}"\n`;
       taskPrompt += `ลำดับตอน: ${i} จาก ${target} ตอน\n`;
-      taskPrompt += `ความยาวที่ต้องการ: อย่างน้อย ${wordTarget} คำ (ขั้นต่ำ 1000 คำ)\n\n`;
+      taskPrompt += `ความยาวที่ต้องการ: อย่างน้อย ${wordTarget} คำ\n\n`;
       taskPrompt += `[คำสั่งสำคัญ — ต้องปฏิบัติตาม]\n`;
       taskPrompt += `1. เขียนเนื้อหาเต็มตอนเป็นร้อยแก้วนิยายภาษาไทย ความยาวอย่างน้อย ${wordTarget} คำ\n`;
       taskPrompt += `2. ประกอบด้วยหลายฉาก มีทั้งบทบรรยายและบทสนทนาที่ลื่นไหล\n`;
@@ -459,26 +497,34 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
 
       if (cancelledRef.current) break;
 
-      // ขยายเนื้อหาถ้าจำนวนคำต่ำกว่าเป้าหมายเกิน 10% หรือต่ำกว่า 1000 คำ
+      // ขยายเนื้อหาถ้าจำนวนคำต่ำกว่าเป้าหมายเกิน 10%
       const minWords = Math.floor(wordTarget * 0.9);
-      const absoluteMinWords = 1000;
-      const initialWordCount = generatedContent.split(/\s+/).filter(Boolean).length;
+      const initialWordCount = countThaiWords(generatedContent);
       let finalContent = generatedContent;
       let finalWordCount = initialWordCount;
 
-      if (initialWordCount < minWords || initialWordCount < absoluteMinWords) {
-        setCurrentMsg(`📝 กำลังขยายตอนที่ ${i}/${target} ให้ครบ ${wordTarget.toLocaleString()} คำ...`);
-        const expanded = await expandContent(generatedContent, wordTarget, chapterTitle, i, linkedEvent, novel);
+      if (initialWordCount < minWords) {
+        // ขยายพร้อมแสดง progress แบบ real-time
+        let expandRound = 0;
+        const expanded = await expandContent(
+          generatedContent, 
+          wordTarget, 
+          chapterTitle, 
+          i, 
+          linkedEvent, 
+          novel,
+          ({ attempt, maxAttempts, currentWordCount }) => {
+            expandRound = attempt;
+            setCurrentMsg(`📝 ขยายรอบที่ ${attempt}/${maxAttempts} — ตอนนี้ ${currentWordCount}/${wordTarget} คำ...`);
+          }
+        );
         finalContent = expanded.content;
         finalWordCount = expanded.wordCount;
       }
 
-      // ตรวจสอบว่าผ่านขั้นต่ำ 1000 คำหรือไม่
-      if (finalWordCount < absoluteMinWords) {
-        errorCountRef.current += 1;
-        setLog((l) => [...l, { order: i, title: chapterTitle, status: "error", wordCount: finalWordCount }]);
-        setCurrentMsg(`⚠️ ตอนที่ ${i} สั้นเกินไป (${finalWordCount} คำ) — ข้าม`);
-        continue;
+      // บันทึกทันที ไม่ว่าจะได้กี่คำ (แสดงคำเตือนถ้าสั้น)
+      if (finalWordCount < 500) {
+        setCurrentMsg(`⚠️ ตอนที่ ${i} สั้น (${finalWordCount} คำ) — บันทึกไว้ก่อน`);
       }
 
       if (existing) {
