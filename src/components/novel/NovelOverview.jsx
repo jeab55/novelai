@@ -67,7 +67,7 @@ export default function NovelOverview({ novel, novelId, onTabChange }) {
   const doneChapters = chapters.filter((c) => c.status === "เขียนเสร็จ" || c.status === "เผยแพร่").length;
   const targetChapters = novel?.target_chapters || 10;
   const progress = Math.min(100, Math.round((doneChapters / targetChapters) * 100));
-  const recentChapters = [...chapters].sort((a, b) => new Date(b.updated_date) - new Date(a.updated_date)).slice(0, 5);
+  const recentChapters = [...chapters].sort((a, b) => (a.order || 0) - (b.order || 0)).slice(0, 5);
 
   const shortcuts = [
     { label: "ห้องเขียน", icon: Edit3, tab: "writing", count: `${chapters.length} ตอน`, color: "from-amber-50 to-orange-50 border-amber-200/60 dark:from-amber-900/20 dark:to-orange-900/20 dark:border-amber-800/40" },
