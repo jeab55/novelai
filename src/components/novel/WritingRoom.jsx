@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import AiChapterGeneratorDialog from "./AiChapterGeneratorDialog";
 import AiDraftDialog from "./AiDraftDialog";
 import ContinuityChecker from "./ContinuityChecker";
+import BulkAutoWriteDialog from "./BulkAutoWriteDialog";
 
 const statusColors = {
   "ร่าง": "bg-amber-50 text-amber-700 border border-amber-200",
@@ -32,6 +33,7 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
   const [aiChapterGeneratorOpen, setAiChapterGeneratorOpen] = useState(false);
   const [aiDraftOpen, setAiDraftOpen] = useState(false);
   const [draftChapter, setDraftChapter] = useState(null);
+  const [bulkAutoWriteOpen, setBulkAutoWriteOpen] = useState(false);
   const queryClient = useQueryClient();
 
   // Handle chapter navigation from other tabs (e.g. AiPlotDialog draft)
@@ -96,6 +98,12 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
       novel={novel}
       novelId={novelId}
     />
+    <BulkAutoWriteDialog
+      open={bulkAutoWriteOpen}
+      onClose={() => setBulkAutoWriteOpen(false)}
+      novel={novel}
+      novelId={novelId}
+    />
     {draftChapter && (
       <AiDraftDialog
         open={aiDraftOpen}
@@ -132,6 +140,15 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
           >
             <Sparkles className="w-3.5 h-3.5" />
             AI สร้างตอน
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5 text-violet-600 border-violet-200 hover:bg-violet-50 dark:text-violet-400 dark:border-violet-800/40 dark:hover:bg-violet-950/20"
+            onClick={() => setBulkAutoWriteOpen(true)}
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            AI สร้างตอนทั้งหมด
           </Button>
           {chapters.length > 0 && (
             <Button
