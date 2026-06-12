@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Feather, PenTool, Users, Globe, Clock, Bot, Trash2, Share2, History } from "lucide-react";
+import { ArrowLeft, Feather, PenTool, Users, Globe, Clock, Bot, Trash2, Share2, History, CheckCircle2 } from "lucide-react";
 import VersionHistoryDialog from "@/components/novel/VersionHistoryDialog";
 import { saveVersion } from "@/lib/saveVersion";
 import { useNavigate } from "react-router-dom";
@@ -13,6 +13,7 @@ import DeleteNovelDialog from "@/components/novel/DeleteNovelDialog";
 import ShareNovelDialog from "@/components/novel/ShareNovelDialog";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/AuthContext";
+import { useBulkWrite } from "@/lib/BulkWriteContext";
 import WritingRoom from "@/components/novel/WritingRoom";
 import CharacterBible from "@/components/novel/CharacterBible";
 import WorldBible from "@/components/novel/WorldBible";
@@ -27,6 +28,7 @@ export default function NovelWorkspace() {
   const [shareDialog, setShareDialog] = useState(false);
   const [novelVersionOpen, setNovelVersionOpen] = useState(false);
   const { user } = useAuth();
+  const { jobs } = useBulkWrite();
   const isAdmin = user?.role === "admin";
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -142,8 +144,16 @@ export default function NovelWorkspace() {
             <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
               <Feather className="w-4 h-4 text-primary" />
             </div>
-            <div className="min-w-0">
-              <h1 className="font-heading font-semibold text-base truncate">{novel.title}</h1>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <h1 className="font-heading font-semibold text-base truncate">{novel.title}</h1>
+                {(novel.auto_written || (jobs[novelId]?.status === "done")) && (
+                  <span className="inline-flex items-center gap-1 bg-emerald-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm shrink-0">
+                    <CheckCircle2 className="w-2.5 h-2.5" />
+                    สร้างเสร็จ
+                  </span>
+                )}
+              </div>
               <div className="flex items-center gap-2 flex-wrap">
                 <p className="text-xs text-muted-foreground truncate">
                   {novel.genre}{novel.era ? ` · ${novel.era}` : ""}{novel.target_chapters ? ` · ${novel.target_chapters} ตอน` : ""}
