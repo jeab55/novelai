@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { base44 } from "@/api/base44Client";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Loader2, Users, BookOpen, Wand2, Save, X, ChevronDown, ChevronUp, Star } from "lucide-react";
+import { Loader2, Users, BookOpen, Wand2, ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "sonner";
 
 // ——— diff: paragraph-level ———
@@ -70,144 +70,77 @@ const CFG = {
   },
 };
 
-// ——— single-review card with inline diff ———
-function ReviewRevisionCard({ review, cfg, chapter, novel, characters, novelWriter, novelId, onContentUpdate }) {
-  const queryClient = useQueryClient();
+// ——— single review card ———
+// onReviseReady(segments, color, revisedText) → ส่ง diff ขึ้น ChapterEditor แบบ inline
+function ReviewRevisionCard({ review, cfg, chapter, characters, novelWriter, onReviseReady }) {
   const [loading, setLoading] = useState(false);
-  const [diffResult, setDiffResult] = useState(null);
-  const [revisedContent, setRevisedContent] = useState(null);
-  const [originalContent, setOriginalContent] = useState(null);
+  const [done, setDone] = useState(false);
 
   const handleRevise = async () => {
     if (!chapter.content?.trim()) { toast.error("ไม่มีเนื้อหาตอนให้ปรับปรุง"); return; }
     setLoading(true);
-    setDiffResult(null);
-    setRevisedContent(null);
-    setOriginalContent(null);
-    const prompt = buildSinglePrompt(novel, characters, chapter, review, cfg.label, novelWriter?.system_prompt);
+    const prompt = buildSinglePrompt(chapter.novel || {}, characters, chapter, review, cfg.label, novelWriter?.system_prompt);
     const result = await base44.integrations.Core.InvokeLLM({ prompt, model: "claude_sonnet_4_6" });
     const revised = (typeof result === "string" ? result : result?.text || "").trim();
-    setDiffResult(diffParas(chapter.content, revised));
-    setRevisedContent(revised);
-    setOriginalContent(chapter.content);
+    const segments = diffParas(chapter.content, revised);
     setLoading(false);
-    toast.success("AI แก้ไขเรียบร้อย — ตรวจสอบและกด 'บันทึก'");
-  };
-
-  const handleSave = async () => {
-    await base44.entities.Chapter.update(chapter.id, {
-      previous_content: originalContent,
-      content: revisedContent,
-      word_count: 0,
-    });
-    queryClient.invalidateQueries({ queryKey: ["chapters", novelId] });
-    onContentUpdate(revisedContent, originalContent);
-    setDiffResult(null);
-    setRevisedContent(null);
-    setOriginalContent(null);
-    toast.success("บันทึกแล้ว — เนื้อหาเดิมถูกเก็บไว้ใน 'ฉบับสำรอง'");
-  };
-
-  const handleCancel = () => {
-    setDiffResult(null);
-    setRevisedContent(null);
-    setOriginalContent(null);
+    setDone(true);
+    onReviseReady(segments, cfg.color, revised, chapter.content);
+    toast.success("AI แก้ไขแล้ว — ดูไฮไลต์ในเนื้อเรื่องด้านล่าง");
   };
 
   return (
-    <div className={`rounded-xl border ${cfg.cardBorder} ${cfg.cardBg} overflow-hidden`}>
-      {/* review content */}
-      <div className="px-3 py-2.5">
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex-1 min-w-0">
-            <span className={`text-xs font-semibold ${cfg.nameCls}`}>{review.reviewer_name}</span>
-            {review.star_rating > 0 && (
-              <span className="ml-1.5 text-[10px] text-amber-600 font-medium">
-                {"★".repeat(review.star_rating)}{"☆".repeat(5 - review.star_rating)}
-              </span>
-            )}
-            <p className="text-xs text-foreground/80 mt-0.5 leading-relaxed">{review.content}</p>
-          </div>
-          {/* ปุ่มปรับปรุง */}
-          {!diffResult && (
-            <Button
-              size="sm"
-              className={`h-7 text-[11px] gap-1 shrink-0 ${cfg.btnCls}`}
-              onClick={handleRevise}
-              disabled={loading}
-            >
-              {loading
-                ? <Loader2 className="w-3 h-3 animate-spin" />
-                : <Wand2 className="w-3 h-3" />}
-              {loading ? "กำลังแก้..." : "ปรับปรุงตามรีวิวนี้"}
-            </Button>
+    <div className={`rounded-xl border ${cfg.cardBorder} ${cfg.cardBg} px-3 py-2.5`}>
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex-1 min-w-0">
+          <span className={`text-xs font-semibold ${cfg.nameCls}`}>{review.reviewer_name}</span>
+          {review.star_rating > 0 && (
+            <span className="ml-1.5 text-[10px] text-amber-600 font-medium">
+              {"★".repeat(review.star_rating)}{"☆".repeat(5 - review.star_rating)}
+            </span>
           )}
+          <p className="text-xs text-foreground/80 mt-0.5 leading-relaxed">{review.content}</p>
         </div>
+        <Button
+          size="sm"
+          className={`h-7 text-[11px] gap-1 shrink-0 ${cfg.btnCls} ${done ? "opacity-60" : ""}`}
+          onClick={handleRevise}
+          disabled={loading || done}
+        >
+          {loading
+            ? <Loader2 className="w-3 h-3 animate-spin" />
+            : <Wand2 className="w-3 h-3" />}
+          {loading ? "กำลังแก้..." : done ? "ดูในเนื้อเรื่อง" : "ปรับปรุงตามรีวิวนี้"}
+        </Button>
       </div>
-
-      {/* diff preview */}
-      {diffResult && (
-        <div className="border-t border-border/40 px-3 py-3 space-y-2 bg-background/60">
-          <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground/70">
-            <span className="w-2 h-2 rounded-full inline-block" style={{ background: cfg.color }} />
-            ข้อความที่แก้ไข/เพิ่ม · ข้อความสีปกติ = ไม่เปลี่ยน
-          </div>
-          <div
-            className="rounded-lg border border-border/50 bg-card px-4 py-3 max-h-[40vh] overflow-y-auto text-sm leading-relaxed"
-            style={{ fontFamily: "'Sarabun', 'Noto Sans Thai', sans-serif", fontSize: "14px", lineHeight: "1.9" }}
-          >
-            {diffResult.map((seg, i) =>
-              seg.text === "" ? <br key={i} /> : seg.type === "added" ? (
-                <span key={i} style={{ color: cfg.color, fontWeight: 500 }}>
-                  {seg.text}{i < diffResult.length - 1 ? "\n" : ""}
-                </span>
-              ) : (
-                <span key={i} style={{ color: "hsl(var(--foreground))" }}>
-                  {seg.text}{i < diffResult.length - 1 ? "\n" : ""}
-                </span>
-              )
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <Button size="sm" className={`h-7 text-[11px] gap-1 ${cfg.btnCls}`} onClick={handleSave}>
-              <Save className="w-3 h-3" />บันทึกทับ
-            </Button>
-            <Button variant="ghost" size="sm" className="h-7 text-[11px] gap-1 text-muted-foreground" onClick={handleCancel}>
-              <X className="w-3 h-3" />ยกเลิก
-            </Button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
 
 // ——— grouped section ———
-function ReviewGroup({ cfgKey, reviews, chapter, novel, novelId, characters, novelWriter, onContentUpdate }) {
+function ReviewGroup({ cfgKey, reviews, chapter, characters, novelWriter, onReviseReady }) {
   const cfg = CFG[cfgKey];
   const filtered = reviews.filter((r) => r.reviewer_type === cfg.reviewerType);
   if (!filtered.length) return null;
   const Icon = cfg.icon;
 
   return (
-    <div className="space-y-2 py-2 first:pt-0">
+    <div className="space-y-1.5 py-2 first:pt-0">
       <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground px-0.5">
         <span className={`w-2 h-2 rounded-full ${cfg.dotCls}`} />
         <Icon className="w-3 h-3" style={{ color: cfg.color }} />
         {cfg.label} ({filtered.length} รีวิว) — เลือกปรับปรุงรายอัน
       </div>
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         {filtered.map((r) => (
           <ReviewRevisionCard
             key={r.id}
             review={r}
             cfg={cfg}
             chapter={chapter}
-            novel={novel}
             characters={characters}
             novelWriter={novelWriter}
-            novelId={novelId}
-            onContentUpdate={onContentUpdate}
+            onReviseReady={onReviseReady}
           />
         ))}
       </div>
@@ -216,7 +149,8 @@ function ReviewGroup({ cfgKey, reviews, chapter, novel, novelId, characters, nov
 }
 
 // ——— main export ———
-export default function ReaderReviewRevisionPanel({ chapter, novel, novelId, onContentUpdate }) {
+// onReviseReady(segments, color, revisedText, originalText) → ChapterEditor จัดการแสดงผล inline
+export default function ReaderReviewRevisionPanel({ chapter, novel, novelId, onReviseReady }) {
   const [open, setOpen] = useState(false);
 
   const { data: allReviews = [] } = useQuery({
@@ -237,6 +171,9 @@ export default function ReaderReviewRevisionPanel({ chapter, novel, novelId, onC
     queryFn: () => base44.entities.Character.filter({ novel_id: novelId }),
     enabled: open,
   });
+
+  // ใส่ novel ลงใน chapter object เพื่อส่งต่อไป prompt builder
+  const chapterWithNovel = { ...chapter, novel };
 
   const readerCount = allReviews.filter((r) => r.reviewer_type === "นักอ่าน").length;
   const editorCount = allReviews.filter((r) => r.reviewer_type === "บรรณาธิการ AI").length;
@@ -274,8 +211,8 @@ export default function ReaderReviewRevisionPanel({ chapter, novel, novelId, onC
             </p>
           ) : (
             <>
-              <ReviewGroup cfgKey="reader" reviews={allReviews} chapter={chapter} novel={novel} novelId={novelId} characters={characters} novelWriter={novelWriter} onContentUpdate={onContentUpdate} />
-              <ReviewGroup cfgKey="editor" reviews={allReviews} chapter={chapter} novel={novel} novelId={novelId} characters={characters} novelWriter={novelWriter} onContentUpdate={onContentUpdate} />
+              <ReviewGroup cfgKey="reader" reviews={allReviews} chapter={chapterWithNovel} characters={characters} novelWriter={novelWriter} onReviseReady={onReviseReady} />
+              <ReviewGroup cfgKey="editor" reviews={allReviews} chapter={chapterWithNovel} characters={characters} novelWriter={novelWriter} onReviseReady={onReviseReady} />
             </>
           )}
         </div>

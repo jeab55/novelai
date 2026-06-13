@@ -13,6 +13,7 @@ import SceneTemplateDialog from "./SceneTemplateDialog";
 import QuickNotesPanel from "./QuickNotesPanel";
 import AiEditorReviewPanel from "./AiEditorReviewPanel";
 import ReaderReviewRevisionPanel from "./ReaderReviewRevisionPanel";
+import InlineDiffViewer from "./InlineDiffViewer";
 import { saveVersion } from "@/lib/saveVersion";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -61,6 +62,8 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
   const [autoSaveStatus, setAutoSaveStatus] = useState("saved"); // "saving" | "saved"
   const [fontSize, setFontSize] = useState(19);
   const [contentWidth, setContentWidth] = useState(720);
+  // inline diff state — set เมื่อ ReaderReviewRevisionPanel ได้รับผลจาก AI
+  const [inlineDiff, setInlineDiff] = useState(null); // { segments, color, revisedText, originalText } | null
   const queryClient = useQueryClient();
 
   const { data: plotEvents = [] } = useQuery({
@@ -104,7 +107,37 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
 
   const handleSave = () => {
     setSaving(true);
+    setInlineDiff(null); // ลบไฮไลต์เมื่อบันทึก
     saveMutation.mutate({ title, content, status, word_count: wordCount, plot_event_id: plotEventId, plot_event_title: plotEventTitle, plot_event_description: plotEventDescription, plot_event_order: plotEventOrder });
+  };
+
+  // รับ diff จาก ReaderReviewRevisionPanel แล้วแสดง inline ในเนื้อเรื่อง
+  const handleReviseReady = (segments, color, revisedText, originalText) => {
+    setInlineDiff({ segments, color, revisedText, originalText });
+    // update content ให้ตรงกับ revisedText แต่ยังไม่บันทึกลง DB
+    setContent(revisedText);
+  };
+
+  // บันทึกเนื้อหาที่ AI แก้ พร้อมล้างไฮไลต์
+  const handleInlineDiffSave = async () => {
+    if (!inlineDiff) return;
+    setSaving(true);
+    await base44.entities.Chapter.update(chapter.id, {
+      previous_content: inlineDiff.originalText,
+      content: inlineDiff.revisedText,
+      word_count: countWords(inlineDiff.revisedText),
+    });
+    queryClient.invalidateQueries({ queryKey: ["chapters", novelId] });
+    setPreviousContent(inlineDiff.originalText);
+    setInlineDiff(null);
+    setSaving(false);
+    toast.success("บันทึกแล้ว — เนื้อหาเดิมถูกเก็บไว้ใน 'ฉบับสำรอง'");
+  };
+
+  // ยกเลิก diff — คืนเนื้อหาเดิม
+  const handleInlineDiffCancel = () => {
+    if (inlineDiff) setContent(inlineDiff.originalText);
+    setInlineDiff(null);
   };
 
   const handleBindEvent = () => {
@@ -528,35 +561,51 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
         chapter={{ ...chapter, title, content, plot_event_id: plotEventId, plot_event_title: plotEventTitle, plot_event_description: plotEventDescription, plot_event_order: plotEventOrder }}
         novel={novel || { title: "" }}
         novelId={novelId}
-        onContentUpdate={(revised, oldContent) => {
-          setContent(revised);
-          setPreviousContent(oldContent);
-          queryClient.invalidateQueries({ queryKey: ["chapters", novelId] });
-        }}
+        onReviseReady={handleReviseReady}
       />
       <div className="flex flex-1 overflow-hidden">
-        <div className="flex-1 overflow-auto bg-background">
-          <div className="mx-auto px-8 py-10" style={{ maxWidth: `${contentWidth}px` }}>
-            <textarea
-              value={content}
-              onChange={(e) => {
-                setContent(e.target.value);
-                setAutoSaveStatus("saving");
-                debouncedAutoSave(e.target.value);
-              }}
-              placeholder="เริ่มเขียนเรื่องราวของคุณที่นี่..."
-              className="w-full min-h-[65vh] bg-transparent border-none outline-none resize-none placeholder:text-muted-foreground/40"
-              style={{
-                fontFamily: "'Sarabun', 'Noto Sans Thai', sans-serif",
-                fontSize: `${fontSize}px`,
-                lineHeight: "1.95",
-                color: "hsl(var(--foreground))",
-              }}
+        {/* inline diff view — แทน textarea เมื่อมี diff */}
+        {inlineDiff ? (
+          <>
+            <InlineDiffViewer
+              segments={inlineDiff.segments}
+              highlightColor={inlineDiff.color}
+              fontSize={fontSize}
+              contentWidth={contentWidth}
+              onSave={handleInlineDiffSave}
+              onCancel={handleInlineDiffCancel}
+              saving={saving}
             />
-          </div>
-        </div>
-        {notesOpen && (
-          <QuickNotesPanel novelId={novelId} onClose={() => setNotesOpen(false)} />
+            {notesOpen && (
+              <QuickNotesPanel novelId={novelId} onClose={() => setNotesOpen(false)} />
+            )}
+          </>
+        ) : (
+          <>
+            <div className="flex-1 overflow-auto bg-background">
+              <div className="mx-auto px-8 py-10" style={{ maxWidth: `${contentWidth}px` }}>
+                <textarea
+                  value={content}
+                  onChange={(e) => {
+                    setContent(e.target.value);
+                    setAutoSaveStatus("saving");
+                    debouncedAutoSave(e.target.value);
+                  }}
+                  placeholder="เริ่มเขียนเรื่องราวของคุณที่นี่..."
+                  className="w-full min-h-[65vh] bg-transparent border-none outline-none resize-none placeholder:text-muted-foreground/40"
+                  style={{
+                    fontFamily: "'Sarabun', 'Noto Sans Thai', sans-serif",
+                    fontSize: `${fontSize}px`,
+                    lineHeight: "1.95",
+                    color: "hsl(var(--foreground))",
+                  }}
+                />
+              </div>
+            </div>
+            {notesOpen && (
+              <QuickNotesPanel novelId={novelId} onClose={() => setNotesOpen(false)} />
+            )}
+          </>
         )}
       </div>
     </div>
