@@ -12,6 +12,7 @@ import ChapterBalanceMeter from "./ChapterBalanceMeter";
 import SceneTemplateDialog from "./SceneTemplateDialog";
 import QuickNotesPanel from "./QuickNotesPanel";
 import AiEditorReviewPanel from "./AiEditorReviewPanel";
+import ReaderReviewRevisionPanel from "./ReaderReviewRevisionPanel";
 import { saveVersion } from "@/lib/saveVersion";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -520,6 +521,16 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
         novelId={novelId}
         onContentUpdate={(revised) => {
           setContent(revised);
+          queryClient.invalidateQueries({ queryKey: ["chapters", novelId] });
+        }}
+      />
+      <ReaderReviewRevisionPanel
+        chapter={{ ...chapter, title, content, plot_event_id: plotEventId, plot_event_title: plotEventTitle, plot_event_description: plotEventDescription, plot_event_order: plotEventOrder }}
+        novel={novel || { title: "" }}
+        novelId={novelId}
+        onContentUpdate={(revised, oldContent) => {
+          setContent(revised);
+          setPreviousContent(oldContent);
           queryClient.invalidateQueries({ queryKey: ["chapters", novelId] });
         }}
       />

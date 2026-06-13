@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, FileText, Loader2, Trash2, Download, Copy, MoreHorizontal, Clock, Sparkles } from "lucide-react";
+import { Plus, FileText, Loader2, Trash2, Download, Copy, MoreHorizontal, Clock, Sparkles, Users } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { motion, AnimatePresence } from "framer-motion";
 import ChapterEditor from "./ChapterEditor";
@@ -60,6 +60,24 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
       return all.filter((e) => !e.is_deleted);
     },
   });
+
+  // รีวิวจากนักอ่านทั้งหมด — เพื่อแสดงสัญลักษณ์ในรายการตอน
+  const { data: allReviews = [] } = useQuery({
+    queryKey: ["reviews-all", novelId],
+    queryFn: async () => {
+      // โหลดทีละตอน — ดึง reviews ของตอนที่มีอยู่
+      if (chapters.length === 0) return [];
+      const chapterIds = chapters.map((c) => c.id);
+      const reviewsList = await Promise.all(
+        chapterIds.map((id) => base44.entities.Review.filter({ chapter_id: id }))
+      );
+      return reviewsList.flat().filter((r) => r.reviewer_type === "นักอ่าน");
+    },
+    enabled: chapters.length > 0,
+  });
+
+  // set ของ chapter id ที่มีรีวิวนักอ่าน
+  const chaptersWithReaderReviews = new Set(allReviews.map((r) => r.chapter_id));
 
   const createChapter = useMutation({
     mutationFn: (data) => base44.entities.Chapter.create(data),
@@ -280,6 +298,21 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
                   {ch.status || "ร่าง"}
                 </Badge>
                 <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-all shrink-0">
+                  {chaptersWithReaderReviews.has(ch.id) && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5 h-8 text-green-700 border-green-300 hover:bg-green-50 dark:text-green-400 dark:border-green-800/40 dark:hover:bg-green-950/20"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedChapter(ch);
+                      }}
+                      title="แก้ตามรีวิวนักอ่าน"
+                    >
+                      <Users className="w-3.5 h-3.5" />
+                      แก้ตามรีวิว
+                    </Button>
+                  )}
                   <Button
                     variant="outline"
                     size="sm"
