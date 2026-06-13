@@ -111,21 +111,25 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
     saveMutation.mutate({ title, content, status, word_count: wordCount, plot_event_id: plotEventId, plot_event_title: plotEventTitle, plot_event_description: plotEventDescription, plot_event_order: plotEventOrder });
   };
 
-  // รับ diff จาก ReaderReviewRevisionPanel แล้วแสดง inline ในเนื้อเรื่อง
-  const handleReviseReady = (segments, color, revisedText, originalText) => {
-    setInlineDiff({ segments, color, revisedText, originalText });
-    // update content ให้ตรงกับ revisedText แต่ยังไม่บันทึกลง DB
-    setContent(revisedText);
+  // รับผลจาก ReaderReviewRevisionPanel:
+  //   rawText = เนื้อหาที่ AI ส่งกลับ (มี [[EDIT]] tags, ใช้แสดง highlight)
+  //   color = สีไฮไลต์
+  //   cleanText = เนื้อหาสุทธิไม่มี tags (ใช้บันทึก)
+  //   originalText = เนื้อหาก่อนแก้ (สำรองไว้)
+  const handleReviseReady = (rawText, color, cleanText, originalText) => {
+    setInlineDiff({ rawText, color, cleanText, originalText });
+    // อัปเดต content เป็น cleanText เพื่อให้ wordCount ถูกต้อง แต่ยังไม่บันทึก DB
+    setContent(cleanText);
   };
 
-  // บันทึกเนื้อหาที่ AI แก้ พร้อมล้างไฮไลต์
+  // บันทึกเนื้อหาที่ AI แก้ (cleanText ไม่มี tags) พร้อมล้างไฮไลต์
   const handleInlineDiffSave = async () => {
     if (!inlineDiff) return;
     setSaving(true);
     await base44.entities.Chapter.update(chapter.id, {
       previous_content: inlineDiff.originalText,
-      content: inlineDiff.revisedText,
-      word_count: countWords(inlineDiff.revisedText),
+      content: inlineDiff.cleanText,
+      word_count: countWords(inlineDiff.cleanText),
     });
     queryClient.invalidateQueries({ queryKey: ["chapters", novelId] });
     setPreviousContent(inlineDiff.originalText);
@@ -568,7 +572,7 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
         {inlineDiff ? (
           <>
             <InlineDiffViewer
-              segments={inlineDiff.segments}
+              rawText={inlineDiff.rawText}
               highlightColor={inlineDiff.color}
               fontSize={fontSize}
               contentWidth={contentWidth}

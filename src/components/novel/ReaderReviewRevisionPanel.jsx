@@ -5,18 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Loader2, Users, BookOpen, Wand2, ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "sonner";
 
-// ——— diff: paragraph-level ———
-function splitParas(text) {
-  return (text || "").split(/\n/).map((p) => p.trimEnd());
-}
-function diffParas(oldText, newText) {
-  const oldSet = new Set(splitParas(oldText).filter((p) => p.trim() !== ""));
-  return splitParas(newText).map((para) => ({
-    type: para.trim() === "" ? "same" : oldSet.has(para) ? "same" : "added",
-    text: para,
-  }));
-}
-
 // ——— prompt builder (single review) ———
 function buildSinglePrompt(novel, characters, chapter, review, reviewerLabel, writerSystemPrompt) {
   let ctx = `[บทบาท]\n${writerSystemPrompt || "คุณคือนักเขียนนิยายภาษาไทยมืออาชีพ"}\n\n`;
@@ -40,7 +28,9 @@ function buildSinglePrompt(novel, characters, chapter, review, reviewerLabel, wr
   ctx += `[คำสั่ง]\n`;
   ctx += `- ปรับปรุงเนื้อหาเฉพาะตามความคิดเห็นข้างต้น ไม่ต้องแก้ส่วนอื่น\n`;
   ctx += `- รักษาโครงเรื่อง ตัวละคร และสไตล์การเขียนของนักเขียน AI ประจำเรื่องไว้\n`;
-  ctx += `- ผลลัพธ์: เฉพาะเนื้อหาตอนที่ปรับปรุงแล้ว ไม่ต้องมีคำอธิบายหรือ prefix ใดๆ\n`;
+  ctx += `- ส่งคืนเนื้อหาตอนเต็ม โดยข้อความส่วนใดที่เธอแก้ไขหรือเพิ่มใหม่ตามรีวิว ให้ครอบด้วย [[EDIT]] และ [[/EDIT]] ส่วนข้อความเดิมที่ไม่เปลี่ยนห้ามครอบ\n`;
+  ctx += `- ห้ามมีคำอธิบาย prefix หรือข้อความอื่นใดนอกจากเนื้อหาตอน\n`;
+  ctx += `- ตัวอย่างรูปแบบ: "...ข้อความเดิม... [[EDIT]]ข้อความที่แก้ใหม่[[/EDIT]] ...ข้อความเดิม..."\n`;
   return ctx;
 }
 
@@ -81,11 +71,13 @@ function ReviewRevisionCard({ review, cfg, chapter, characters, novelWriter, onR
     setLoading(true);
     const prompt = buildSinglePrompt(chapter.novel || {}, characters, chapter, review, cfg.label, novelWriter?.system_prompt);
     const result = await base44.integrations.Core.InvokeLLM({ prompt, model: "claude_sonnet_4_6" });
-    const revised = (typeof result === "string" ? result : result?.text || "").trim();
-    const segments = diffParas(chapter.content, revised);
+    const rawText = (typeof result === "string" ? result : result?.text || "").trim();
+    // strip [[EDIT]] tags เพื่อได้ข้อความสุทธิสำหรับบันทึก
+    const cleanText = rawText.replace(/\[\[EDIT\]\]/g, "").replace(/\[\[\/EDIT\]\]/g, "");
     setLoading(false);
     setDone(true);
-    onReviseReady(segments, cfg.color, revised, chapter.content);
+    // ส่ง rawText (มี tags) ให้ InlineDiffViewer parse เอง, cleanText สำหรับบันทึก
+    onReviseReady(rawText, cfg.color, cleanText, chapter.content);
     toast.success("AI แก้ไขแล้ว — ดูไฮไลต์ในเนื้อเรื่องด้านล่าง");
   };
 

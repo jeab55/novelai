@@ -1,11 +1,12 @@
 /**
  * InlineDiffViewer
- * แสดงเนื้อหาที่ AI แก้แบบ inline ในพื้นที่เดียวกับ textarea
- * - ข้อความเดิมที่ไม่เปลี่ยน → สีปกติ
- * - ข้อความที่ AI เพิ่ม/แก้ใหม่ → highlight ตามสีที่กำหนด
- * รับ props:
- *   segments: Array<{ type: "same"|"added", text: string }>
- *   highlightColor: string (CSS color)
+ * แสดงเนื้อหาที่ AI แก้แบบ inline โดย parse [[EDIT]]...[[/EDIT]] tags
+ * - ข้อความนอก tag → สีปกติ
+ * - ข้อความใน [[EDIT]]...[[/EDIT]] → highlight ตามสีที่กำหนด
+ *
+ * Props:
+ *   rawText: string — เนื้อหาที่ AI ส่งกลับมา (มี [[EDIT]] tags)
+ *   highlightColor: string — CSS hex color
  *   fontSize: number
  *   contentWidth: number
  *   onSave: () => void
@@ -15,8 +16,28 @@
 import { Button } from "@/components/ui/button";
 import { Save, X } from "lucide-react";
 
+// parse rawText → array of { type: "normal"|"edit", text: string }
+function parseEditTags(rawText) {
+  if (!rawText) return [];
+  const segments = [];
+  const regex = /\[\[EDIT\]\]([\s\S]*?)\[\[\/EDIT\]\]/g;
+  let lastIndex = 0;
+  let match;
+  while ((match = regex.exec(rawText)) !== null) {
+    if (match.index > lastIndex) {
+      segments.push({ type: "normal", text: rawText.slice(lastIndex, match.index) });
+    }
+    segments.push({ type: "edit", text: match[1] });
+    lastIndex = regex.lastIndex;
+  }
+  if (lastIndex < rawText.length) {
+    segments.push({ type: "normal", text: rawText.slice(lastIndex) });
+  }
+  return segments;
+}
+
 export default function InlineDiffViewer({
-  segments,
+  rawText,
   highlightColor,
   fontSize,
   contentWidth,
@@ -24,21 +45,24 @@ export default function InlineDiffViewer({
   onCancel,
   saving = false,
 }) {
-  if (!segments) return null;
+  if (!rawText) return null;
+
+  const segments = parseEditTags(rawText);
+  const hasEdits = segments.some((s) => s.type === "edit");
 
   return (
     <div className="flex-1 overflow-auto bg-background relative">
-      {/* Banner แจ้งเตือน */}
+      {/* Banner */}
       <div
         className="sticky top-0 z-10 flex items-center gap-3 px-6 py-2 text-xs font-medium border-b"
         style={{ background: highlightColor + "18", borderColor: highlightColor + "40" }}
       >
         <span className="w-3 h-3 rounded-full shrink-0" style={{ background: highlightColor }} />
         <span style={{ color: highlightColor }}>
-          AI แก้เนื้อหาแล้ว — ตรวจสอบข้อความที่ไฮไลต์ด้านล่าง
+          AI แก้เนื้อหาแล้ว — {hasEdits ? "ข้อความไฮไลต์คือส่วนที่แก้ไข" : "ไม่พบส่วนที่ถูกทำเครื่องหมาย"}
         </span>
         <span className="text-muted-foreground/60 ml-1">
-          (สีไฮไลต์ = ส่วนที่แก้ไข/เพิ่มใหม่ · สีปกติ = ไม่เปลี่ยน)
+          (ไฮไลต์ = แก้ใหม่ · สีปกติ = ไม่เปลี่ยน)
         </span>
         <div className="ml-auto flex items-center gap-2">
           <Button
@@ -63,7 +87,7 @@ export default function InlineDiffViewer({
         </div>
       </div>
 
-      {/* เนื้อหา inline diff */}
+      {/* เนื้อหา */}
       <div className="mx-auto px-8 py-10" style={{ maxWidth: `${contentWidth}px` }}>
         <div
           style={{
@@ -75,26 +99,24 @@ export default function InlineDiffViewer({
             wordBreak: "break-word",
           }}
         >
-          {segments.map((seg, i) => {
-            if (seg.text === "") return <br key={i} />;
-            if (seg.type === "added") {
-              return (
-                <mark
-                  key={i}
-                  style={{
-                    background: highlightColor + "28",
-                    color: highlightColor,
-                    fontWeight: 500,
-                    borderRadius: "2px",
-                    padding: "0 1px",
-                  }}
-                >
-                  {seg.text}
-                </mark>
-              );
-            }
-            return <span key={i}>{seg.text}</span>;
-          })}
+          {segments.map((seg, i) =>
+            seg.type === "edit" ? (
+              <mark
+                key={i}
+                style={{
+                  background: highlightColor + "28",
+                  color: highlightColor,
+                  fontWeight: 500,
+                  borderRadius: "2px",
+                  padding: "0 1px",
+                }}
+              >
+                {seg.text}
+              </mark>
+            ) : (
+              <span key={i}>{seg.text}</span>
+            )
+          )}
         </div>
       </div>
     </div>
