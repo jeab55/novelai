@@ -3,7 +3,7 @@ import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Save, Loader2, Download, Copy, MoreHorizontal, Maximize2, Minimize2, Sparkles, Clock, X, RefreshCw, Volume2, History, PieChart, FileText, StickyNote, CheckCircle2, Type, AlignJustify } from "lucide-react";
+import { ArrowLeft, Save, Loader2, Download, Copy, MoreHorizontal, Maximize2, Minimize2, Sparkles, Clock, X, RefreshCw, Volume2, History, PieChart, FileText, StickyNote, CheckCircle2, Type, AlignJustify, ShieldCheck } from "lucide-react";
 import AiDraftDialog from "./AiDraftDialog";
 import EditorReviewPanel from "./EditorReviewPanel";
 import TextToSpeechPanel from "./TextToSpeechPanel";
@@ -14,6 +14,7 @@ import QuickNotesPanel from "./QuickNotesPanel";
 import AiEditorReviewPanel from "./AiEditorReviewPanel";
 import ReaderReviewRevisionPanel from "./ReaderReviewRevisionPanel";
 import InlineDiffViewer from "./InlineDiffViewer";
+import HistoricalFactCheckPanel from "./HistoricalFactCheckPanel";
 import { saveVersion } from "@/lib/saveVersion";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -63,7 +64,8 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
   const [fontSize, setFontSize] = useState(19);
   const [contentWidth, setContentWidth] = useState(720);
   // inline diff state — set เมื่อ ReaderReviewRevisionPanel ได้รับผลจาก AI
-  const [inlineDiff, setInlineDiff] = useState(null); // { segments, color, revisedText, originalText } | null
+  const [inlineDiff, setInlineDiff] = useState(null); // { rawText, color, cleanText, originalText } | null
+  const [factCheckOpen, setFactCheckOpen] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: plotEvents = [] } = useQuery({
@@ -288,6 +290,18 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
         >
           <StickyNote className="w-3.5 h-3.5" />
           โน้ต
+        </Button>
+
+        {/* Historical Fact Check button */}
+        <Button
+          variant="outline"
+          size="sm"
+          className={`gap-1.5 h-8 text-xs border-indigo-300 hover:bg-indigo-50 ${factCheckOpen ? "bg-indigo-100 text-indigo-800" : "text-indigo-700"}`}
+          onClick={() => setFactCheckOpen((v) => !v)}
+          title="ตรวจข้อเท็จจริงทางประวัติศาสตร์"
+        >
+          <ShieldCheck className="w-3.5 h-3.5" />
+          ตรวจข้อเท็จจริง
         </Button>
 
         {/* AI Draft button */}
@@ -567,6 +581,13 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
         novelId={novelId}
         onReviseReady={handleReviseReady}
       />
+      {factCheckOpen && (
+        <HistoricalFactCheckPanel
+          content={content}
+          novel={novel || { title: "" }}
+          onClose={() => setFactCheckOpen(false)}
+        />
+      )}
       <div className="flex flex-1 overflow-hidden">
         {/* inline diff view — แทน textarea เมื่อมี diff */}
         {inlineDiff ? (
