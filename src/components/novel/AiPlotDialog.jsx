@@ -489,15 +489,21 @@ export default function AiPlotDialog({ open, onClose, novel, novelId, onOpenChap
                 <br />แล้ววางโครงเรื่อง 3 องก์ พร้อมไทม์ไลน์เหตุการณ์หลัก
                 <br /><span className="text-primary/80 font-medium">และสร้างตัวละครหลักของเรื่องให้ในครั้งเดียว</span>
               </p>
-              {writer && (
-                <p className="text-xs text-primary/80 bg-primary/5 border border-primary/20 rounded-lg px-3 py-2 inline-block">
-                  ✍️ ใช้สไตล์ของ <strong>{writer.name}</strong>
-                </p>
+              {writer ? (
+                <Button
+                  onClick={generate}
+                  variant="outline"
+                  className="gap-2 mt-2 border-primary/30 text-primary hover:bg-primary/5"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  ใช้สไตล์ของ <strong>{writer.name}</strong>
+                </Button>
+              ) : (
+                <Button onClick={generate} className="gap-2 mt-2">
+                  <Sparkles className="w-4 h-4" />
+                  เริ่มวางพล็อต
+                </Button>
               )}
-              <Button onClick={generate} disabled={step === "generating"} className="gap-2 mt-2">
-                <Sparkles className="w-4 h-4" />
-                เริ่มวางพล็อต
-              </Button>
             </div>
           )}
 
