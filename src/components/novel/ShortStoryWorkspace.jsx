@@ -70,6 +70,7 @@ export default function ShortStoryWorkspace({ novelId, novel }) {
   const [aiAction, setAiAction] = useState(null); // null | action id
   const [aiLoading, setAiLoading] = useState(false);
   const [aiResult, setAiResult] = useState(null); // {text, action}
+  const [continueHint, setContinueHint] = useState("");
   const [exportOpen, setExportOpen] = useState(false);
 
   // Sync chapter content → local state
@@ -154,7 +155,10 @@ export default function ShortStoryWorkspace({ novelId, novel }) {
       prompt += `[คำสั่ง: ตัดให้กระชับ]\nรับข้อความด้านล่าง แล้วตัดทอนให้สั้นลงประมาณ 30% โดย:\n- ลบส่วนที่เยิ่นเย้อหรือซ้ำซ้อน\n- รักษาจุดพีค อารมณ์สำคัญ และเส้นเรื่อง\n- ทุกประโยคที่เหลือต้องมีความหมาย\nส่งกลับเฉพาะเนื้อหาที่ตัดแล้ว ไม่มีคำอธิบาย:\n\n${contentSnippet}`;
     } else if (actionId === "continue") {
       const tail = content.substring(Math.max(0, content.length - 800));
-      prompt += `[คำสั่ง: เขียนต่อ]\nเนื้อเรื่องปัจจุบันจบที่:\n\n${tail}\n\n---\nเขียนต่อจากนี้อีกประมาณ 300-500 คำ รักษาโทนและสไตล์ของเรื่อง ส่งกลับเฉพาะเนื้อหาที่เขียนต่อ ไม่มีคำอธิบาย:`;
+      const hintSection = continueHint.trim()
+        ? `\n\nทิศทาง/เนื้อหาที่ผู้ใช้ต้องการ:\n${continueHint.trim()}\n\nให้นำทิศทางนี้มาผสมกลมกลืนกับเนื้อเรื่องเดิมอย่างเป็นธรรมชาติ`
+        : "";
+      prompt += `[คำสั่ง: เขียนต่อ]\nเนื้อเรื่องปัจจุบันจบที่:\n\n${tail}${hintSection}\n\n---\nเขียนต่อจากนี้อีกประมาณ 300-500 คำ รักษาโทน สไตล์ และตัวละครเดิม ส่งกลับเฉพาะเนื้อหาที่เขียนต่อ ไม่มีคำอธิบาย:`;
     }
 
     const res = await base44.integrations.Core.InvokeLLM({ prompt, model: "claude_sonnet_4_6" });
@@ -277,6 +281,17 @@ export default function ShortStoryWorkspace({ novelId, novel }) {
               <span className="font-medium">{a.label}</span>
             </button>
           ))}
+        </div>
+
+        {/* Continue hint input */}
+        <div className="mt-2 px-1">
+          <Textarea
+            value={continueHint}
+            onChange={(e) => setContinueHint(e.target.value)}
+            placeholder="(ไม่บังคับ) บอกทิศทางที่ต้องการ เช่น 'ให้สองคนทะเลาะกัน' หรือวางเนื้อเรื่องที่อยากให้เขียนต่อจาก..."
+            className="min-h-[60px] text-xs resize-none border-dashed"
+            rows={2}
+          />
         </div>
 
         {/* AI result preview */}
