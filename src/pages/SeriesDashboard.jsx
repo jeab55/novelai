@@ -1,10 +1,12 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { BookOpen, Layers, FileEdit, ChevronDown, ChevronUp } from "lucide-react";
+import { BookOpen, Layers, FileEdit, ChevronDown, ChevronUp, MoreVertical, ImagePlus } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/lib/AuthContext";
@@ -26,6 +28,9 @@ export default function SeriesDashboard() {
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
   const [selectedNovelId, setSelectedNovelId] = useState(null);
+  const queryClient = useQueryClient();
+  const coverInputRef = useRef(null);
+  const [uploadingFor, setUploadingFor] = useState(null);
 
   const { data: novels = [], isLoading } = useQuery({
     queryKey: ["novels-for-series", user?.id],
@@ -46,6 +51,15 @@ export default function SeriesDashboard() {
     queryKey: ["episodes-all"],
     queryFn: () => base44.entities.Episode.list(),
   });
+
+  const handleCoverUpload = async (novelId, file) => {
+    if (!file) return;
+    setUploadingFor(novelId);
+    const { file_url } = await base44.integrations.Core.UploadFile({ file });
+    await base44.entities.Novel.update(novelId, { cover_url: file_url });
+    queryClient.invalidateQueries({ queryKey: ["novels-for-series"] });
+    setUploadingFor(null);
+  };
 
   const getNovelEpisodes = (novelId) =>
     episodes
@@ -121,7 +135,30 @@ export default function SeriesDashboard() {
                         <BookOpen className="w-12 h-12 text-white/60" />
                       </div>
                     )}
-                    {novel.genre && (
+                    {/* 3-dot menu */}
+                  <div className="absolute top-2 left-2" onClick={(e) => e.stopPropagation()}>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button className="w-7 h-7 rounded-lg bg-black/40 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/60 transition-colors">
+                          <MoreVertical className="w-3.5 h-3.5" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start">
+                        <DropdownMenuItem
+                          className="gap-2 cursor-pointer"
+                          onClick={() => {
+                            coverInputRef.current.dataset.novelid = novel.id;
+                            coverInputRef.current.click();
+                          }}
+                        >
+                          <ImagePlus className="w-4 h-4" />
+                          {uploadingFor === novel.id ? "กำลังอัปโหลด..." : "เปลี่ยนรูปปก"}
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+
+                  {novel.genre && (
                       <div className="absolute bottom-3 left-3">
                         <span className="inline-flex items-center text-xs font-medium px-2.5 py-1 rounded-full bg-black/40 text-white backdrop-blur-sm">
                           {novel.genre}
@@ -219,6 +256,20 @@ export default function SeriesDashboard() {
           </div>
         )}
       </div>
+
+      {/* Hidden file input for cover upload */}
+      <input
+        ref={coverInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          const novelId = e.target.dataset.novelid;
+          if (file && novelId) handleCoverUpload(novelId, file);
+          e.target.value = "";
+        }}
+      />
     </AppLayout>
   );
 }
