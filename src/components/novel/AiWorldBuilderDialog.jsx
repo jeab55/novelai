@@ -235,18 +235,20 @@ export default function AiWorldBuilderDialog({ open, onClose, novel, novelId }) 
                 <br />แล้วสร้างฐานข้อมูลโลก/ฉาก ครอบคลุมทุกหมวด
                 <br /><span className="text-primary/80 font-medium">พร้อมผูกสถานที่กับไทม์ไลน์อัตโนมัติ</span>
               </p>
-              {writer && (
-                <p className="text-xs text-primary/80 bg-primary/5 border border-primary/20 rounded-lg px-3 py-2 inline-block">
-                  ✍️ ใช้สไตล์ของ <strong>{writer.name}</strong>
-                </p>
-              )}
               {existingEntries.length > 0 && (
                 <p className="text-xs text-muted-foreground">มีข้อมูลโลก/ฉากอยู่แล้ว {existingEntries.length} รายการ — รายการซ้ำจะติดป้าย "มีอยู่แล้ว" และไม่ถูกบันทึกซ้ำ</p>
               )}
-              <Button onClick={generate} className="gap-2 mt-2">
-                <Sparkles className="w-4 h-4" />
-                เริ่มสร้างโลก/ฉาก
-              </Button>
+              {writer ? (
+                <Button onClick={generate} variant="outline" className="gap-2 mt-2 border-primary/30 text-primary hover:bg-primary/5">
+                  <Sparkles className="w-4 h-4" />
+                  ใช้สไตล์ของ <strong>{writer.name}</strong>
+                </Button>
+              ) : (
+                <Button onClick={generate} className="gap-2 mt-2">
+                  <Sparkles className="w-4 h-4" />
+                  เริ่มสร้างโลก/ฉาก
+                </Button>
+              )}
             </div>
           )}
 
