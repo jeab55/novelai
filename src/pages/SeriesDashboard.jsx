@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { BookOpen, Layers, X, FileEdit, Eye } from "lucide-react";
+import { BookOpen, Layers, FileEdit, ChevronDown, ChevronUp } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/lib/AuthContext";
@@ -25,7 +25,7 @@ const genreColors = {
 export default function SeriesDashboard() {
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
-  const [selectedNovel, setSelectedNovel] = useState(null);
+  const [selectedNovelId, setSelectedNovelId] = useState(null);
 
   const { data: novels = [], isLoading } = useQuery({
     queryKey: ["novels-for-series", user?.id],
@@ -51,10 +51,6 @@ export default function SeriesDashboard() {
     episodes
       .filter((e) => String(e.novel_id) === String(novelId))
       .sort((a, b) => (a.episode_number || 0) - (b.episode_number || 0));
-
-  const getEpisodeCount = (novelId) => getNovelEpisodes(novelId).length;
-
-  const selectedEpisodes = selectedNovel ? getNovelEpisodes(selectedNovel.id) : [];
 
   return (
     <AppLayout>
@@ -95,153 +91,131 @@ export default function SeriesDashboard() {
             </Link>
           </motion.div>
         ) : (
-          <div className="flex gap-6">
-            {/* Novel grid */}
-            <div className={`grid gap-5 transition-all duration-300 ${selectedNovel ? "grid-cols-1 sm:grid-cols-2 flex-1" : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 w-full"}`}>
-              {novels.map((novel, i) => {
-                const gradient = genreColors[novel.genre] || "from-gray-400 to-slate-500";
-                const epCount = getEpisodeCount(novel.id);
-                const isSelected = selectedNovel?.id === novel.id;
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {novels.map((novel, i) => {
+              const gradient = genreColors[novel.genre] || "from-gray-400 to-slate-500";
+              const novelEpisodes = getNovelEpisodes(novel.id);
+              const isOpen = selectedNovelId === novel.id;
 
-                return (
-                  <motion.div
-                    key={novel.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.05 }}
-                    onClick={() => setSelectedNovel(isSelected ? null : novel)}
-                  >
-                    <div className={`group bg-card border rounded-2xl overflow-hidden hover:shadow-xl hover:shadow-primary/5 transition-all duration-300 cursor-pointer flex flex-col h-full ${
-                      isSelected ? "border-primary/50 ring-2 ring-primary/20 shadow-lg" : "border-border/60 hover:border-primary/25"
-                    }`}>
-                      <div className="relative h-44 overflow-hidden">
-                        {novel.cover_url ? (
-                          <img
-                            src={novel.cover_url}
-                            alt={novel.title}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                          />
-                        ) : (
-                          <div className={`w-full h-full bg-gradient-to-br ${gradient} flex items-center justify-center`}>
-                            <BookOpen className="w-12 h-12 text-white/60" />
-                          </div>
-                        )}
-                        {novel.genre && (
-                          <div className="absolute bottom-3 left-3">
-                            <span className="inline-flex items-center text-xs font-medium px-2.5 py-1 rounded-full bg-black/40 text-white backdrop-blur-sm">
-                              {novel.genre}
-                            </span>
-                          </div>
-                        )}
-                        <div className="absolute top-3 right-3">
-                          <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full border backdrop-blur-sm bg-white/90 text-primary border-primary/20">
-                            {epCount} ตอน
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="p-5 flex flex-col flex-1">
-                        <h3 className="font-heading font-bold text-base leading-tight group-hover:text-primary transition-colors mb-2 line-clamp-2">
-                          {novel.title}
-                        </h3>
-                        {novel.synopsis && (
-                          <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed flex-1">
-                            {novel.synopsis}
-                          </p>
-                        )}
-                        <div className="mt-4 pt-4 border-t border-border/40 flex items-center justify-between">
-                          <Badge variant="outline" className="text-xs font-normal">
-                            {novel.status || "กำลังเขียน"}
-                          </Badge>
-                          <span className="text-xs text-muted-foreground">
-                            {new Date(novel.created_date).toLocaleDateString("th-TH")}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </div>
-
-            {/* Episode panel */}
-            <AnimatePresence>
-              {selectedNovel && (
+              return (
                 <motion.div
-                  initial={{ opacity: 0, x: 30, width: 0 }}
-                  animate={{ opacity: 1, x: 0, width: 320 }}
-                  exit={{ opacity: 0, x: 30, width: 0 }}
-                  transition={{ duration: 0.25, ease: "easeInOut" }}
-                  className="shrink-0 overflow-hidden"
-                  style={{ width: 320 }}
+                  key={novel.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.05 }}
+                  className={`bg-card border rounded-2xl overflow-hidden transition-all duration-300 cursor-pointer flex flex-col ${
+                    isOpen ? "border-primary/50 ring-2 ring-primary/20 shadow-lg" : "border-border/60 hover:shadow-xl hover:shadow-primary/5 hover:border-primary/25"
+                  }`}
+                  onClick={() => setSelectedNovelId(isOpen ? null : novel.id)}
                 >
-                  <div className="bg-card border border-border/60 rounded-2xl overflow-hidden h-full flex flex-col" style={{ minHeight: 400 }}>
-                    {/* Panel header */}
-                    <div className="flex items-center justify-between px-5 py-4 border-b border-border/40">
-                      <div className="min-w-0 flex-1 pr-2">
-                        <h3 className="font-heading font-bold text-sm leading-tight truncate">{selectedNovel.title}</h3>
-                        <p className="text-xs text-muted-foreground mt-0.5">{selectedEpisodes.length} ตอน</p>
+                  {/* Cover */}
+                  <div className="relative h-44 overflow-hidden">
+                    {novel.cover_url ? (
+                      <img
+                        src={novel.cover_url}
+                        alt={novel.title}
+                        className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
+                      />
+                    ) : (
+                      <div className={`w-full h-full bg-gradient-to-br ${gradient} flex items-center justify-center`}>
+                        <BookOpen className="w-12 h-12 text-white/60" />
                       </div>
-                      <button
-                        onClick={() => setSelectedNovel(null)}
-                        className="p-1 rounded-lg hover:bg-accent transition-colors text-muted-foreground hover:text-foreground shrink-0"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-
-                    {/* Episode list */}
-                    <div className="flex-1 overflow-y-auto p-3 space-y-1.5">
-                      {selectedEpisodes.length === 0 ? (
-                        <div className="text-center py-10">
-                          <p className="text-sm text-muted-foreground">ยังไม่มีตอน</p>
-                          <Link to={`/series/${selectedNovel.id}`}>
-                            <Button size="sm" variant="outline" className="mt-3 gap-1.5 text-xs">
-                              เพิ่มตอนแรก
-                            </Button>
-                          </Link>
-                        </div>
-                      ) : (
-                        selectedEpisodes.map((ep) => (
-                          <Link
-                            key={ep.id}
-                            to={`/series/${selectedNovel.id}/episode/${ep.id}`}
-                            className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-accent/50 transition-colors group block"
-                          >
-                            <span className="w-7 h-7 rounded-lg bg-primary/10 text-primary text-xs font-bold flex items-center justify-center shrink-0">
-                              {ep.episode_number}
-                            </span>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium leading-tight truncate">{ep.title}</p>
-                              {ep.word_count > 0 && (
-                                <p className="text-xs text-muted-foreground mt-0.5">{ep.word_count.toLocaleString()} คำ</p>
-                              )}
-                            </div>
-                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium border shrink-0 ${
-                              ep.status === "published"
-                                ? "bg-emerald-100 text-emerald-700 border-emerald-200"
-                                : "bg-muted text-muted-foreground border-border"
-                            }`}>
-                              {ep.status === "published" ? "เผยแพร่" : "ร่าง"}
-                            </span>
-                          </Link>
-                        ))
-                      )}
-                    </div>
-
-                    {/* Panel footer */}
-                    <div className="px-4 py-3 border-t border-border/40">
-                      <Link to={`/series/${selectedNovel.id}`}>
-                        <Button size="sm" variant="outline" className="w-full gap-1.5 text-xs">
-                          <FileEdit className="w-3.5 h-3.5" />
-                          จัดการตอนทั้งหมด
-                        </Button>
-                      </Link>
+                    )}
+                    {novel.genre && (
+                      <div className="absolute bottom-3 left-3">
+                        <span className="inline-flex items-center text-xs font-medium px-2.5 py-1 rounded-full bg-black/40 text-white backdrop-blur-sm">
+                          {novel.genre}
+                        </span>
+                      </div>
+                    )}
+                    <div className="absolute top-3 right-3">
+                      <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full border backdrop-blur-sm bg-white/90 text-primary border-primary/20">
+                        {novelEpisodes.length} ตอน
+                      </span>
                     </div>
                   </div>
+
+                  {/* Info */}
+                  <div className="p-5 flex flex-col flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <h3 className="font-heading font-bold text-base leading-tight mb-2 line-clamp-2 flex-1">
+                        {novel.title}
+                      </h3>
+                      {isOpen ? <ChevronUp className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" /> : <ChevronDown className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />}
+                    </div>
+                    {novel.synopsis && !isOpen && (
+                      <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed flex-1">
+                        {novel.synopsis}
+                      </p>
+                    )}
+                    <div className="mt-4 pt-4 border-t border-border/40 flex items-center justify-between">
+                      <Badge variant="outline" className="text-xs font-normal">
+                        {novel.status || "กำลังเขียน"}
+                      </Badge>
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(novel.created_date).toLocaleDateString("th-TH")}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Episode list — expands inside the card */}
+                  <AnimatePresence initial={false}>
+                    {isOpen && (
+                      <motion.div
+                        key="eps"
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.22, ease: "easeInOut" }}
+                        className="overflow-hidden"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div className="border-t border-border/40 px-4 pb-4 pt-2 space-y-1 bg-muted/20">
+                          {novelEpisodes.length === 0 ? (
+                            <div className="text-center py-4">
+                              <p className="text-xs text-muted-foreground mb-2">ยังไม่มีตอน</p>
+                              <Link to={`/series/${novel.id}`}>
+                                <Button size="sm" variant="outline" className="text-xs h-7">เพิ่มตอนแรก</Button>
+                              </Link>
+                            </div>
+                          ) : (
+                            <>
+                              {novelEpisodes.map((ep) => (
+                                <Link
+                                  key={ep.id}
+                                  to={`/series/${novel.id}/episode/${ep.id}`}
+                                  className="flex items-center gap-2.5 px-2 py-2 rounded-lg hover:bg-accent/60 transition-colors group"
+                                >
+                                  <span className="w-6 h-6 rounded-md bg-primary/10 text-primary text-xs font-bold flex items-center justify-center shrink-0">
+                                    {ep.episode_number}
+                                  </span>
+                                  <span className="flex-1 text-sm truncate">{ep.title}</span>
+                                  <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium border shrink-0 ${
+                                    ep.status === "published"
+                                      ? "bg-emerald-100 text-emerald-700 border-emerald-200"
+                                      : "bg-muted text-muted-foreground border-border"
+                                  }`}>
+                                    {ep.status === "published" ? "เผยแพร่" : "ร่าง"}
+                                  </span>
+                                </Link>
+                              ))}
+                              <div className="pt-2">
+                                <Link to={`/series/${novel.id}`}>
+                                  <Button size="sm" variant="ghost" className="w-full text-xs h-7 gap-1.5 text-muted-foreground">
+                                    <FileEdit className="w-3 h-3" />
+                                    จัดการตอนทั้งหมด
+                                  </Button>
+                                </Link>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </motion.div>
-              )}
-            </AnimatePresence>
+              );
+            })}
           </div>
         )}
       </div>
