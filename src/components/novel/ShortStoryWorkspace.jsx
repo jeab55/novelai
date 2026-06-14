@@ -1,14 +1,15 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Sparkles, Save, Users, ChevronDown, ChevronUp, Wand2, Scissors, ArrowRight, Expand, CheckCircle2, Bot } from "lucide-react";
+import { Loader2, Sparkles, Save, Users, ChevronDown, ChevronUp, Scissors, ArrowRight, Expand, CheckCircle2, Bot, Download } from "lucide-react";
 import { toast } from "sonner";
 import { saveVersion } from "@/lib/saveVersion";
 import { useAuth } from "@/lib/AuthContext";
+import ExportDialog from "./ExportDialog";
 
 const countThaiWords = (text) => {
   if (!text) return 0;
@@ -69,6 +70,7 @@ export default function ShortStoryWorkspace({ novelId, novel }) {
   const [aiAction, setAiAction] = useState(null); // null | action id
   const [aiLoading, setAiLoading] = useState(false);
   const [aiResult, setAiResult] = useState(null); // {text, action}
+  const [exportOpen, setExportOpen] = useState(false);
 
   // Sync chapter content → local state
   useEffect(() => {
@@ -175,6 +177,8 @@ export default function ShortStoryWorkspace({ novelId, novel }) {
   }
 
   return (
+    <>
+    <ExportDialog open={exportOpen} onOpenChange={setExportOpen} novel={novel} chapters={chapter ? [{ ...chapter, content }] : []} />
     <div className="max-w-4xl mx-auto px-4 py-6 space-y-4">
       {/* Word count progress */}
       <div className="bg-card border border-border/60 rounded-xl px-4 py-3 space-y-1.5">
@@ -196,6 +200,9 @@ export default function ShortStoryWorkspace({ novelId, novel }) {
                 <Bot className="w-3 h-3" />{writerRecord.name}
               </span>
             )}
+            <Button size="sm" variant="outline" className="h-7 gap-1 text-xs" onClick={() => setExportOpen(true)}>
+              <Download className="w-3 h-3" />ส่งออก
+            </Button>
           </div>
         </div>
         <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
@@ -301,5 +308,6 @@ export default function ShortStoryWorkspace({ novelId, novel }) {
         </div>
       )}
     </div>
+    </>
   );
 }

@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Plus, FileText, Loader2, Trash2, Download, Copy, MoreHorizontal, Clock, Sparkles, Users, BookOpen } from "lucide-react";
+import ExportDialog from "./ExportDialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { motion, AnimatePresence } from "framer-motion";
 import ChapterEditor from "./ChapterEditor";
@@ -34,6 +35,7 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
   const [aiDraftOpen, setAiDraftOpen] = useState(false);
   const [draftChapter, setDraftChapter] = useState(null);
   const [bulkAutoWriteOpen, setBulkAutoWriteOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
   const queryClient = useQueryClient();
 
   // Handle chapter navigation from other tabs (e.g. AiPlotDialog draft)
@@ -114,6 +116,7 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
 
   return (
     <>
+    <ExportDialog open={exportOpen} onOpenChange={setExportOpen} novel={novel} chapters={chapters} />
     <AiChapterGeneratorDialog
       open={aiChapterGeneratorOpen}
       onClose={() => setAiChapterGeneratorOpen(false)}
@@ -177,10 +180,10 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
               variant="outline"
               size="sm"
               className="gap-1.5 text-muted-foreground"
-              onClick={() => downloadAllChaptersMd(novel?.title || "novel", chapters)}
+              onClick={() => setExportOpen(true)}
             >
               <Download className="w-3.5 h-3.5" />
-              ส่งออกทั้งเรื่อง
+              ส่งออก
             </Button>
           )}
           <Dialog open={newChapterOpen} onOpenChange={setNewChapterOpen}>
