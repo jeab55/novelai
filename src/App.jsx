@@ -16,6 +16,9 @@ import NovelWorkspace from '@/pages/NovelWorkspace';
 import Trash from '@/pages/Trash';
 import PublicNovelView from '@/pages/PublicNovelView';
 import Settings from '@/pages/Settings';
+import SeriesDashboard from '@/pages/SeriesDashboard';
+import SeriesDetail from '@/pages/SeriesDetail';
+import EpisodeEditor from '@/pages/EpisodeEditor';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -49,6 +52,9 @@ const AuthenticatedApp = () => {
         <Route path="/novel/:id" element={<NovelWorkspace />} />
         <Route path="/trash" element={<Trash />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/series" element={<SeriesDashboard />} />
+        <Route path="/series/:id" element={<SeriesDetail />} />
+        <Route path="/series/:seriesId/episode/:episodeId" element={<EpisodeEditor />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>
