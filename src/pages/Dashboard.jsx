@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, BookOpen, Feather, Pencil, LogOut, Trash2, Share2, Moon, Sun, CheckCircle2, Settings } from "lucide-react";
 import DeleteNovelDialog from "@/components/novel/DeleteNovelDialog";
 import CreateNovelWizard from "@/components/novel/CreateNovelWizard";
+import ShortStoryCreatorDialog from "@/components/novel/ShortStoryCreatorDialog";
 import ShareNovelDialog from "@/components/novel/ShareNovelDialog";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
@@ -47,6 +48,7 @@ function useDarkMode() {
 export default function Dashboard() {
   const [dark, setDark] = useDarkMode();
   const [open, setOpen] = useState(false);
+  const [shortStoryOpen, setShortStoryOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [editForm, setEditForm] = useState({});
   const [editingId, setEditingId] = useState(null);
@@ -186,10 +188,15 @@ export default function Dashboard() {
             <Button variant="ghost" size="icon" onClick={() => logout()} title="ออกจากระบบ" className="text-muted-foreground hover:text-foreground">
               <LogOut className="w-4 h-4" />
             </Button>
+            <Button variant="outline" className="gap-2 font-body border-sky-300 text-sky-700 hover:bg-sky-50" onClick={() => setShortStoryOpen(true)}>
+                <BookOpen className="w-4 h-4" />
+                เรื่องสั้น AI
+              </Button>
             <Button className="gap-2 font-body" onClick={() => setOpen(true)}>
                 <Plus className="w-4 h-4" />
                 สร้างเรื่องใหม่
               </Button>
+            <ShortStoryCreatorDialog open={shortStoryOpen} onOpenChange={setShortStoryOpen} />
             <CreateNovelWizard
               open={open}
               onOpenChange={setOpen}

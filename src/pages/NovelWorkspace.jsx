@@ -19,6 +19,7 @@ import CharacterBible from "@/components/novel/CharacterBible";
 import WorldBible from "@/components/novel/WorldBible";
 import Timeline from "@/components/novel/Timeline";
 import WriterManager from "@/components/novel/WriterManager";
+import ShortStoryWorkspace from "@/components/novel/ShortStoryWorkspace";
 
 export default function NovelWorkspace() {
   const novelId = window.location.pathname.split("/novel/")[1]?.split("/")[0];
@@ -178,21 +179,23 @@ export default function NovelWorkspace() {
                   </span>
                 )}
               </div>
-              {/* Progress bar */}
-              <div className="mt-2 space-y-1">
-                <div className="flex items-center justify-between text-[11px]">
-                  <span className={isBulkWriting ? "text-primary font-medium" : "text-muted-foreground"}>
-                    {isBulkWriting ? `✍️ กำลังสร้างตอนที่ ${jobs[novelId]?.current || 0}/${targetCount}` : `เขียนแล้ว ${completedCount}/${targetCount} ตอน`}
-                  </span>
-                  <span className={isBulkWriting ? "text-primary font-semibold" : "text-muted-foreground"}>{progressPct}%</span>
+              {/* Progress bar — ซ่อนสำหรับเรื่องสั้น (แสดงใน ShortStoryWorkspace แทน) */}
+              {novel.novel_type !== "เรื่องสั้น" && (
+                <div className="mt-2 space-y-1">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className={isBulkWriting ? "text-primary font-medium" : "text-muted-foreground"}>
+                      {isBulkWriting ? `✍️ กำลังสร้างตอนที่ ${jobs[novelId]?.current || 0}/${targetCount}` : `เขียนแล้ว ${completedCount}/${targetCount} ตอน`}
+                    </span>
+                    <span className={isBulkWriting ? "text-primary font-semibold" : "text-muted-foreground"}>{progressPct}%</span>
+                  </div>
+                  <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
+                    <div
+                      className={`h-1.5 rounded-full transition-all duration-500 ${isBulkWriting ? "bg-primary animate-pulse" : "bg-emerald-500"}`}
+                      style={{ width: `${progressPct}%` }}
+                    />
+                  </div>
                 </div>
-                <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
-                  <div
-                    className={`h-1.5 rounded-full transition-all duration-500 ${isBulkWriting ? "bg-primary animate-pulse" : "bg-emerald-500"}`}
-                    style={{ width: `${progressPct}%` }}
-                  />
-                </div>
-              </div>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-1 ml-auto shrink-0">
@@ -231,7 +234,13 @@ export default function NovelWorkspace() {
         </div>
       </header>
 
-      {/* Tabs */}
+      {/* เรื่องสั้น → ShortStoryWorkspace แบบ single-page */}
+      {novel.novel_type === "เรื่องสั้น" ? (
+        <div className="flex-1 overflow-y-auto">
+          <ShortStoryWorkspace novelId={novelId} novel={novel} />
+        </div>
+      ) : (
+      /* นิยายยาว → Tabs เดิม */
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
         <div className="border-b border-border/60 bg-card/40 backdrop-blur-sm">
           <div className="max-w-7xl mx-auto px-4 overflow-x-auto">
@@ -283,6 +292,7 @@ export default function NovelWorkspace() {
           </TabsContent>
         </div>
       </Tabs>
+      )}
     </div>
     </>
   );
