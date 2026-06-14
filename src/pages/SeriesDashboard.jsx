@@ -4,13 +4,12 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { BookOpen, Layers, ChevronDown, ChevronUp, MoreVertical, ImagePlus, FolderOpen, X, BookMarked, Clock } from "lucide-react";
+import { BookOpen, Layers, ChevronDown, ChevronUp, MoreVertical, ImagePlus, FolderOpen, BookMarked } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { motion, AnimatePresence } from "framer-motion";
 import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/lib/AuthContext";
+import ReaderDialog from "@/components/reader/ReaderDialog";
 
 const genreColors = {
   "โรแมนติก": "from-pink-400 to-rose-500",
@@ -25,60 +24,11 @@ const genreColors = {
   "อื่นๆ": "from-gray-400 to-slate-500",
 };
 
-function countWords(text) {
-  if (!text) return 0;
-  try {
-    const seg = new Intl.Segmenter("th", { granularity: "word" });
-    return [...seg.segment(text)].filter((s) => s.isWordLike).length;
-  } catch {
-    return text.trim().split(/\s+/).filter(Boolean).length;
-  }
-}
 
-function ReadDialog({ chapter, onClose }) {
-  if (!chapter) return null;
-  const words = countWords(chapter.content);
-  const minutes = Math.max(1, Math.round(words / 250));
-
-  return (
-    <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl w-full h-[85vh] flex flex-col p-0 gap-0">
-        <DialogHeader className="px-6 pt-6 pb-4 border-b border-border/40 shrink-0">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <DialogTitle className="font-heading text-xl leading-snug">{chapter.title}</DialogTitle>
-              <div className="flex items-center gap-3 mt-1.5">
-                <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                  <BookMarked className="w-3 h-3" />
-                  {words.toLocaleString()} คำ
-                </span>
-                <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                  <Clock className="w-3 h-3" />
-                  อ่านประมาณ {minutes} นาที
-                </span>
-              </div>
-            </div>
-          </div>
-        </DialogHeader>
-        <ScrollArea className="flex-1 min-h-0">
-          <div className="px-8 py-6">
-            {chapter.content ? (
-              <div className="font-body text-base leading-[2] text-foreground whitespace-pre-wrap">
-                {chapter.content}
-              </div>
-            ) : (
-              <p className="text-muted-foreground text-center py-12">ยังไม่มีเนื้อหา</p>
-            )}
-          </div>
-        </ScrollArea>
-      </DialogContent>
-    </Dialog>
-  );
-}
 
 function NovelCard({ novel, chapters, uploadingFor, onUploadClick }) {
   const [isOpen, setIsOpen] = useState(false);
-  const [readingChapter, setReadingChapter] = useState(null);
+  const [readerStartIdx, setReaderStartIdx] = useState(null);
   const gradient = genreColors[novel.genre] || "from-gray-400 to-slate-500";
   const novelChapters = chapters
     .filter((c) => String(c.novel_id) === String(novel.id) && !c.is_deleted)
@@ -170,14 +120,14 @@ function NovelCard({ novel, chapters, uploadingFor, onUploadClick }) {
                 {novelChapters.length === 0 ? (
                   <p className="text-xs text-muted-foreground text-center py-4">ยังไม่มีตอน</p>
                 ) : (
-                  novelChapters.map((ch, idx) => (
+                  novelChapters.map((ch, chIdx) => (
                     <button
                       key={ch.id}
-                      onClick={() => setReadingChapter(ch)}
+                      onClick={() => setReaderStartIdx(chIdx)}
                       className="w-full flex items-center gap-2.5 px-2 py-2.5 rounded-lg hover:bg-accent/70 transition-colors text-left group"
                     >
                       <span className="w-6 h-6 rounded-md bg-primary/10 text-primary text-xs font-bold flex items-center justify-center shrink-0">
-                        {ch.order || idx + 1}
+                        {ch.order || chIdx + 1}
                       </span>
                       <span className="flex-1 text-sm truncate group-hover:text-primary transition-colors">{ch.title}</span>
                       {ch.word_count > 0 && (
@@ -193,8 +143,8 @@ function NovelCard({ novel, chapters, uploadingFor, onUploadClick }) {
         </AnimatePresence>
       </div>
 
-      {readingChapter && (
-        <ReadDialog chapter={readingChapter} onClose={() => setReadingChapter(null)} />
+      {readerStartIdx !== null && (
+        <ReaderDialog chapters={novelChapters} initialIndex={readerStartIdx} onClose={() => setReaderStartIdx(null)} />
       )}
     </>
   );
