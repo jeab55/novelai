@@ -21,12 +21,19 @@ const roleColors = {
   "ตัวประกอบ": "bg-gray-100 text-gray-600",
 };
 
-export default function CharacterBible({ novelId }) {
+export default function CharacterBible({ novelId, novel }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
   const [versionChar, setVersionChar] = useState(null);
   const queryClient = useQueryClient();
+
+  const { data: novelWriter } = useQuery({
+    queryKey: ["writer", novel?.writer_id],
+    queryFn: () => base44.entities.Writer.filter({ id: novel.writer_id }),
+    enabled: !!novel?.writer_id,
+    select: (d) => d[0],
+  });
 
   const { data: characters = [], isLoading } = useQuery({
     queryKey: ["characters", novelId],
@@ -82,6 +89,7 @@ export default function CharacterBible({ novelId }) {
                 novelId={novelId}
                 character={editing}
                 novelIdForVersion={novelId}
+                writerSystemPrompt={novelWriter?.system_prompt}
                 onDone={() => { setDialogOpen(false); setEditing(null); }}
               />
             </DialogContent>

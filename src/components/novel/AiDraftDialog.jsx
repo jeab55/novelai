@@ -30,7 +30,7 @@ function countThaiWords(text) {
 }
 
 // ขยายเนื้อหาอัตโนมัติ
-async function expandContentAutomatically(currentContent, targetWords, chapterTitle, form, systemPrompt) {
+async function expandContentAutomatically(currentContent, targetWords, chapterTitle, form, systemPrompt, writerPrompt = "") {
   const minWords = Math.floor(targetWords * 0.9);
   const absoluteMinWords = 1000;
   let content = currentContent;
@@ -46,7 +46,8 @@ async function expandContentAutomatically(currentContent, targetWords, chapterTi
     attempts += 1;
     const remainingWords = Math.max(targetWords - wordCount, 300);
     
-    let expandPrompt = `[ขยายเนื้อหา — เขียนต่อจากเดิม]\n`;
+    let expandPrompt = writerPrompt ? `[บทบาทและสไตล์การเขียน]\n${writerPrompt}\n\n` : "";
+    expandPrompt += `[ขยายเนื้อหา — เขียนต่อจากเดิม]\n`;
     expandPrompt += `เนื้อหาปัจจุบันมี ${wordCount} คำ แต่ต้องการอย่างน้อย ${targetWords} คำ\n`;
     expandPrompt += `โปรดเขียนเนื้อหาต่อจากเนื้อหาด้านล่าง เพิ่มอีกอย่างน้อย ${remainingWords} คำ\n\n`;
     expandPrompt += `[คำสั่ง]\n`;
@@ -278,7 +279,7 @@ export default function AiDraftDialog({ open, onClose, chapter, novel, novelId, 
     
     if (initialWordCount < minWords || initialWordCount < 1000) {
       setLoadingType("expanding");
-      const expanded = await expandContentAutomatically(text, form.wordTarget, form.chapterTitle, form, sysPrompt);
+      const expanded = await expandContentAutomatically(text, form.wordTarget, form.chapterTitle, form, sysPrompt, selectedWriter?.system_prompt || "");
       text = expanded.content;
     }
     

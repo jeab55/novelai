@@ -11,7 +11,7 @@ import ReactMarkdown from "react-markdown";
 
 const ROLES = ["ตัวเอก", "ตัวรอง", "ตัวร้าย", "ตัวประกอบ"];
 
-export default function CharacterForm({ novelId, character, onDone, novelIdForVersion }) {
+export default function CharacterForm({ novelId, character, onDone, novelIdForVersion, writerSystemPrompt }) {
   const [form, setForm] = useState({
     name: character?.name || "",
     role: character?.role || "",
@@ -67,7 +67,8 @@ export default function CharacterForm({ novelId, character, onDone, novelIdForVe
       form.relationships && `ความสัมพันธ์: ${form.relationships}`,
     ].filter(Boolean).join("\n");
 
-    const prompt = `คุณคือนักวิเคราะห์ตัวละครในนิยายมืออาชีพ วิเคราะห์ตัวละครต่อไปนี้อย่างละเอียด:
+    const writerCtx = writerSystemPrompt ? `[สไตล์และแนวของนักเขียน]\n${writerSystemPrompt}\n\n` : "";
+    const prompt = `${writerCtx}คุณคือนักวิเคราะห์ตัวละครในนิยายมืออาชีพ วิเคราะห์ตัวละครต่อไปนี้อย่างละเอียด:
 
 ${charDesc}
 

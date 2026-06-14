@@ -273,7 +273,7 @@ export default function NovelWorkspace() {
             <WritingRoom novelId={novelId} novel={novel} pendingOpenChapter={pendingOpenChapter} onPendingOpenChapterConsumed={() => setPendingOpenChapter(null)} />
           </TabsContent>
           <TabsContent value="characters" className="m-0">
-            <CharacterBible novelId={novelId} />
+            <CharacterBible novelId={novelId} novel={novel} />
           </TabsContent>
           <TabsContent value="world" className="m-0">
             <WorldBible
