@@ -88,17 +88,34 @@ export default function ShortStoryWorkspace({ novelId, novel }) {
   };
 
   const handleSave = async () => {
-    if (!chapter) return;
+    if (!content.trim()) { toast.error("ยังไม่มีเนื้อหา กรุณาเขียนก่อน"); return; }
     setSaving(true);
-    const wc = countThaiWords(content);
-    // บันทึก version ก่อน
-    await saveVersion({ entityType: "chapter", entityId: chapter.id, novelId, data: { ...chapter, content }, label: "บันทึกด้วยตนเอง", createdByName: user?.full_name || "" });
-    await base44.entities.Chapter.update(chapter.id, { content, word_count: wc, status: wc >= 500 ? "เขียนเสร็จ" : "ร่าง" });
-    setWordCount(wc);
-    setIsDirty(false);
-    setSaving(false);
-    queryClient.invalidateQueries({ queryKey: ["chapters", novelId] });
-    toast.success("บันทึกแล้ว");
+    try {
+      const wc = countThaiWords(content);
+      let targetChapter = chapter;
+      if (!targetChapter) {
+        // สร้าง chapter ใหม่ถ้ายังไม่มี
+        targetChapter = await base44.entities.Chapter.create({
+          novel_id: novelId,
+          title: novel?.title || "เรื่องสั้น",
+          content,
+          word_count: wc,
+          order: 1,
+          status: wc >= 500 ? "เขียนเสร็จ" : "ร่าง",
+        });
+      } else {
+        await saveVersion({ entityType: "chapter", entityId: targetChapter.id, novelId, data: { ...targetChapter, content }, label: "บันทึกด้วยตนเอง", createdByName: user?.full_name || "" });
+        await base44.entities.Chapter.update(targetChapter.id, { content, word_count: wc, status: wc >= 500 ? "เขียนเสร็จ" : "ร่าง" });
+      }
+      setWordCount(wc);
+      setIsDirty(false);
+      queryClient.invalidateQueries({ queryKey: ["chapters", novelId] });
+      toast.success("บันทึกแล้ว");
+    } catch (err) {
+      toast.error("บันทึกไม่สำเร็จ: " + (err?.message || "เกิดข้อผิดพลาด"));
+    } finally {
+      setSaving(false);
+    }
   };
 
   // Auto-save debounce
@@ -286,7 +303,7 @@ export default function ShortStoryWorkspace({ novelId, novel }) {
       <div className="bg-card border border-border/60 rounded-xl overflow-hidden">
         <div className="flex items-center justify-between px-4 py-2.5 border-b border-border/40">
           <span className="text-sm font-medium">เนื้อเรื่อง</span>
-          <Button size="sm" onClick={handleSave} disabled={saving || !isDirty} className="h-7 gap-1.5 text-xs">
+          <Button size="sm" onClick={handleSave} disabled={saving} className="h-7 gap-1.5 text-xs">
             {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
             {saving ? "กำลังบันทึก..." : "บันทึก"}
           </Button>
