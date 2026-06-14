@@ -3,7 +3,7 @@ import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Save, Loader2, Download, Copy, MoreHorizontal, Maximize2, Minimize2, Sparkles, Clock, X, RefreshCw, Volume2, History, PieChart, FileText, StickyNote, CheckCircle2, Type, AlignJustify, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Save, Loader2, Download, Copy, MoreHorizontal, Maximize2, Minimize2, Sparkles, Clock, X, RefreshCw, Volume2, History, PieChart, FileText, StickyNote, CheckCircle2, Type, AlignJustify, ShieldCheck, Image } from "lucide-react";
 import AiDraftDialog from "./AiDraftDialog";
 import EditorReviewPanel from "./EditorReviewPanel";
 import TextToSpeechPanel from "./TextToSpeechPanel";
@@ -15,6 +15,7 @@ import AiEditorReviewPanel from "./AiEditorReviewPanel";
 import ReaderReviewRevisionPanel from "./ReaderReviewRevisionPanel";
 import InlineDiffViewer from "./InlineDiffViewer";
 import HistoricalFactCheckPanel from "./HistoricalFactCheckPanel";
+import ChapterIllustrationPanel from "./ChapterIllustrationPanel";
 import { saveVersion } from "@/lib/saveVersion";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -66,6 +67,7 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
   // inline diff state — set เมื่อ ReaderReviewRevisionPanel ได้รับผลจาก AI
   const [inlineDiff, setInlineDiff] = useState(null); // { rawText, color, cleanText, originalText } | null
   const [factCheckOpen, setFactCheckOpen] = useState(false);
+  const [illustrationOpen, setIllustrationOpen] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: plotEvents = [] } = useQuery({
@@ -290,6 +292,18 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
         >
           <StickyNote className="w-3.5 h-3.5" />
           โน้ต
+        </Button>
+
+        {/* Illustration button */}
+        <Button
+          variant="outline"
+          size="sm"
+          className={`gap-1.5 h-8 text-xs border-violet-300 hover:bg-violet-50 ${illustrationOpen ? "bg-violet-100 text-violet-800" : "text-violet-700"}`}
+          onClick={() => setIllustrationOpen((v) => !v)}
+          title="สร้างภาพประกอบ AI"
+        >
+          <Image className="w-3.5 h-3.5" />
+          ภาพประกอบ
         </Button>
 
         {/* Historical Fact Check button */}
@@ -586,6 +600,14 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
           content={content}
           novel={novel || { title: "" }}
           onClose={() => setFactCheckOpen(false)}
+        />
+      )}
+      {illustrationOpen && (
+        <ChapterIllustrationPanel
+          chapter={chapter}
+          novel={novel || { title: "" }}
+          novelId={novelId}
+          onClose={() => setIllustrationOpen(false)}
         />
       )}
       <div className="flex flex-1 overflow-hidden">

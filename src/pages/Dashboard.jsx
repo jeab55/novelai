@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Plus, BookOpen, Feather, Pencil, LogOut, Trash2, Share2, Moon, Sun, CheckCircle2 } from "lucide-react";
+import { Plus, BookOpen, Feather, Pencil, LogOut, Trash2, Share2, Moon, Sun, CheckCircle2, Settings } from "lucide-react";
 import DeleteNovelDialog from "@/components/novel/DeleteNovelDialog";
 import CreateNovelWizard from "@/components/novel/CreateNovelWizard";
 import ShareNovelDialog from "@/components/novel/ShareNovelDialog";
@@ -176,6 +176,11 @@ export default function Dashboard() {
             <Link to="/trash">
               <Button variant="ghost" size="icon" title="ถังขยะ" className="text-muted-foreground hover:text-destructive">
                 <Trash2 className="w-4 h-4" />
+              </Button>
+            </Link>
+            <Link to="/settings">
+              <Button variant="ghost" size="icon" title="ตั้งค่า" className="text-muted-foreground hover:text-foreground">
+                <Settings className="w-4 h-4" />
               </Button>
             </Link>
             <Button variant="ghost" size="icon" onClick={() => logout()} title="ออกจากระบบ" className="text-muted-foreground hover:text-foreground">
