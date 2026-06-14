@@ -205,7 +205,7 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
     }
   };
 
-  const expandContent = async (currentContent, targetWords, chapterTitle, order, linkedEvent, novelContext, onProgress) => {
+  const expandContent = async (currentContent, targetWords, chapterTitle, order, linkedEvent, novelContext, onProgress, writerPrompt = "") => {
     let content = currentContent;
     const maxAttempts = 2; // สูงสุด 2 รอบ แล้วออกเสมอ
 
@@ -224,7 +224,8 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
 
       const remainingWords = Math.max(targetWords - currentWordCount, 300);
       
-      let expandPrompt = `[ขยายเนื้อหา — เขียนต่อจากเดิม]\n`;
+      let expandPrompt = writerPrompt ? `[บทบาทและสไตล์การเขียน]\n${writerPrompt}\n\n` : "";
+      expandPrompt += `[ขยายเนื้อหา — เขียนต่อจากเดิม]\n`;
       expandPrompt += `เนื้อหาปัจจุบันมี ${currentWordCount} คำ แต่ต้องการอย่างน้อย ${targetWords} คำ\n`;
       expandPrompt += `โปรดเขียนเนื้อหาต่อจากเนื้อหาด้านล่าง เพิ่มอีกอย่างน้อย ${remainingWords} คำ\n\n`;
       expandPrompt += `[คำสั่ง]\n`;
@@ -576,7 +577,8 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
           ({ attempt, maxAttempts, currentWordCount }) => {
             expandRound = attempt;
             setCurrentMsg(`📝 ขยายรอบที่ ${attempt}/${maxAttempts} — ตอนนี้ ${currentWordCount}/${wordTarget} คำ...`);
-          }
+          },
+          writerPrompt
         );
         finalContent = expanded.content;
         finalWordCount = expanded.wordCount;

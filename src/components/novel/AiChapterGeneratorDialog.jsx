@@ -23,6 +23,13 @@ export default function AiChapterGeneratorDialog({ open, onClose, novel, novelId
   const [replaceConfirm, setReplaceConfirm] = useState(false);
   const [selectedPlotEvents, setSelectedPlotEvents] = useState([]);
 
+  const { data: writer } = useQuery({
+    queryKey: ["writers-all"],
+    queryFn: () => base44.entities.Writer.list(),
+    enabled: !!novel?.writer_id,
+    select: (d) => d.find((w) => String(w.id) === String(novel?.writer_id)),
+  });
+
   const { data: plotEvents = [] } = useQuery({
     queryKey: ["plotEvents", novelId],
     queryFn: async () => {
@@ -52,7 +59,9 @@ export default function AiChapterGeneratorDialog({ open, onClose, novel, novelId
       ? `เหตุการณ์ไทม์ไลน์ที่มี:\n${plotEvents.map((e, i) => `${i + 1}. ${e.title} - ${e.description || ""}`).join("\n")}`
       : "ยังไม่มีเหตุการณ์ไทม์ไลน์";
 
-    const prompt = `คุณคือผู้ช่วยแต่งนิยาย ช่วยสร้างโครงตอนย่อยจากโครงเรื่องหลัก
+    const writerCtx = writer?.system_prompt ? `[สไตล์การเขียน]\n${writer.system_prompt}\n\n` : "";
+
+    const prompt = `${writerCtx}คุณคือผู้ช่วยแต่งนิยาย ช่วยสร้างโครงตอนย่อยจากโครงเรื่องหลัก
 
 ข้อมูลนิยาย:
 - ชื่อ: ${novel.title}
