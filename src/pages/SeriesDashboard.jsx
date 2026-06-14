@@ -1,19 +1,13 @@
-import React, { useState } from "react";
+import React from "react";
 import { base44 } from "@/api/base44Client";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, BookOpen, Feather, Layers, CheckCircle2, Clock, PauseCircle } from "lucide-react";
+import { BookOpen, Layers } from "lucide-react";
 import { motion } from "framer-motion";
-import SeriesFormDialog from "@/components/series/SeriesFormDialog";
 import AppLayout from "@/components/AppLayout";
-
-const statusConfig = {
-  ongoing: { label: "กำลังเขียน", color: "bg-blue-100 text-blue-700 border-blue-200", icon: Clock },
-  completed: { label: "จบแล้ว", color: "bg-emerald-100 text-emerald-700 border-emerald-200", icon: CheckCircle2 },
-  hiatus: { label: "พักชั่วคราว", color: "bg-amber-100 text-amber-700 border-amber-200", icon: PauseCircle },
-};
+import { useAuth } from "@/lib/AuthContext";
 
 const genreColors = {
   "โรแมนติก": "from-pink-400 to-rose-500",
@@ -29,12 +23,23 @@ const genreColors = {
 };
 
 export default function SeriesDashboard() {
-  const [createOpen, setCreateOpen] = useState(false);
-  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
 
-  const { data: series = [], isLoading } = useQuery({
-    queryKey: ["series"],
-    queryFn: () => base44.entities.Series.list("-created_date"),
+  // Use Novels as "series" — novels with multiple episodes
+  const { data: novels = [], isLoading } = useQuery({
+    queryKey: ["novels-for-series", user?.id],
+    queryFn: async () => {
+      const all = await base44.entities.Novel.list("-created_date");
+      return all.filter((n) => {
+        if (n.is_deleted) return false;
+        if (isAdmin) return true;
+        if (String(n.created_by_id) === String(user?.id)) return true;
+        if (Array.isArray(n.shared_with) && n.shared_with.includes(user?.email)) return true;
+        return false;
+      });
+    },
+    enabled: !!user,
   });
 
   const { data: episodes = [] } = useQuery({
@@ -42,71 +47,68 @@ export default function SeriesDashboard() {
     queryFn: () => base44.entities.Episode.list(),
   });
 
-  const getEpisodeCount = (seriesId) =>
-    episodes.filter((e) => String(e.series_id) === String(seriesId)).length;
+  const getEpisodeCount = (novelId) =>
+    episodes.filter((e) => String(e.novel_id) === String(novelId)).length;
 
   return (
     <AppLayout>
       <div className="max-w-6xl mx-auto px-6 py-10">
-        {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
             <h2 className="font-heading font-bold text-2xl text-foreground tracking-tight">ซีรีส์ทั้งหมด</h2>
             <p className="text-sm text-muted-foreground mt-1">
-              {series.length > 0 ? `${series.length} ซีรีส์` : "ยังไม่มีซีรีส์"}
+              {novels.length > 0 ? `${novels.length} เรื่อง` : "ยังไม่มีนิยาย"}
             </p>
           </div>
-          <Button className="gap-2" onClick={() => setCreateOpen(true)}>
-            <Plus className="w-4 h-4" />
-            สร้างซีรีส์ใหม่
-          </Button>
+          <Link to="/">
+            <Button variant="outline" className="gap-2">
+              <BookOpen className="w-4 h-4" />
+              จัดการนิยาย
+            </Button>
+          </Link>
         </div>
 
         {isLoading ? (
           <div className="flex items-center justify-center py-24">
             <div className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
           </div>
-        ) : series.length === 0 ? (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-center py-24"
-          >
+        ) : novels.length === 0 ? (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center py-24">
             <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-primary/10 to-accent/30 flex items-center justify-center mx-auto mb-6 shadow-inner">
               <Layers className="w-12 h-12 text-primary/50" />
             </div>
-            <h2 className="text-2xl font-heading font-semibold mb-3">ยังไม่มีซีรีส์</h2>
+            <h2 className="text-2xl font-heading font-semibold mb-3">ยังไม่มีนิยาย</h2>
             <p className="text-muted-foreground mb-8 max-w-sm mx-auto leading-relaxed">
-              สร้างซีรีส์แรกของคุณเพื่อเริ่มจัดการตอนต่างๆ อย่างเป็นระบบ
+              สร้างนิยายในหน้าหลักก่อน แล้วจัดการตอนได้ที่นี่
             </p>
-            <Button onClick={() => setCreateOpen(true)} className="gap-2 h-11 px-6 text-base shadow-sm">
-              <Plus className="w-4 h-4" />
-              สร้างซีรีส์ใหม่
-            </Button>
+            <Link to="/">
+              <Button className="gap-2 h-11 px-6 text-base shadow-sm">
+                <BookOpen className="w-4 h-4" />
+                ไปหน้านิยาย
+              </Button>
+            </Link>
           </motion.div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {series.map((s, i) => {
-              const statusInfo = statusConfig[s.status] || statusConfig.ongoing;
-              const StatusIcon = statusInfo.icon;
-              const gradient = genreColors[s.genre] || "from-gray-400 to-slate-500";
-              const epCount = getEpisodeCount(s.id);
+            {novels.map((novel, i) => {
+              const gradient = genreColors[novel.genre] || "from-gray-400 to-slate-500";
+              const epCount = getEpisodeCount(novel.id);
 
               return (
                 <motion.div
-                  key={s.id}
+                  key={novel.id}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.05 }}
                 >
-                  <Link to={`/series/${s.id}`}>
+                  <Link to={`/series/${novel.id}`}>
                     <div className="group bg-card border border-border/60 rounded-2xl overflow-hidden hover:shadow-xl hover:shadow-primary/5 hover:border-primary/25 transition-all duration-300 cursor-pointer flex flex-col h-full">
                       {/* Cover image or gradient placeholder */}
                       <div className="relative h-44 overflow-hidden">
-                        {s.cover_image_url ? (
+                        {novel.cover_url ? (
                           <img
-                            src={s.cover_image_url}
-                            alt={s.title}
+                            src={novel.cover_url}
+                            alt={novel.title}
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                           />
                         ) : (
@@ -114,43 +116,35 @@ export default function SeriesDashboard() {
                             <BookOpen className="w-12 h-12 text-white/60" />
                           </div>
                         )}
-                        {/* Status badge overlay */}
-                        <div className="absolute top-3 right-3">
-                          <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full border backdrop-blur-sm bg-white/90 ${statusInfo.color}`}>
-                            <StatusIcon className="w-3 h-3" />
-                            {statusInfo.label}
-                          </span>
-                        </div>
-                        {/* Genre badge */}
-                        {s.genre && (
+                        {novel.genre && (
                           <div className="absolute bottom-3 left-3">
                             <span className="inline-flex items-center text-xs font-medium px-2.5 py-1 rounded-full bg-black/40 text-white backdrop-blur-sm">
-                              {s.genre}
+                              {novel.genre}
                             </span>
                           </div>
                         )}
+                        <div className="absolute top-3 right-3">
+                          <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full border backdrop-blur-sm bg-white/90 text-primary border-primary/20">
+                            {epCount} ตอน
+                          </span>
+                        </div>
                       </div>
 
-                      {/* Content */}
                       <div className="p-5 flex flex-col flex-1">
                         <h3 className="font-heading font-bold text-base leading-tight group-hover:text-primary transition-colors mb-2 line-clamp-2">
-                          {s.title}
+                          {novel.title}
                         </h3>
-                        {s.description && (
+                        {novel.synopsis && (
                           <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed flex-1">
-                            {s.description}
+                            {novel.synopsis}
                           </p>
                         )}
-
-                        {/* Footer */}
                         <div className="mt-4 pt-4 border-t border-border/40 flex items-center justify-between">
-                          <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                            <BookOpen className="w-3.5 h-3.5" />
-                            <span className="font-medium text-foreground">{epCount}</span>
-                            <span>ตอน</span>
-                          </div>
+                          <Badge variant="outline" className="text-xs font-normal">
+                            {novel.status || "กำลังเขียน"}
+                          </Badge>
                           <span className="text-xs text-muted-foreground">
-                            {new Date(s.created_date).toLocaleDateString("th-TH")}
+                            {new Date(novel.created_date).toLocaleDateString("th-TH")}
                           </span>
                         </div>
                       </div>
@@ -162,15 +156,6 @@ export default function SeriesDashboard() {
           </div>
         )}
       </div>
-
-      <SeriesFormDialog
-        open={createOpen}
-        onClose={() => setCreateOpen(false)}
-        onSaved={() => {
-          queryClient.invalidateQueries({ queryKey: ["series"] });
-          setCreateOpen(false);
-        }}
-      />
     </AppLayout>
   );
 }

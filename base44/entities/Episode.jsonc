@@ -2,9 +2,9 @@
   "name": "Episode",
   "type": "object",
   "properties": {
-    "series_id": {
+    "novel_id": {
       "type": "string",
-      "description": "ID \u0e02\u0e2d\u0e07\u0e0b\u0e35\u0e23\u0e35\u0e2a\u0e4c\u0e17\u0e35\u0e48\u0e2a\u0e31\u0e07\u0e01\u0e31\u0e14"
+      "description": "ID \u0e02\u0e2d\u0e07\u0e19\u0e34\u0e22\u0e32\u0e22\u0e17\u0e35\u0e48\u0e2a\u0e31\u0e07\u0e01\u0e31\u0e14"
     },
     "title": {
       "type": "string",
@@ -38,7 +38,7 @@
     }
   },
   "required": [
-    "series_id",
+    "novel_id",
     "title",
     "episode_number"
   ]

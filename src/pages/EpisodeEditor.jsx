@@ -8,7 +8,6 @@ import { ArrowLeft, Save, Eye, EyeOff, CheckCircle2, Loader2 } from "lucide-reac
 import { toast } from "sonner";
 import AppLayout from "@/components/AppLayout";
 
-// Thai word counter
 const countWords = (text) => {
   if (!text) return 0;
   try {
@@ -24,7 +23,7 @@ const countWords = (text) => {
 };
 
 export default function EpisodeEditor() {
-  const { seriesId, episodeId } = useParams();
+  const { id: novelId, episodeId } = useParams();
   const queryClient = useQueryClient();
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
@@ -41,11 +40,11 @@ export default function EpisodeEditor() {
     },
   });
 
-  const { data: series } = useQuery({
-    queryKey: ["series", seriesId],
+  const { data: novel } = useQuery({
+    queryKey: ["novel", novelId],
     queryFn: async () => {
-      const all = await base44.entities.Series.list();
-      return all.find((s) => String(s.id) === String(seriesId));
+      const all = await base44.entities.Novel.list();
+      return all.find((n) => String(n.id) === String(novelId));
     },
   });
 
@@ -61,13 +60,10 @@ export default function EpisodeEditor() {
     setWordCount(countWords(content));
     setIsDirty(true);
     setSaved(false);
-
-    // Auto-save after 3s of no typing
     if (autoSaveRef.current) clearTimeout(autoSaveRef.current);
     autoSaveRef.current = setTimeout(() => {
       if (episodeId) handleSave(false);
     }, 3000);
-
     return () => clearTimeout(autoSaveRef.current);
   }, [content, title]);
 
@@ -77,7 +73,7 @@ export default function EpisodeEditor() {
       setIsDirty(false);
       setSaved(true);
       queryClient.invalidateQueries({ queryKey: ["episode", episodeId] });
-      queryClient.invalidateQueries({ queryKey: ["episodes", seriesId] });
+      queryClient.invalidateQueries({ queryKey: ["episodes", novelId] });
       setTimeout(() => setSaved(false), 2000);
     },
   });
@@ -118,24 +114,17 @@ export default function EpisodeEditor() {
         {/* Top bar */}
         <div className="flex items-center gap-3">
           <Link
-            to={`/series/${seriesId}`}
+            to={`/series/${novelId}`}
             className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
-            {series?.title || "กลับ"}
+            {novel?.title || "กลับ"}
           </Link>
           <span className="text-muted-foreground/40">/</span>
-          <span className="text-sm text-muted-foreground">
-            ตอนที่ {episode?.episode_number}
-          </span>
+          <span className="text-sm text-muted-foreground">ตอนที่ {episode?.episode_number}</span>
 
           <div className="ml-auto flex items-center gap-2">
-            {/* Word count */}
-            <span className="text-xs text-muted-foreground hidden sm:block">
-              {wordCount.toLocaleString()} คำ
-            </span>
-
-            {/* Save indicator */}
+            <span className="text-xs text-muted-foreground hidden sm:block">{wordCount.toLocaleString()} คำ</span>
             {saveMutation.isPending ? (
               <span className="flex items-center gap-1 text-xs text-muted-foreground">
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -147,8 +136,6 @@ export default function EpisodeEditor() {
                 บันทึกแล้ว
               </span>
             ) : null}
-
-            {/* Publish toggle */}
             <Button
               variant={isPublished ? "outline" : "default"}
               size="sm"
@@ -161,14 +148,7 @@ export default function EpisodeEditor() {
                 : <><Eye className="w-3.5 h-3.5" />เผยแพร่</>
               }
             </Button>
-
-            <Button
-              size="sm"
-              variant="outline"
-              className="gap-1.5"
-              onClick={() => handleSave(true)}
-              disabled={saveMutation.isPending}
-            >
+            <Button size="sm" variant="outline" className="gap-1.5" onClick={() => handleSave(true)} disabled={saveMutation.isPending}>
               <Save className="w-3.5 h-3.5" />
               บันทึก
             </Button>
@@ -206,7 +186,6 @@ export default function EpisodeEditor() {
           />
         </div>
 
-        {/* Bottom word count bar */}
         <div className="flex items-center justify-between text-xs text-muted-foreground pb-2">
           <span>{wordCount.toLocaleString()} คำ</span>
           <span>{content.length.toLocaleString()} ตัวอักษร</span>

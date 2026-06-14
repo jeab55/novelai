@@ -1,53 +1,55 @@
 import React, { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import {
-  Plus, ArrowLeft, BookOpen, CheckCircle2, Clock, FileEdit,
-  Trash2, PauseCircle, Edit, Eye, EyeOff
+  Plus, ArrowLeft, BookOpen, FileEdit, Trash2, Eye, EyeOff, CheckCircle2
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import SeriesFormDialog from "@/components/series/SeriesFormDialog";
-import EpisodeFormDialog from "@/components/series/EpisodeFormDialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import AppLayout from "@/components/AppLayout";
 
-const statusConfig = {
-  ongoing: { label: "กำลังเขียน", color: "bg-blue-100 text-blue-700 border-blue-200", icon: Clock },
-  completed: { label: "จบแล้ว", color: "bg-emerald-100 text-emerald-700 border-emerald-200", icon: CheckCircle2 },
-  hiatus: { label: "พักชั่วคราว", color: "bg-amber-100 text-amber-700 border-amber-200", icon: PauseCircle },
-};
-
 export default function SeriesDetail() {
-  const { id } = useParams();
-  const navigate = useNavigate();
+  const { id: novelId } = useParams();
   const queryClient = useQueryClient();
-  const [editSeriesOpen, setEditSeriesOpen] = useState(false);
-  const [addEpisodeOpen, setAddEpisodeOpen] = useState(false);
-  const [editEpisode, setEditEpisode] = useState(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
 
-  const { data: series, isLoading: seriesLoading } = useQuery({
-    queryKey: ["series", id],
+  const { data: novel, isLoading: novelLoading } = useQuery({
+    queryKey: ["novel", novelId],
     queryFn: async () => {
-      const all = await base44.entities.Series.list();
-      return all.find((s) => String(s.id) === String(id));
+      const all = await base44.entities.Novel.list();
+      return all.find((n) => String(n.id) === String(novelId));
     },
   });
 
   const { data: episodes = [], isLoading: episodesLoading } = useQuery({
-    queryKey: ["episodes", id],
+    queryKey: ["episodes", novelId],
     queryFn: async () => {
-      const all = await base44.entities.Episode.filter({ series_id: id });
+      const all = await base44.entities.Episode.filter({ novel_id: novelId });
       return all.sort((a, b) => (a.episode_number || 0) - (b.episode_number || 0));
+    },
+  });
+
+  const createEpisodeMutation = useMutation({
+    mutationFn: (data) => base44.entities.Episode.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["episodes", novelId] });
+      queryClient.invalidateQueries({ queryKey: ["episodes-all"] });
+      setAddOpen(false);
+      setNewTitle("");
+      toast.success("เพิ่มตอนแล้ว");
     },
   });
 
   const deleteEpisodeMutation = useMutation({
     mutationFn: (epId) => base44.entities.Episode.delete(epId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["episodes", id] });
+      queryClient.invalidateQueries({ queryKey: ["episodes", novelId] });
+      queryClient.invalidateQueries({ queryKey: ["episodes-all"] });
       toast.success("ลบตอนแล้ว");
     },
   });
@@ -58,10 +60,20 @@ export default function SeriesDetail() {
         status,
         published_at: status === "published" ? new Date().toISOString() : null,
       }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["episodes", id] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["episodes", novelId] }),
   });
 
-  if (seriesLoading) {
+  const handleAddEpisode = () => {
+    if (!newTitle.trim()) return;
+    createEpisodeMutation.mutate({
+      novel_id: novelId,
+      title: newTitle.trim(),
+      episode_number: episodes.length + 1,
+      status: "draft",
+    });
+  };
+
+  if (novelLoading) {
     return (
       <AppLayout>
         <div className="flex items-center justify-center py-24">
@@ -71,65 +83,51 @@ export default function SeriesDetail() {
     );
   }
 
-  if (!series) {
+  if (!novel) {
     return (
       <AppLayout>
         <div className="text-center py-24">
-          <p className="text-muted-foreground">ไม่พบซีรีส์นี้</p>
+          <p className="text-muted-foreground">ไม่พบนิยายนี้</p>
           <Link to="/series"><Button className="mt-4" variant="outline">กลับไปหน้าซีรีส์</Button></Link>
         </div>
       </AppLayout>
     );
   }
 
-  const statusInfo = statusConfig[series.status] || statusConfig.ongoing;
-  const StatusIcon = statusInfo.icon;
   const publishedCount = episodes.filter((e) => e.status === "published").length;
 
   return (
     <AppLayout>
       <div className="max-w-4xl mx-auto px-6 py-8">
-        {/* Back button */}
         <Link to="/series" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6 transition-colors">
           <ArrowLeft className="w-4 h-4" />
           กลับไปหน้าซีรีส์
         </Link>
 
-        {/* Series header */}
+        {/* Novel header */}
         <div className="bg-card border border-border/60 rounded-2xl overflow-hidden mb-8 shadow-sm">
           <div className="flex flex-col sm:flex-row gap-0">
-            {/* Cover */}
-            <div className="sm:w-48 h-48 sm:h-auto shrink-0 relative overflow-hidden">
-              {series.cover_image_url ? (
-                <img src={series.cover_image_url} alt={series.title} className="w-full h-full object-cover" />
+            <div className="sm:w-44 h-44 sm:h-auto shrink-0 relative overflow-hidden">
+              {novel.cover_url ? (
+                <img src={novel.cover_url} alt={novel.title} className="w-full h-full object-cover" />
               ) : (
                 <div className="w-full h-full bg-gradient-to-br from-primary/20 to-accent/40 flex items-center justify-center">
                   <BookOpen className="w-14 h-14 text-primary/40" />
                 </div>
               )}
             </div>
-
-            {/* Info */}
             <div className="flex-1 p-6 flex flex-col justify-between">
               <div>
-                <div className="flex items-start justify-between gap-3 mb-3">
-                  <h1 className="font-heading font-bold text-2xl leading-tight">{series.title}</h1>
-                  <Button variant="outline" size="sm" className="shrink-0 gap-1.5" onClick={() => setEditSeriesOpen(true)}>
-                    <Edit className="w-3.5 h-3.5" />
-                    แก้ไข
-                  </Button>
-                </div>
-                {series.description && (
-                  <p className="text-sm text-muted-foreground leading-relaxed mb-4">{series.description}</p>
+                <h1 className="font-heading font-bold text-2xl leading-tight mb-2">{novel.title}</h1>
+                {novel.synopsis && (
+                  <p className="text-sm text-muted-foreground leading-relaxed">{novel.synopsis}</p>
                 )}
               </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border ${statusInfo.color}`}>
-                  <StatusIcon className="w-3 h-3" />
-                  {statusInfo.label}
-                </span>
-                {series.genre && (
-                  <Badge variant="outline" className="text-xs">{series.genre}</Badge>
+              <div className="flex flex-wrap items-center gap-2 mt-4">
+                {novel.genre && (
+                  <span className="text-xs px-2.5 py-1 rounded-full bg-primary/10 text-primary border border-primary/20 font-medium">
+                    {novel.genre}
+                  </span>
                 )}
                 <span className="text-xs text-muted-foreground ml-auto">
                   {episodes.length} ตอน · เผยแพร่ {publishedCount} ตอน
@@ -142,7 +140,7 @@ export default function SeriesDetail() {
         {/* Episodes list */}
         <div className="flex items-center justify-between mb-5">
           <h2 className="font-heading font-semibold text-lg">รายการตอน</h2>
-          <Button className="gap-2" onClick={() => setAddEpisodeOpen(true)}>
+          <Button className="gap-2" onClick={() => setAddOpen(true)}>
             <Plus className="w-4 h-4" />
             เพิ่มตอนใหม่
           </Button>
@@ -156,7 +154,7 @@ export default function SeriesDetail() {
           <div className="text-center py-16 border border-dashed border-border/60 rounded-2xl">
             <FileEdit className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
             <p className="text-muted-foreground mb-4">ยังไม่มีตอน เริ่มเพิ่มตอนแรกได้เลย</p>
-            <Button variant="outline" className="gap-2" onClick={() => setAddEpisodeOpen(true)}>
+            <Button variant="outline" className="gap-2" onClick={() => setAddOpen(true)}>
               <Plus className="w-4 h-4" />
               เพิ่มตอนแรก
             </Button>
@@ -171,12 +169,9 @@ export default function SeriesDetail() {
                 transition={{ delay: i * 0.04 }}
                 className="group bg-card border border-border/60 rounded-xl px-5 py-4 flex items-center gap-4 hover:border-primary/25 hover:shadow-sm transition-all"
               >
-                {/* Episode number */}
                 <div className="w-10 h-10 rounded-xl bg-primary/8 border border-primary/15 flex items-center justify-center shrink-0">
                   <span className="text-sm font-bold text-primary">{ep.episode_number}</span>
                 </div>
-
-                {/* Info */}
                 <div className="flex-1 min-w-0">
                   <h3 className="font-medium text-sm leading-tight truncate">{ep.title}</h3>
                   <div className="flex items-center gap-2 mt-1">
@@ -190,31 +185,19 @@ export default function SeriesDetail() {
                     {ep.word_count > 0 && (
                       <span className="text-xs text-muted-foreground">{ep.word_count.toLocaleString()} คำ</span>
                     )}
-                    {ep.published_at && ep.status === "published" && (
-                      <span className="text-xs text-muted-foreground">
-                        {new Date(ep.published_at).toLocaleDateString("th-TH")}
-                      </span>
-                    )}
                   </div>
                 </div>
-
-                {/* Actions */}
                 <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Link to={`/series/${id}/episode/${ep.id}`}>
+                  <Link to={`/series/${novelId}/episode/${ep.id}`}>
                     <Button size="sm" variant="outline" className="gap-1.5 h-8 px-3 text-xs">
                       <FileEdit className="w-3.5 h-3.5" />
                       แก้ไข
                     </Button>
                   </Link>
                   <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-8 w-8 p-0"
+                    size="sm" variant="ghost" className="h-8 w-8 p-0"
                     title={ep.status === "published" ? "ถอนการเผยแพร่" : "เผยแพร่"}
-                    onClick={() => togglePublishMutation.mutate({
-                      epId: ep.id,
-                      status: ep.status === "published" ? "draft" : "published",
-                    })}
+                    onClick={() => togglePublishMutation.mutate({ epId: ep.id, status: ep.status === "published" ? "draft" : "published" })}
                   >
                     {ep.status === "published"
                       ? <EyeOff className="w-3.5 h-3.5 text-muted-foreground" />
@@ -222,8 +205,7 @@ export default function SeriesDetail() {
                     }
                   </Button>
                   <Button
-                    size="sm"
-                    variant="ghost"
+                    size="sm" variant="ghost"
                     className="h-8 w-8 p-0 hover:text-destructive hover:bg-destructive/5"
                     onClick={() => {
                       if (confirm(`ลบตอนที่ ${ep.episode_number}: ${ep.title}?`)) {
@@ -240,27 +222,33 @@ export default function SeriesDetail() {
         )}
       </div>
 
-      <SeriesFormDialog
-        open={editSeriesOpen}
-        onClose={() => setEditSeriesOpen(false)}
-        series={series}
-        onSaved={() => {
-          queryClient.invalidateQueries({ queryKey: ["series", id] });
-          queryClient.invalidateQueries({ queryKey: ["series"] });
-          setEditSeriesOpen(false);
-        }}
-      />
-
-      <EpisodeFormDialog
-        open={addEpisodeOpen}
-        onClose={() => setAddEpisodeOpen(false)}
-        seriesId={id}
-        nextEpisodeNumber={episodes.length + 1}
-        onSaved={() => {
-          queryClient.invalidateQueries({ queryKey: ["episodes", id] });
-          setAddEpisodeOpen(false);
-        }}
-      />
+      {/* Add Episode Dialog */}
+      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-heading">เพิ่มตอนใหม่</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">ชื่อตอนที่ {episodes.length + 1}</label>
+              <Input
+                value={newTitle}
+                onChange={(e) => setNewTitle(e.target.value)}
+                placeholder="ชื่อตอน..."
+                onKeyDown={(e) => e.key === "Enter" && handleAddEpisode()}
+                autoFocus
+              />
+            </div>
+            <Button
+              className="w-full"
+              onClick={handleAddEpisode}
+              disabled={!newTitle.trim() || createEpisodeMutation.isPending}
+            >
+              {createEpisodeMutation.isPending ? "กำลังเพิ่ม..." : "เพิ่มตอน"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 }

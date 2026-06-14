@@ -54,7 +54,7 @@ const AuthenticatedApp = () => {
         <Route path="/settings" element={<Settings />} />
         <Route path="/series" element={<SeriesDashboard />} />
         <Route path="/series/:id" element={<SeriesDetail />} />
-        <Route path="/series/:seriesId/episode/:episodeId" element={<EpisodeEditor />} />
+        <Route path="/series/:id/episode/:episodeId" element={<EpisodeEditor />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>
