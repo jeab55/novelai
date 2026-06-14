@@ -46,7 +46,10 @@ export default function NovelWorkspace() {
   // โหลดจำนวนตอนที่เขียนเสร็จ
   const { data: chapters } = useQuery({
     queryKey: ["chapters", novelId],
-    queryFn: () => base44.entities.Chapter.filter({ novel_id: novelId, is_deleted: false }),
+    queryFn: async () => {
+      const all = await base44.entities.Chapter.filter({ novel_id: novelId }, "order");
+      return all.filter((c) => !c.is_deleted).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    },
     enabled: !!novelId && !!novel,
   });
 

@@ -50,7 +50,7 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
     queryKey: ["chapters", novelId],
     queryFn: async () => {
       const all = await base44.entities.Chapter.filter({ novel_id: novelId }, "order");
-      return all.filter((c) => !c.is_deleted);
+      return all.filter((c) => !c.is_deleted).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
     },
     staleTime: 10000,
   });
