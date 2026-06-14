@@ -55,7 +55,7 @@ export default function SeriesDashboard() {
       <div className="max-w-6xl mx-auto px-6 py-10">
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h2 className="font-heading font-bold text-2xl text-foreground tracking-tight">ซีรีส์ทั้งหมด</h2>
+            <h2 className="font-heading font-bold text-2xl text-foreground tracking-tight">งานของฉัน</h2>
             <p className="text-sm text-muted-foreground mt-1">
               {novels.length > 0 ? `${novels.length} เรื่อง` : "ยังไม่มีนิยาย"}
             </p>

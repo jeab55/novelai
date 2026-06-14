@@ -20,7 +20,7 @@ export default function AppLayout({ children }) {
 
   const navItems = [
     { to: "/", label: "นิยาย", icon: BookOpen },
-    { to: "/series", label: "ซีรีส์", icon: Layers },
+    { to: "/series", label: "งานของฉัน", icon: Layers },
   ];
 
   const isActive = (to) => {
