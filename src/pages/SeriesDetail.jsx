@@ -5,8 +5,9 @@ import { useParams, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  Plus, ArrowLeft, BookOpen, FileEdit, Trash2, Eye, EyeOff, CheckCircle2
+  Plus, ArrowLeft, BookOpen, FileEdit, Trash2, Eye, EyeOff, CheckCircle2, Download
 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -17,6 +18,9 @@ export default function SeriesDetail() {
   const queryClient = useQueryClient();
   const [addOpen, setAddOpen] = useState(false);
   const [newTitle, setNewTitle] = useState("");
+  const [importOpen, setImportOpen] = useState(false);
+  const [selectedChapterIds, setSelectedChapterIds] = useState([]);
+  const [importing, setImporting] = useState(false);
 
   const { data: novel, isLoading: novelLoading } = useQuery({
     queryKey: ["novel", novelId],
@@ -24,6 +28,17 @@ export default function SeriesDetail() {
       const all = await base44.entities.Novel.list();
       return all.find((n) => String(n.id) === String(novelId));
     },
+  });
+
+  const { data: chapters = [] } = useQuery({
+    queryKey: ["chapters-for-import", novelId],
+    queryFn: async () => {
+      const all = await base44.entities.Chapter.filter({ novel_id: novelId });
+      return all
+        .filter((c) => !c.is_deleted)
+        .sort((a, b) => (a.order || 0) - (b.order || 0));
+    },
+    enabled: importOpen,
   });
 
   const { data: episodes = [], isLoading: episodesLoading } = useQuery({
@@ -62,6 +77,30 @@ export default function SeriesDetail() {
       }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["episodes", novelId] }),
   });
+
+  const handleImportChapters = async () => {
+    if (selectedChapterIds.length === 0) return;
+    setImporting(true);
+    const selectedChapters = chapters.filter((c) => selectedChapterIds.includes(c.id));
+    const baseNumber = episodes.length + 1;
+    for (let i = 0; i < selectedChapters.length; i++) {
+      const ch = selectedChapters[i];
+      await base44.entities.Episode.create({
+        novel_id: novelId,
+        title: ch.title,
+        episode_number: baseNumber + i,
+        content: ch.content || "",
+        word_count: ch.word_count || 0,
+        status: "draft",
+      });
+    }
+    queryClient.invalidateQueries({ queryKey: ["episodes", novelId] });
+    queryClient.invalidateQueries({ queryKey: ["episodes-all"] });
+    setImporting(false);
+    setImportOpen(false);
+    setSelectedChapterIds([]);
+    toast.success(`นำเข้า ${selectedChapters.length} ตอนสำเร็จ`);
+  };
 
   const handleAddEpisode = () => {
     if (!newTitle.trim()) return;
@@ -140,10 +179,16 @@ export default function SeriesDetail() {
         {/* Episodes list */}
         <div className="flex items-center justify-between mb-5">
           <h2 className="font-heading font-semibold text-lg">รายการตอน</h2>
-          <Button className="gap-2" onClick={() => setAddOpen(true)}>
-            <Plus className="w-4 h-4" />
-            เพิ่มตอนใหม่
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" className="gap-2" onClick={() => { setSelectedChapterIds([]); setImportOpen(true); }}>
+              <Download className="w-4 h-4" />
+              นำตอนจากนิยายมาเพิ่ม
+            </Button>
+            <Button className="gap-2" onClick={() => setAddOpen(true)}>
+              <Plus className="w-4 h-4" />
+              เพิ่มตอนใหม่
+            </Button>
+          </div>
         </div>
 
         {episodesLoading ? (
@@ -221,6 +266,71 @@ export default function SeriesDetail() {
           </div>
         )}
       </div>
+
+      {/* Import Chapters Dialog */}
+      <Dialog open={importOpen} onOpenChange={setImportOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="font-heading">นำตอนจากนิยายมาเพิ่ม</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 pt-2 max-h-80 overflow-y-auto pr-1">
+            {chapters.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-6">ไม่พบบทที่เขียนไว้</p>
+            ) : (
+              <>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs text-muted-foreground">{chapters.length} บทที่พบในนิยาย</span>
+                  <button
+                    className="text-xs text-primary hover:underline"
+                    onClick={() =>
+                      setSelectedChapterIds(
+                        selectedChapterIds.length === chapters.length ? [] : chapters.map((c) => c.id)
+                      )
+                    }
+                  >
+                    {selectedChapterIds.length === chapters.length ? "ยกเลิกทั้งหมด" : "เลือกทั้งหมด"}
+                  </button>
+                </div>
+                {chapters.map((ch) => (
+                  <label
+                    key={ch.id}
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-accent/40 cursor-pointer transition-colors border border-transparent hover:border-border/40"
+                  >
+                    <Checkbox
+                      checked={selectedChapterIds.includes(ch.id)}
+                      onCheckedChange={(checked) =>
+                        setSelectedChapterIds((prev) =>
+                          checked ? [...prev, ch.id] : prev.filter((id) => id !== ch.id)
+                        )
+                      }
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{ch.title}</p>
+                      {ch.word_count > 0 && (
+                        <p className="text-xs text-muted-foreground">{ch.word_count.toLocaleString()} คำ</p>
+                      )}
+                    </div>
+                    <span className={`text-xs px-2 py-0.5 rounded-full border ${
+                      ch.status === "เผยแพร่"
+                        ? "bg-emerald-100 text-emerald-700 border-emerald-200"
+                        : "bg-muted text-muted-foreground border-border"
+                    }`}>
+                      {ch.status || "ร่าง"}
+                    </span>
+                  </label>
+                ))}
+              </>
+            )}
+          </div>
+          <Button
+            className="w-full mt-2"
+            disabled={selectedChapterIds.length === 0 || importing}
+            onClick={handleImportChapters}
+          >
+            {importing ? "กำลังนำเข้า..." : `นำเข้า ${selectedChapterIds.length > 0 ? selectedChapterIds.length : ""} ตอน`}
+          </Button>
+        </DialogContent>
+      </Dialog>
 
       {/* Add Episode Dialog */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
