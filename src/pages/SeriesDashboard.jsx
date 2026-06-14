@@ -23,12 +23,12 @@ const genreColors = {
   "อื่นๆ": "from-gray-400 to-slate-500",
 };
 
-function NovelCard({ novel, episodes, uploadingFor, onUploadClick }) {
+function NovelCard({ novel, chapters, uploadingFor, onUploadClick }) {
   const [isOpen, setIsOpen] = useState(false);
   const gradient = genreColors[novel.genre] || "from-gray-400 to-slate-500";
-  const novelEpisodes = episodes
-    .filter((e) => String(e.novel_id) === String(novel.id))
-    .sort((a, b) => (a.episode_number || 0) - (b.episode_number || 0));
+  const novelChapters = chapters
+    .filter((c) => String(c.novel_id) === String(novel.id) && !c.is_deleted)
+    .sort((a, b) => (a.order || 0) - (b.order || 0));
 
   return (
     <div
@@ -71,7 +71,7 @@ function NovelCard({ novel, episodes, uploadingFor, onUploadClick }) {
         )}
         <div className="absolute top-3 right-3">
           <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full border backdrop-blur-sm bg-white/90 text-primary border-primary/20">
-            {novelEpisodes.length} ตอน
+            {novelChapters.length} ตอน
           </span>
         </div>
       </div>
@@ -104,39 +104,39 @@ function NovelCard({ novel, episodes, uploadingFor, onUploadClick }) {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="border-t border-border/40 px-4 pb-4 pt-2 space-y-1 bg-muted/20">
-              {novelEpisodes.length === 0 ? (
+              {novelChapters.length === 0 ? (
                 <div className="text-center py-4">
                   <p className="text-xs text-muted-foreground mb-2">ยังไม่มีตอน</p>
-                  <Link to={`/series/${novel.id}`}>
+                  <Link to={`/novel/${novel.id}`}>
                     <Button size="sm" variant="outline" className="text-xs h-7">เพิ่มตอนแรก</Button>
                   </Link>
                 </div>
               ) : (
                 <>
-                  {novelEpisodes.map((ep) => (
+                  {novelChapters.map((ch, idx) => (
                     <Link
-                      key={ep.id}
-                      to={`/series/${novel.id}/episode/${ep.id}`}
+                      key={ch.id}
+                      to={`/novel/${novel.id}`}
                       className="flex items-center gap-2.5 px-2 py-2 rounded-lg hover:bg-accent/60 transition-colors group"
                     >
                       <span className="w-6 h-6 rounded-md bg-primary/10 text-primary text-xs font-bold flex items-center justify-center shrink-0">
-                        {ep.episode_number}
+                        {ch.order || idx + 1}
                       </span>
-                      <span className="flex-1 text-sm truncate">{ep.title}</span>
+                      <span className="flex-1 text-sm truncate">{ch.title}</span>
                       <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium border shrink-0 ${
-                        ep.status === "published"
+                        ch.status === "เผยแพร่"
                           ? "bg-emerald-100 text-emerald-700 border-emerald-200"
                           : "bg-muted text-muted-foreground border-border"
                       }`}>
-                        {ep.status === "published" ? "เผยแพร่" : "ร่าง"}
+                        {ch.status || "ร่าง"}
                       </span>
                     </Link>
                   ))}
                   <div className="pt-2">
-                    <Link to={`/series/${novel.id}`}>
+                    <Link to={`/novel/${novel.id}`}>
                       <Button size="sm" variant="ghost" className="w-full text-xs h-7 gap-1.5 text-muted-foreground">
                         <FileEdit className="w-3 h-3" />
-                        จัดการตอนทั้งหมด
+                        เปิดหน้าเขียน
                       </Button>
                     </Link>
                   </div>
@@ -177,9 +177,9 @@ export default function SeriesDashboard() {
     queryFn: () => base44.entities.Series.list(),
   });
 
-  const { data: episodes = [] } = useQuery({
-    queryKey: ["episodes-all"],
-    queryFn: () => base44.entities.Episode.list(),
+  const { data: chapters = [] } = useQuery({
+    queryKey: ["chapters-all"],
+    queryFn: () => base44.entities.Chapter.list(),
   });
 
   const handleCoverUpload = async (novelId, file) => {
@@ -266,7 +266,7 @@ export default function SeriesDashboard() {
                     <NovelCard
                       key={novel.id}
                       novel={novel}
-                      episodes={episodes}
+                      chapters={chapters}
                       uploadingFor={uploadingFor}
                       onUploadClick={handleUploadClick}
                     />
@@ -292,7 +292,7 @@ export default function SeriesDashboard() {
                     <NovelCard
                       key={novel.id}
                       novel={novel}
-                      episodes={episodes}
+                      chapters={chapters}
                       uploadingFor={uploadingFor}
                       onUploadClick={handleUploadClick}
                     />
