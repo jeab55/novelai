@@ -63,6 +63,7 @@ export default function ShortStoryWorkspace({ novelId, novel }) {
 
   // Local state
   const [content, setContent] = useState("");
+  const contentRef = useRef("");
   const [wordCount, setWordCount] = useState(0);
   const [saving, setSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
@@ -76,14 +77,17 @@ export default function ShortStoryWorkspace({ novelId, novel }) {
   // Sync chapter content → local state
   useEffect(() => {
     if (chapter && content === "") {
-      setContent(chapter.content || "");
-      setWordCount(countThaiWords(chapter.content || ""));
+      const c = chapter.content || "";
+      setContent(c);
+      contentRef.current = c;
+      setWordCount(countThaiWords(c));
     }
   }, [chapter]);
 
   const handleContentChange = (e) => {
     const val = e.target.value;
     setContent(val);
+    contentRef.current = val;
     setWordCount(countThaiWords(val));
     setIsDirty(true);
   };
@@ -161,16 +165,35 @@ export default function ShortStoryWorkspace({ novelId, novel }) {
       prompt += `[คำสั่ง: เขียนต่อ]\nเนื้อเรื่องปัจจุบันจบที่:\n\n${tail}${hintSection}\n\n---\nเขียนต่อจากนี้อีกประมาณ 300-500 คำ รักษาโทน สไตล์ และตัวละครเดิม ส่งกลับเฉพาะเนื้อหาที่เขียนต่อ ไม่มีคำอธิบาย:`;
     }
 
-    const res = await base44.integrations.Core.InvokeLLM({ prompt, model: "claude_sonnet_4_6" });
-    let text = typeof res === "string" ? res : (res?.text || "");
-    text = text.replace(/^```[\w]*\n?/m, "").replace(/\n?```$/m, "").trim();
+    try {
+      const res = await base44.integrations.Core.InvokeLLM({ prompt, model: "claude_sonnet_4_6" });
+      let text = typeof res === "string" ? res : (res?.text || "");
+      text = text.replace(/^```[\w]*\n?/m, "").replace(/\n?```$/m, "").trim();
 
-    setAiLoading(false);
-    if (text) {
-      setAiResult({ text, action: actionId });
-    } else {
-      toast.error("AI ไม่ได้ส่งผลลัพธ์กลับมา");
+      if (!text) {
+        toast.error("AI ไม่ได้ส่งผลลัพธ์กลับมา");
+        setAiAction(null);
+        return;
+      }
+
+      if (actionId === "continue") {
+        // ต่อท้ายเนื้อเรื่องทันที (ใช้ ref เพื่อให้ได้ค่าล่าสุดเสมอ)
+        const newContent = contentRef.current + "\n\n" + text;
+        setContent(newContent);
+        contentRef.current = newContent;
+        setWordCount(countThaiWords(newContent));
+        setIsDirty(true);
+        setContinueHint("");
+        setAiAction(null);
+        toast.success("เขียนต่อเรียบร้อย");
+      } else {
+        setAiResult({ text, action: actionId });
+      }
+    } catch (err) {
+      toast.error("เกิดข้อผิดพลาด: " + (err?.message || "ไม่สามารถสร้างเนื้อหาได้"));
       setAiAction(null);
+    } finally {
+      setAiLoading(false);
     }
   };
 
