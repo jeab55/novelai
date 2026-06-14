@@ -54,6 +54,11 @@ export default function Dashboard() {
   });
   const activeWriters = writers.filter((w) => w.is_active !== false);
 
+  const { data: seriesList = [] } = useQuery({
+    queryKey: ["series-list"],
+    queryFn: () => base44.entities.Series.list(),
+  });
+
   const { data: novels = [], isLoading } = useQuery({
     queryKey: ["novels", user?.id],
     queryFn: async () => {
@@ -114,6 +119,7 @@ export default function Dashboard() {
       status: novel.status || "กำลังเขียน",
       writer_id: novel.writer_id || "",
       target_chapters: novel.target_chapters || 10,
+      series_id: novel.series_id || "",
     });
     setEditOpen(true);
   };
@@ -203,6 +209,18 @@ export default function Dashboard() {
                   โทน: {activeWriters.find((w) => w.id === editForm.writer_id)?.style || "-"}
                 </p>
               )}
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">ซีรีย์ (ถ้ามี)</label>
+              <Select value={editForm.series_id || "__none__"} onValueChange={(v) => setEditForm({ ...editForm, series_id: v === "__none__" ? "" : v })}>
+                <SelectTrigger><SelectValue placeholder="ไม่ระบุซีรีย์" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">— ไม่ระบุซีรีย์ —</SelectItem>
+                  {seriesList.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>{s.title}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <label className="text-sm font-medium mb-1.5 block">จำนวนตอนที่ต้องการ</label>
