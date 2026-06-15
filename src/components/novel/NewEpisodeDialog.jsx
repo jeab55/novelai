@@ -43,6 +43,14 @@ export default function NewEpisodeDialog({ open, onClose, novel }) {
     select: (data) => data.find((w) => String(w.id) === String(novel?.writer_id)),
   });
 
+  // โหลด EP ก่อนหน้าทั้งหมดใน Series เดียวกัน
+  const { data: prevEpisodes = [] } = useQuery({
+    queryKey: ["series-novels", novel?.series_id],
+    queryFn: () => base44.entities.Novel.filter({ series_id: novel.series_id }),
+    enabled: !!novel?.series_id && open,
+    select: (data) => data.filter((n) => !n.is_deleted && n.id !== novelId),
+  });
+
   // ถ้า existingChars โหลดครั้งแรก → select ทั้งหมด
   React.useEffect(() => {
     if (existingChars.length > 0 && inheritedChars.length === 0) {
@@ -61,16 +69,32 @@ export default function NewEpisodeDialog({ open, onClose, novel }) {
     const writerCtx = writer?.system_prompt
       ? `[สไตล์และโทนการเขียน]\n${writer.system_prompt}\n\n`
       : "";
-    const charSummary = existingChars.map((c) => `${c.name} (${c.role})`).join(", ");
+    const charSummary = existingChars.map((c) => `${c.name} (${c.role}) — ${c.personality || ""}`).join("\n");
+
+    // สรุป EP ก่อนหน้าทั้งหมด เรียงตามลำดับ
+    const prevEpCtx = prevEpisodes.length > 0
+      ? `\n[EP ก่อนหน้าในซีรีส์]\n` + prevEpisodes.map((ep, i) =>
+          `EP ${i + 1}: ${ep.title}\nเรื่องย่อ: ${ep.synopsis || "(ไม่มีเรื่องย่อ)"}`
+        ).join("\n\n")
+      : "";
+
+    const currentEpCtx = `\n[EP ปัจจุบัน (EP ที่กำลังต่อ)]\nชื่อ: ${novel?.title}\nเรื่องย่อ: ${novel?.synopsis || "(ไม่มีเรื่องย่อ)"}`;
 
     const result = await base44.integrations.Core.InvokeLLM({
-      prompt: `${writerCtx}คุณเป็นนักเขียนนิยาย ต้องการสร้างข้อมูลสำหรับ EP ถัดไปของนิยาย
-ชื่อนิยาย: ${novel?.title}
+      prompt: `${writerCtx}คุณเป็นนักเขียนนิยายซีรีส์ ต้องการสร้าง EP ใหม่ที่ต่อเนื่องและเชื่อมโยงกับ EP ก่อนหน้า
+ชื่อซีรีส์/นิยาย: ${novel?.title}
 แนว: ${novel?.genre || ""}
-เรื่องย่อนิยาย: ${novel?.synopsis || ""}
-ตัวละครหลักที่มีอยู่: ${charSummary || "(ยังไม่มี)"}
+${prevEpCtx}
+${currentEpCtx}
 
-กรุณาสร้างชื่อ EP และเรื่องย่อสำหรับ EP ถัดไปที่ต่อเนื่องจากนิยายนี้ ให้สอดคล้องกับสไตล์การเขียนและแนวนิยาย`,
+ตัวละครหลักที่มีอยู่ใน EP ปัจจุบัน:
+${charSummary || "(ยังไม่มี)"}
+
+กรุณาสร้างชื่อ EP ใหม่และเรื่องย่อสำหรับ EP ถัดไป โดย:
+- ต้องมีเหตุการณ์ใหม่ที่ต่อเนื่องจากเหตุการณ์ใน EP ก่อนหน้า
+- แสดงผลกระทบหรือความเปลี่ยนแปลงที่เกิดขึ้นจาก EP ก่อนหน้า
+- ตัวละครเดิมต้องปรากฏและมีพัฒนาการต่อเนื่อง
+- เรื่องราวต้องสดใหม่ แต่มีความเชื่อมโยงเป็นเนื้อเดียวกันกับทั้งซีรีส์`,
       response_json_schema: {
         type: "object",
         properties: {
