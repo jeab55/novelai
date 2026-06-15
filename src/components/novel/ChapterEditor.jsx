@@ -3,14 +3,12 @@ import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Save, Loader2, Download, Copy, MoreHorizontal, Maximize2, Minimize2, Sparkles, Clock, X, RefreshCw, Volume2, History, PieChart, FileText, StickyNote, CheckCircle2, Type, AlignJustify, ShieldCheck, Image } from "lucide-react";
+import { ArrowLeft, Save, Loader2, Download, Copy, MoreHorizontal, Maximize2, Minimize2, Sparkles, Clock, X, RefreshCw, History, PieChart, FileText, CheckCircle2, Type, AlignJustify, ShieldCheck, Image } from "lucide-react";
 import AiDraftDialog from "./AiDraftDialog";
 import EditorReviewPanel from "./EditorReviewPanel";
-import TextToSpeechPanel from "./TextToSpeechPanel";
 import VersionHistoryDialog from "./VersionHistoryDialog";
 import ChapterBalanceMeter from "./ChapterBalanceMeter";
 import SceneTemplateDialog from "./SceneTemplateDialog";
-import QuickNotesPanel from "./QuickNotesPanel";
 import AiEditorReviewPanel from "./AiEditorReviewPanel";
 import ReaderReviewRevisionPanel from "./ReaderReviewRevisionPanel";
 import InlineDiffViewer from "./InlineDiffViewer";
@@ -47,7 +45,6 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
   const [status, setStatus] = useState(chapter.status || "ร่าง");
   const [saving, setSaving] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
-  const [ttsOpen, setTtsOpen] = useState(false);
   const [draftOpen, setDraftOpen] = useState(false);
   const [versionOpen, setVersionOpen] = useState(false);
   const [changeEventOpen, setChangeEventOpen] = useState(false);
@@ -61,7 +58,6 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
   const [editorReview, setEditorReview] = useState(chapter.editor_review || "");
   const [balanceOpen, setBalanceOpen] = useState(false);
   const [templateOpen, setTemplateOpen] = useState(false);
-  const [notesOpen, setNotesOpen] = useState(false);
   const [autoSaveStatus, setAutoSaveStatus] = useState("saved"); // "saving" | "saved"
   const [fontSize, setFontSize] = useState(19);
   const [contentWidth, setContentWidth] = useState(720);
@@ -236,18 +232,6 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
           ))}
         </div>
 
-        {/* TTS button */}
-        <Button
-          variant="outline"
-          size="sm"
-          className={`gap-1.5 h-8 text-xs border-amber-300 hover:bg-amber-50 ${ttsOpen ? "bg-amber-100 text-amber-800" : "text-amber-700"}`}
-          onClick={() => setTtsOpen((v) => !v)}
-          title="อ่านด้วยเสียง"
-        >
-          <Volume2 className="w-3.5 h-3.5" />
-          ฟังเสียง
-        </Button>
-
         {/* Version History button */}
         <Button
           variant="outline"
@@ -282,18 +266,6 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
         >
           <FileText className="w-3.5 h-3.5" />
           เทมเพลต
-        </Button>
-
-        {/* Quick Notes button */}
-        <Button
-          variant="outline"
-          size="sm"
-          className={`gap-1.5 h-8 text-xs border-amber-300 hover:bg-amber-50 ${notesOpen ? "bg-amber-100 text-amber-800" : "text-amber-700"}`}
-          onClick={() => setNotesOpen((v) => !v)}
-          title="บันทึกย่อ"
-        >
-          <StickyNote className="w-3.5 h-3.5" />
-          โน้ต
         </Button>
 
         {/* Illustration button */}
@@ -552,12 +524,6 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
     <div className="flex flex-col h-[calc(100vh-7rem)]">
       {toolbar}
       {timelineBanner}
-      {ttsOpen && (
-        <TextToSpeechPanel
-          content={content}
-          onClose={() => setTtsOpen(false)}
-        />
-      )}
       {balanceOpen && (
         <ChapterBalanceMeter
           content={content}
@@ -645,9 +611,6 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
               onCancel={handleInlineDiffCancel}
               saving={saving}
             />
-            {notesOpen && (
-              <QuickNotesPanel novelId={novelId} onClose={() => setNotesOpen(false)} />
-            )}
           </>
         ) : (
           <>
@@ -671,9 +634,6 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
                 />
               </div>
             </div>
-            {notesOpen && (
-              <QuickNotesPanel novelId={novelId} onClose={() => setNotesOpen(false)} />
-            )}
           </>
         )}
       </div>
