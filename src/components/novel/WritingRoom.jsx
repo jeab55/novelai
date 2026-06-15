@@ -201,29 +201,25 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
         }}
       />
     )}
-    {newEpisodeOpen && (
-      <NewEpisodeDialog
-        open={true}
-        onClose={() => {
-          setNewEpisodeOpen(false);
-          queryClient.invalidateQueries({ queryKey: ["seasons", novelId] });
-        }}
-        novel={novel}
-      />
-    )}
-    {seasonSelectorOpen && (
-      <SeasonSelectorDialog
-        open={true}
-        onClose={() => {
-          setSeasonSelectorOpen(false);
-          queryClient.invalidateQueries({ queryKey: ["seasons", novelId] });
-        }}
-        novel={novel}
-        onSeasonSelected={(season) => {
-          window.location.href = `/novel/${season.id}`;
-        }}
-      />
-    )}
+    <NewEpisodeDialog
+      open={newEpisodeOpen}
+      onClose={() => {
+        setNewEpisodeOpen(false);
+        queryClient.invalidateQueries({ queryKey: ["seasons", novelId] });
+      }}
+      novel={novel}
+    />
+    <SeasonSelectorDialog
+      open={seasonSelectorOpen}
+      onClose={() => {
+        setSeasonSelectorOpen(false);
+        queryClient.invalidateQueries({ queryKey: ["seasons", novelId] });
+      }}
+      novel={novel}
+      onSeasonChange={(season) => {
+        window.location.href = `/novel/${season.id}`;
+      }}
+    />
     <div className="max-w-4xl mx-auto px-4 py-6">
       {/* Season Tabs */}
       {seasons.length > 1 && (
