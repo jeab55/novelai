@@ -318,7 +318,7 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
         {/* Season Tabs & Management */}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3 flex-1">
-            <div className="flex items-center gap-1.5 bg-secondary/50 p-1 rounded-xl">
+            <div className="flex items-center gap-1.5 bg-secondary/50 p-1 rounded-xl flex-1">
               {seasons.length > 1 ? (
                 seasons.map((season, idx) => (
                   <button
@@ -341,17 +341,6 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
                 </div>
               )}
             </div>
-            {seasons.length > 1 && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1.5 h-8 text-purple-700 border-purple-300 hover:bg-purple-50 dark:text-purple-400 dark:border-purple-800/40 dark:hover:bg-purple-950/20"
-                onClick={() => setSeasonSelectorOpen(true)}
-              >
-                <Layers className="w-3.5 h-3.5" />
-                เพิ่ม Season
-              </Button>
-            )}
           </div>
         </div>
 
@@ -370,16 +359,27 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
               ตอนใหม่
             </Button>
             {seasons.length > 1 && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1.5 h-9 text-destructive border-destructive/30 hover:bg-destructive/10"
-                onClick={() => setDeleteSeasonDialogOpen(true)}
-                title="ลบ Season นี้"
-              >
-                <Trash2 className="w-4 h-4" />
-                ลบ Season
-              </Button>
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 h-9 text-purple-700 border-purple-300 hover:bg-purple-50 dark:text-purple-400 dark:border-purple-800/40 dark:hover:bg-purple-950/20"
+                  onClick={() => setSeasonSelectorOpen(true)}
+                >
+                  <Layers className="w-4 h-4" />
+                  เพิ่ม Season
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 h-9 text-destructive border-destructive/30 hover:bg-destructive/10"
+                  onClick={() => setDeleteSeasonDialogOpen(true)}
+                  title="ลบ Season นี้"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  ลบ Season
+                </Button>
+              </>
             )}
           </div>
         </div>
