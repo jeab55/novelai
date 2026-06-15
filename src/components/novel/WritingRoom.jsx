@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, FileText, Loader2, Trash2, Download, Copy, MoreHorizontal, Clock, Sparkles, Users, BookOpen } from "lucide-react";
+import { Plus, FileText, Loader2, Trash2, Download, Copy, MoreHorizontal, Clock, Sparkles, Users, BookOpen, Layers } from "lucide-react";
 import ExportDialog from "./ExportDialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { motion, AnimatePresence } from "framer-motion";
@@ -18,6 +18,7 @@ import AiChapterGeneratorDialog from "./AiChapterGeneratorDialog";
 import AiDraftDialog from "./AiDraftDialog";
 import ContinuityChecker from "./ContinuityChecker";
 import BulkAutoWriteDialog from "./BulkAutoWriteDialog";
+import NewEpisodeDialog from "./NewEpisodeDialog";
 
 const statusColors = {
   "ร่าง": "bg-amber-50 text-amber-700 border border-amber-200",
@@ -36,6 +37,7 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
   const [draftChapter, setDraftChapter] = useState(null);
   const [bulkAutoWriteOpen, setBulkAutoWriteOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const [newEpisodeOpen, setNewEpisodeOpen] = useState(false);
   const queryClient = useQueryClient();
 
   // Handle chapter navigation from other tabs (e.g. AiPlotDialog draft)
@@ -117,6 +119,7 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
   return (
     <>
     <ExportDialog open={exportOpen} onOpenChange={setExportOpen} novel={novel} chapters={chapters} />
+    <NewEpisodeDialog open={newEpisodeOpen} onClose={() => setNewEpisodeOpen(false)} novel={novel} />
     <AiChapterGeneratorDialog
       open={aiChapterGeneratorOpen}
       onClose={() => setAiChapterGeneratorOpen(false)}
@@ -186,6 +189,15 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
               ส่งออก
             </Button>
           )}
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5 text-emerald-700 border-emerald-300 hover:bg-emerald-50 dark:text-emerald-400 dark:border-emerald-800/40 dark:hover:bg-emerald-950/20"
+            onClick={() => setNewEpisodeOpen(true)}
+          >
+            <Layers className="w-3.5 h-3.5" />
+            สร้าง EP ใหม่
+          </Button>
           <Dialog open={newChapterOpen} onOpenChange={setNewChapterOpen}>
           <DialogTrigger asChild>
             <Button size="sm" className="gap-1.5">
