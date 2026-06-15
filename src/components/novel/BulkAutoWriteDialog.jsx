@@ -550,6 +550,57 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
     onClose();
   };
 
+  // Retry ทุกตอนที่ล้มเหลว
+  const retryAllFailed = async () => {
+    const failedChaptersList = log.filter((l) => l.status === "error");
+    if (failedChaptersList.length === 0) return;
+    setStep("running");
+    setCurrentMsg(`🔄 กำลังลองสร้าง ${failedChaptersList.length} ตอนที่ล้มเหลวอีกครั้ง...`);
+    
+    const writerPrompt = novelWriter?.system_prompt || "";
+    
+    const [freshChapters, freshPlotEvents, freshCharacters, freshWorldEntries] = await Promise.all([
+      base44.entities.Chapter.filter({ novel_id: novelId }, "order").then((all) => all.filter((c) => !c.is_deleted)),
+      base44.entities.PlotEvent.filter({ novel_id: novelId }, "order").then((all) => all.filter((e) => !e.is_deleted)),
+      base44.entities.Character.filter({ novel_id: novelId }).then((all) => all.filter((c) => !c.is_deleted)),
+      base44.entities.WorldEntry.filter({ novel_id: novelId }).then((all) => all.filter((w) => !w.is_deleted)),
+    ]);
+
+    for (const failed of failedChaptersList) {
+      const existing = freshChapters.find((c) => c.order === failed.order);
+      const linkedEvent = freshPlotEvents.find((e) => e.order === failed.order);
+      
+      setLog((l) => l.map((e) => e.order === failed.order ? { ...e, status: "generating" } : e));
+      setCurrentMsg(`🔄 กำลังลองสร้างตอนที่ ${failed.order} "${failed.title}"...`);
+      
+      const contextChapters = freshChapters.filter((c) => c.order < failed.order && c.content && !c.is_deleted);
+      const result = await generateSingleChapter({
+        i: failed.order,
+        chapterTitle: failed.title,
+        linkedEvent,
+        contextChapters,
+        writerPrompt,
+        existingChapter: existing,
+        allCharacters: freshCharacters,
+        allWorldEntries: freshWorldEntries,
+        allPlotEvents: freshPlotEvents,
+      });
+
+      if (result.success) {
+        setLog((l) => l.map((e) => e.order === failed.order ? { ...e, status: "done", wordCount: result.wordCount } : e));
+        toast.success(`ตอนที่ ${failed.order}: สร้างสำเร็จ!`);
+      } else {
+        setLog((l) => l.map((e) => e.order === failed.order ? { ...e, status: "error", errorMsg: result.error } : e));
+        toast.error(`ตอนที่ ${failed.order}: ${result.error}`);
+      }
+      
+      setCurrentMsg("");
+    }
+    
+    queryClient.invalidateQueries({ queryKey: ["chapters", novelId] });
+    setStep("done");
+  };
+
   const progressPct = progress.total > 0 ? Math.round((progress.current / progress.total) * 100) : 0;
   const doneCount = log.filter((l) => l.status === "done").length;
   const skipCount = log.filter((l) => l.status === "skip").length;
@@ -740,6 +791,19 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
                   {doneCount + skipCount} / {progress.total} ตอน
                 </span>
               </div>
+              {step === "done" && errorCount > 0 && (
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5 h-7 text-xs border-amber-300 text-amber-700 hover:bg-amber-50"
+                    onClick={retryAllFailed}
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    ลองใหม่ {errorCount} ตอน
+                  </Button>
+                </div>
+              )}
               <div className="w-full bg-muted rounded-full h-2.5 overflow-hidden">
                 <div
                   className="bg-primary h-2.5 rounded-full transition-all duration-500"
@@ -870,9 +934,22 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
           )}
           {step === "done" && (
             <>
-              <span className="text-xs text-muted-foreground">
-                {doneCount} ตอนเสร็จ{errorCount > 0 ? ` · ${errorCount} ผิดพลาด` : ""}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">
+                  {doneCount} ตอนเสร็จ{errorCount > 0 ? ` · ${errorCount} ผิดพลาด` : ""}
+                </span>
+                {errorCount > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={retryAllFailed}
+                    className="gap-1.5 text-amber-700 border-amber-300 hover:bg-amber-50"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    ลองใหม่ ({errorCount})
+                  </Button>
+                )}
+              </div>
               <Button onClick={handleClose} size="sm">ปิด</Button>
             </>
           )}
