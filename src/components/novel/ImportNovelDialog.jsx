@@ -194,6 +194,7 @@ export default function ImportNovelDialog({ open, onClose, novels = [], seriesLi
     
     if (!validTypes.includes(fileExt)) {
       toast.error("รูปแบบไฟล์ไม่รองรับ (รองรับ: TXT, MD, DOCX, PDF)");
+      e.target.value = "";
       return;
     }
 
@@ -201,23 +202,31 @@ export default function ImportNovelDialog({ open, onClose, novels = [], seriesLi
     setSelectedFile(file);
     
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      
-      const response = await fetch('/api/functions/extractTextFromFile', {
-        method: 'POST',
-        body: formData,
+      // อ่านไฟล์เป็น base64
+      const reader = new FileReader();
+      const base64Promise = new Promise((resolve, reject) => {
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
       });
       
-      const result = await response.json();
+      reader.readAsDataURL(file);
+      const base64Data = await base64Promise;
       
-      if (!response.ok) {
-        throw new Error(result.error || 'เกิดข้อผิดพลาดในการอ่านไฟล์');
+      // เรียกใช้ backend function ผ่าน base44Client
+      const response = await base44.functions.invoke('extractTextFromFile', {
+        file_name: file.name,
+        file_type: file.type,
+        file_data: base64Data
+      });
+      
+      const result = response.data;
+      
+      if (!result || result.error) {
+        throw new Error(result?.error || 'เกิดข้อผิดพลาดในการอ่านไฟล์');
       }
       
       setRawText(result.text);
       toast.success(`อ่านไฟล์สำเร็จ: ${result.character_count.toLocaleString()} ตัวอักษร`);
-      setStep(0);
     } catch (err) {
       toast.error(err.message);
       setRawText("");
