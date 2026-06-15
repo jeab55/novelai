@@ -341,73 +341,86 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
             {chapters.length} ตอน · {chapters.reduce((acc, c) => acc + (c.word_count || 0), 0).toLocaleString()} คำ
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-1.5 text-primary/70 border-primary/20"
-            onClick={() => setAiChapterGeneratorOpen(true)}
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            AI สร้างตอน
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className={`gap-1.5 text-violet-600 border-violet-200 hover:bg-violet-50 dark:text-violet-400 dark:border-violet-800/40 dark:hover:bg-violet-950/20 ${isBulkWriting ? "opacity-50 cursor-not-allowed" : ""}`}
-            onClick={() => setBulkAutoWriteOpen(true)}
-            disabled={isBulkWriting}
-            title={isBulkWriting ? "กำลังสร้างตอน... กรุณารอจนเสร็จ" : "AI สร้างตอนทั้งหมด"}
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            AI สร้างตอนทั้งหมด
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-1.5 text-purple-700 border-purple-300 hover:bg-purple-50 dark:text-purple-400 dark:border-purple-800/40 dark:hover:bg-purple-950/20"
-            onClick={() => setSeasonSelectorOpen(true)}
-          >
-            <Layers className="w-3.5 h-3.5" />
-            สร้าง Season ใหม่
-          </Button>
-          <Button size="sm" className="gap-1.5" onClick={() => setNewChapterOpen(true)}>
-            <Plus className="w-3.5 h-3.5" />
-            ตอนใหม่
-          </Button>
-          {seasons.length > 1 && (
+        <div className="flex items-center gap-3">
+          {/* กลุ่มสร้างเนื้อหา */}
+          <div className="flex items-center gap-2">
             <Button
               variant="outline"
               size="sm"
-              className="gap-1.5 text-destructive border-destructive/30 hover:bg-destructive/10"
-              onClick={() => setDeleteSeasonDialogOpen(true)}
-              title="ลบ Season นี้"
+              className="gap-1.5 text-primary/70 border-primary/20"
+              onClick={() => setAiChapterGeneratorOpen(true)}
             >
-              <Trash2 className="w-3.5 h-3.5" />
-              ลบ Season
+              <Sparkles className="w-3.5 h-3.5" />
+              AI สร้างตอน
             </Button>
-          )}
+            <Button
+              variant="outline"
+              size="sm"
+              className={`gap-1.5 text-violet-600 border-violet-200 hover:bg-violet-50 dark:text-violet-400 dark:border-violet-800/40 dark:hover:bg-violet-950/20 ${isBulkWriting ? "opacity-50 cursor-not-allowed" : ""}`}
+              onClick={() => setBulkAutoWriteOpen(true)}
+              disabled={isBulkWriting}
+              title={isBulkWriting ? "กำลังสร้างตอน... กรุณารอจนเสร็จ" : "AI สร้างตอนทั้งหมด"}
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              AI สร้างตอนทั้งหมด
+            </Button>
+          </div>
+
+          {/* กลุ่มจัดการ Season */}
+          <div className="flex items-center gap-2 border-l border-border pl-3">
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5 text-purple-700 border-purple-300 hover:bg-purple-50 dark:text-purple-400 dark:border-purple-800/40 dark:hover:bg-purple-950/20"
+              onClick={() => setSeasonSelectorOpen(true)}
+            >
+              <Layers className="w-3.5 h-3.5" />
+              สร้าง Season ใหม่
+            </Button>
+            {seasons.length > 1 && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 text-destructive border-destructive/30 hover:bg-destructive/10"
+                onClick={() => setDeleteSeasonDialogOpen(true)}
+                title="ลบ Season นี้"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                ลบ Season
+              </Button>
+            )}
+          </div>
+
+          {/* กลุ่มสร้างตอนใหม่ */}
+          <div className="border-l border-border pl-3">
+            <Button size="sm" className="gap-1.5" onClick={() => setNewChapterOpen(true)}>
+              <Plus className="w-3.5 h-3.5" />
+              ตอนใหม่
+            </Button>
+          </div>
+
+          {/* กลุ่มเครื่องมือ */}
           {chapters.length > 0 && (
-            <>
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5 text-muted-foreground"
-              onClick={() => setExportOpen(true)}
-            >
-              <Download className="w-3.5 h-3.5" />
-              ส่งออก
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5 text-blue-700 border-blue-300 hover:bg-blue-50"
-              onClick={() => setSpellCheckSummaryOpen(true)}
-            >
-              <FileText className="w-3.5 h-3.5" />
-              สรุปคำผิด
-            </Button>
-            </>
+            <div className="flex items-center gap-2 border-l border-border pl-3">
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 text-muted-foreground"
+                onClick={() => setExportOpen(true)}
+              >
+                <Download className="w-3.5 h-3.5" />
+                ส่งออก
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 text-blue-700 border-blue-300 hover:bg-blue-50"
+                onClick={() => setSpellCheckSummaryOpen(true)}
+              >
+                <FileText className="w-3.5 h-3.5" />
+                สรุปคำผิด
+              </Button>
+            </div>
           )}
         </div>
       </div>
