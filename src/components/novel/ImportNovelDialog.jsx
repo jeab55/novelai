@@ -12,12 +12,15 @@ import { toast } from "sonner";
 
 // ค้นหา delimiter ที่เป็น "ตอนที่" / "บทที่" / "Chapter" ฯลฯ
 const CHAPTER_PATTERNS = [
-  /^(ตอนที่\s*\d+[^\n]*)/m,
-  /^(บทที่\s*\d+[^\n]*)/m,
-  /^(Chapter\s*\d+[^\n]*)/im,
-  /^(ตอน\s*\d+[^\n]*)/m,
-  /^(เล่ม\s*\d+[^\n]*)/m,
-  /^(ภาค\s*\d+[^\n]*)/m,
+  /^(ตอนที่\s*\d+[^\n]*)/gm,
+  /^(บทที่\s*\d+[^\n]*)/gm,
+  /^(Chapter\s*\d+[^\n]*)/gim,
+  /^(ตอน\s*\d+[^\n]*)/gm,
+  /^(เล่ม\s*\d+[^\n]*)/gm,
+  /^(ภาค\s*\d+[^\n]*)/gm,
+  /^(\d+\.\s*[^\n]+)/gm,  // 1. Chapter Title
+  /^(---+\s*$)/gm,        // --- separator
+  /^(===+\s*$)/gm,        // === separator
 ];
 
 function detectAndSplit(text, customDelimiter) {
@@ -41,7 +44,7 @@ function detectAndSplit(text, customDelimiter) {
     return chapters.length > 0 ? chapters : [{ title: "ตอนที่ 1", content: text.trim() }];
   }
 
-  // auto-detect
+  // auto-detect: ลองทุก pattern
   for (const pattern of CHAPTER_PATTERNS) {
     const globalPattern = new RegExp(pattern.source, "gm");
     const matches = [...text.matchAll(globalPattern)];
@@ -215,11 +218,11 @@ export default function ImportNovelDialog({ open, onClose, novels = [], seriesLi
                 <Textarea
                   value={rawText}
                   onChange={(e) => setRawText(e.target.value)}
-                  placeholder={`วางเนื้อหานิยายทั้งหมด...\n\nตัวอย่างรูปแบบที่รองรับ:\n• ตอนที่ 1 ชื่อตอน\nเนื้อหา...\n• บทที่ 1\nเนื้อหา...\n• Chapter 1\nเนื้อหา...`}
+                  placeholder={`วางเนื้อหานิยายทั้งหมดจากแหล่งอื่นที่นี่...\n\nรูปแบบที่ระบบแบ่งตอนอัตโนมัติ:\n• ตอนที่ 1, ตอนที่ 2, ...\n• บทที่ 1, บทที่ 2, ...\n• Chapter 1, Chapter 2, ...\n• 1. Chapter Title\n• --- หรือ === (ตัวคั่น)\n\nระบบจะตรวจจับและแบ่งให้อัตโนมัติ`}
                   className="min-h-[260px] font-mono text-sm resize-none"
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  {rawText.length > 0 ? `${rawText.length.toLocaleString()} ตัวอักษร` : "รองรับรูปแบบ ตอนที่ / บทที่ / Chapter โดยอัตโนมัติ"}
+                  {rawText.length > 0 ? `${rawText.length.toLocaleString()} ตัวอักษร` : "วางข้อความแล้วระบบจะแบ่งตอนให้อัตโนมัติ"}
                 </p>
               </div>
               <div>
