@@ -281,6 +281,7 @@ export default function Dashboard() {
                       : "border-border"
                   }`} 
                   onClick={() => setShowOnlyCompleted(!showOnlyCompleted)}
+                  title={showOnlyCompleted ? "แสดงนิยายทั้งหมด" : "แสดงเฉพาะนิยายที่เขียนเสร็จ"}
                 >
                   <Filter className="w-4 h-4" />
                   {showOnlyCompleted ? "แสดงทั้งหมด" : "เขียนเสร็จแล้ว"}
