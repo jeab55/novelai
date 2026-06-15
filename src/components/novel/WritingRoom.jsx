@@ -165,6 +165,15 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
 
   const deleteSeason = useMutation({
     mutationFn: async () => {
+      // ตรวจสอบว่าเป็น Season 1 (novel หลัก) หรือไม่
+      const isSeason1 = String(selectedSeasonTab) === String(novelId);
+      
+      if (isSeason1) {
+        // ไม่อนุญาตให้ลบ Season 1
+        toast.error("ไม่สามารถลบ Season หลักได้");
+        return;
+      }
+      
       // Soft delete Season
       await base44.entities.Novel.update(selectedSeasonTab, { is_deleted: true, deleted_at: new Date().toISOString() });
       // Soft delete chapters ทั้งหมดใน Season นี้
@@ -178,12 +187,10 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
       queryClient.invalidateQueries({ queryKey: ["chapters", selectedSeasonTab] });
       toast.success("ลบ Season แล้ว (สามารถกู้คืนจากถังขยะได้)");
       setDeleteSeasonDialogOpen(false);
-      // กลับไป Season 1 หากเป็น Season สุดท้ายที่ลบ
-      if (seasons.length > 1) {
-        const remainingSeasons = seasons.filter((s) => String(s.id) !== String(selectedSeasonTab));
-        if (remainingSeasons.length > 0) {
-          window.location.href = `/novel/${remainingSeasons[0].id}`;
-        }
+      // กลับไป Season 1
+      const remainingSeasons = seasons.filter((s) => String(s.id) !== String(selectedSeasonTab));
+      if (remainingSeasons.length > 0) {
+        window.location.href = `/novel/${remainingSeasons[0].id}`;
       }
     },
   });
@@ -295,20 +302,32 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
             ยืนยันการลบ Season
           </AlertDialogTitle>
           <AlertDialogDescription>
-            คุณต้องการลบ Season นี้และตอนทั้งหมดใน Season นี้ใช่หรือไม่?
-            <br /><br />
-            การลบจะ<strong>ซ่อน</strong> Season นี้และตอนทั้งหมด (สามารถกู้คืนจากถังขยะได้)
+            {String(selectedSeasonTab) === String(novelId) ? (
+              <>
+                <strong className="text-destructive">ไม่สามารถลบ Season หลักได้</strong>
+                <br />
+                Season 1 เป็น Season หลักของนิยาย ไม่สามารถลบได้
+              </>
+            ) : (
+              <>
+                คุณต้องการลบ Season นี้และตอนทั้งหมดใน Season นี้ใช่หรือไม่?
+                <br /><br />
+                การลบจะ<strong>ซ่อน</strong> Season นี้และตอนทั้งหมด (สามารถกู้คืนจากถังขยะได้)
+              </>
+            )}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
-          <AlertDialogAction
-            onClick={() => deleteSeason.mutate()}
-            disabled={deleteSeason.isPending}
-            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-          >
-            {deleteSeason.isPending ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />กำลังลบ...</> : "ลบ Season"}
-          </AlertDialogAction>
+          {String(selectedSeasonTab) !== String(novelId) && (
+            <AlertDialogAction
+              onClick={() => deleteSeason.mutate()}
+              disabled={deleteSeason.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteSeason.isPending ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />กำลังลบ...</> : "ลบ Season"}
+            </AlertDialogAction>
+          )}
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
@@ -358,17 +377,17 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
               <Plus className="w-4 h-4" />
               ตอนใหม่
             </Button>
-            {seasons.length > 1 && (
-              <>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5 h-9 text-purple-700 border-purple-300 hover:bg-purple-50 dark:text-purple-400 dark:border-purple-800/40 dark:hover:bg-purple-950/20"
-                  onClick={() => setSeasonSelectorOpen(true)}
-                >
-                  <Layers className="w-4 h-4" />
-                  เพิ่ม Season
-                </Button>
+            <div className="flex items-center gap-1.5 border-l border-border pl-3 ml-1">
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 h-9 text-purple-700 border-purple-300 hover:bg-purple-50 dark:text-purple-400 dark:border-purple-800/40 dark:hover:bg-purple-950/20"
+                onClick={() => setSeasonSelectorOpen(true)}
+              >
+                <Layers className="w-4 h-4" />
+                เพิ่ม Season
+              </Button>
+              {seasons.length > 1 && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -379,8 +398,8 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
                   <Trash2 className="w-4 h-4" />
                   ลบ Season
                 </Button>
-              </>
-            )}
+              )}
+            </div>
           </div>
         </div>
       </div>
