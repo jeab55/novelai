@@ -4,7 +4,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, ArrowLeft, BookOpen, FileEdit, Trash2, Eye, EyeOff } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Plus, ArrowLeft, BookOpen, FileEdit, Trash2, Eye, EyeOff, Sparkles, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -15,6 +16,8 @@ export default function SeriesDetail() {
   const queryClient = useQueryClient();
   const [addOpen, setAddOpen] = useState(false);
   const [newTitle, setNewTitle] = useState("");
+  const [newSynopsis, setNewSynopsis] = useState("");
+  const [generatingSynopsis, setGeneratingSynopsis] = useState(false);
   const autoImportedRef = useRef(false);
 
   const { data: novel, isLoading: novelLoading } = useQuery({
@@ -23,6 +26,21 @@ export default function SeriesDetail() {
       const all = await base44.entities.Novel.list();
       return all.find((n) => String(n.id) === String(novelId));
     },
+  });
+
+  const { data: writer } = useQuery({
+    queryKey: ["writer-for-series", novel?.writer_id],
+    queryFn: async () => {
+      if (!novel?.writer_id) return null;
+      const all = await base44.entities.Writer.list();
+      return all.find((w) => w.id === novel.writer_id) || null;
+    },
+    enabled: !!novel?.writer_id,
+  });
+
+  const { data: characters = [] } = useQuery({
+    queryKey: ["characters-for-series", novelId],
+    queryFn: () => base44.entities.Character.filter({ novel_id: novelId }),
   });
 
   const { data: chapters = [] } = useQuery({
@@ -104,14 +122,43 @@ export default function SeriesDetail() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["episodes", novelId] }),
   });
 
+  const generateSynopsis = async () => {
+    if (!newTitle.trim()) { toast.error("กรุณาใส่ชื่อตอนก่อน"); return; }
+    setGeneratingSynopsis(true);
+    const writerCtx = writer?.system_prompt ? `[สไตล์และโทนการเขียน]\n${writer.system_prompt}\n\n` : "";
+    const charSummary = characters
+      .filter((c) => !c.is_deleted)
+      .map((c) => `${c.name} (${c.role || "ตัวประกอบ"})`)
+      .join(", ");
+    const prompt = `${writerCtx}คุณเป็นนักเขียนนิยายมืออาชีพ กำลังวางแผนเรื่องย่อของตอนใหม่
+ชื่อนิยาย: ${novel?.title || ""}
+แนว: ${novel?.genre || ""}
+เนื้อเรื่องย่อนิยาย: ${novel?.synopsis || "(ไม่มี)"}
+ตอนทั้งหมดที่มีแล้ว: ${episodes.length} ตอน
+ตอนใหม่ที่ ${episodes.length + 1}: "${newTitle}"
+ตัวละครหลัก: ${charSummary || "(ยังไม่มี)"}
+
+กรุณาเขียนเรื่องย่อของตอนนี้ประมาณ 3-5 ประโยค ให้น่าสนใจ สอดคล้องกับนิยาย และสอดคล้องกับสไตล์การเขียน ตอบเป็นภาษาไทยเท่านั้น ห้ามใส่หัวข้อหรือคำนำหน้า`;
+    const result = await base44.integrations.Core.InvokeLLM({ prompt });
+    setNewSynopsis(typeof result === "string" ? result.trim() : "");
+    setGeneratingSynopsis(false);
+  };
+
   const handleAddEpisode = () => {
     if (!newTitle.trim()) return;
     createEpisodeMutation.mutate({
       novel_id: novelId,
       title: newTitle.trim(),
       episode_number: episodes.length + 1,
+      content: newSynopsis.trim() ? `[เรื่องย่อ]\n${newSynopsis.trim()}` : "",
       status: "draft",
     });
+  };
+
+  const handleOpenAddDialog = () => {
+    setNewTitle("");
+    setNewSynopsis("");
+    setAddOpen(true);
   };
 
   if (novelLoading) {
@@ -181,7 +228,7 @@ export default function SeriesDetail() {
         {/* Episodes list */}
         <div className="flex items-center justify-between mb-5">
           <h2 className="font-heading font-semibold text-lg">รายการตอน</h2>
-          <Button className="gap-2" onClick={() => setAddOpen(true)}>
+          <Button className="gap-2" onClick={handleOpenAddDialog}>
             <Plus className="w-4 h-4" />
             เพิ่มตอนใหม่
           </Button>
@@ -195,7 +242,7 @@ export default function SeriesDetail() {
           <div className="text-center py-16 border border-dashed border-border/60 rounded-2xl">
             <FileEdit className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
             <p className="text-muted-foreground mb-4">ยังไม่มีตอน เริ่มเพิ่มตอนแรกได้เลย</p>
-            <Button variant="outline" className="gap-2" onClick={() => setAddOpen(true)}>
+            <Button variant="outline" className="gap-2" onClick={handleOpenAddDialog}>
               <Plus className="w-4 h-4" />
               เพิ่มตอนแรก
             </Button>
@@ -265,28 +312,64 @@ export default function SeriesDetail() {
 
       {/* Add Episode Dialog */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle className="font-heading">เพิ่มตอนใหม่</DialogTitle>
+            <DialogTitle className="font-heading">เพิ่มตอนใหม่ (ตอนที่ {episodes.length + 1})</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-2">
             <div>
-              <label className="text-sm font-medium mb-1.5 block">ชื่อตอนที่ {episodes.length + 1}</label>
-              <Input
-                value={newTitle}
-                onChange={(e) => setNewTitle(e.target.value)}
-                placeholder="ชื่อตอน..."
-                onKeyDown={(e) => e.key === "Enter" && handleAddEpisode()}
-                autoFocus
-              />
+              <label className="text-sm font-medium mb-1.5 block">ชื่อตอน</label>
+              <div className="flex gap-2">
+                <Input
+                  value={newTitle}
+                  onChange={(e) => setNewTitle(e.target.value)}
+                  placeholder="ชื่อตอน..."
+                  autoFocus
+                  className="flex-1"
+                />
+                <Button
+                  variant="outline"
+                  className="gap-1.5 shrink-0"
+                  onClick={generateSynopsis}
+                  disabled={generatingSynopsis || !newTitle.trim()}
+                  title="ให้ AI สร้างเรื่องย่ออัตโนมัติ"
+                >
+                  {generatingSynopsis
+                    ? <Loader2 className="w-4 h-4 animate-spin" />
+                    : <Sparkles className="w-4 h-4" />}
+                  {generatingSynopsis ? "กำลังสร้าง..." : "AI สร้างเรื่องย่อ"}
+                </Button>
+              </div>
             </div>
-            <Button
-              className="w-full"
-              onClick={handleAddEpisode}
-              disabled={!newTitle.trim() || createEpisodeMutation.isPending}
-            >
-              {createEpisodeMutation.isPending ? "กำลังเพิ่ม..." : "เพิ่มตอน"}
-            </Button>
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">
+                เรื่องย่อตอน
+                <span className="text-xs font-normal text-muted-foreground ml-2">(แก้ไขได้ก่อนยืนยัน)</span>
+              </label>
+              <Textarea
+                value={newSynopsis}
+                onChange={(e) => setNewSynopsis(e.target.value)}
+                placeholder="เรื่องย่อของตอนนี้... (ไม่บังคับ)"
+                rows={5}
+                className="resize-none"
+              />
+              {!writer && (
+                <p className="text-xs text-muted-foreground mt-1.5">
+                  💡 เลือก AI Writer ให้นิยายนี้เพื่อให้ AI ใช้สไตล์ที่เหมาะสม
+                </p>
+              )}
+            </div>
+            <div className="flex gap-2 justify-end pt-1">
+              <Button variant="ghost" onClick={() => setAddOpen(false)}>ยกเลิก</Button>
+              <Button
+                onClick={handleAddEpisode}
+                disabled={!newTitle.trim() || createEpisodeMutation.isPending}
+              >
+                {createEpisodeMutation.isPending
+                  ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />กำลังเพิ่ม...</>
+                  : "ยืนยันเพิ่มตอน"}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
