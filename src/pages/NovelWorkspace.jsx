@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Feather, PenTool, Users, Globe, Clock, Bot, Trash2, Share2, History, CheckCircle2, BookOpen } from "lucide-react";
+import { ArrowLeft, Feather, PenTool, Users, Globe, Clock, Bot, Trash2, Share2, History, CheckCircle2, BookOpen, Brain } from "lucide-react";
 import VersionHistoryDialog from "@/components/novel/VersionHistoryDialog";
 import { saveVersion } from "@/lib/saveVersion";
 import { useNavigate } from "react-router-dom";
@@ -20,6 +20,7 @@ import WorldBible from "@/components/novel/WorldBible";
 import Timeline from "@/components/novel/Timeline";
 import WriterManager from "@/components/novel/WriterManager";
 import ShortStoryWorkspace from "@/components/novel/ShortStoryWorkspace";
+import ContinuityAnalysisPanel from "@/components/novel/ContinuityAnalysisPanel";
 
 export default function NovelWorkspace() {
   const novelId = window.location.pathname.split("/novel/")[1]?.split("/")[0];
@@ -293,6 +294,7 @@ export default function NovelWorkspace() {
                 { value: "timeline", icon: Clock, label: "ไทม์ไลน์" },
                 { value: "world", icon: Globe, label: "โลก/ฉาก" },
                 { value: "writers", icon: Bot, label: "นักเขียน AI" },
+                { value: "analysis", icon: Brain, label: "วิเคราะห์พล็อต" },
                 { value: "writing", icon: PenTool, label: "ห้องเขียน" },
               ].map(({ value, icon: Icon, label }) => (
                 <TabsTrigger
@@ -332,6 +334,9 @@ export default function NovelWorkspace() {
           </TabsContent>
           <TabsContent value="writers" className="m-0">
             <WriterManager />
+          </TabsContent>
+          <TabsContent value="analysis" className="m-0">
+            <ContinuityAnalysisPanel novelId={activeNovelId} chapters={chapters || []} />
           </TabsContent>
         </div>
       </Tabs>
