@@ -345,39 +345,42 @@ ${newCharacterHints ? `คำแนะนำพิเศษ: ${newCharacterHints
           )}
 
           {/* Step 3: ยืนยัน */}
-          {step === 3 && (
-            <div className="space-y-4">
-              <div className="bg-muted/30 rounded-2xl p-4 space-y-3">
-                <div>
-                  <p className="text-xs text-muted-foreground mb-0.5">ชื่อ EP ใหม่</p>
-                  <p className="font-heading font-semibold text-base">{epTitle}</p>
-                </div>
-                {epSynopsis && (
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-0.5">เนื้อเรื่องย่อ</p>
-                    <p className="text-sm text-foreground/80 line-clamp-3">{epSynopsis}</p>
-                  </div>
-                )}
-                <div className="flex gap-6 pt-1">
-                  <div className="text-center">
-                    <p className="text-2xl font-bold text-primary">{inheritedChars.length}</p>
-                    <p className="text-xs text-muted-foreground">ตัวละครเดิม</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-2xl font-bold text-primary">{aiNewChars.length}</p>
-                    <p className="text-xs text-muted-foreground">ตัวละครใหม่</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-2xl font-bold text-primary">{novel?.target_chapters || 10}</p>
-                    <p className="text-xs text-muted-foreground">จำนวนตอน</p>
-                  </div>
-                </div>
-              </div>
-              <p className="text-sm text-muted-foreground text-center">
-                ระบบจะสร้างนิยายใหม่ใน Series เดียวกัน พร้อมตัวละครที่เลือก
-              </p>
-            </div>
-          )}
+           {step === 3 && (
+             <div className="space-y-4">
+               <div className="bg-muted/30 rounded-2xl p-4 space-y-3">
+                 <div>
+                   <p className="text-xs text-muted-foreground mb-0.5">ชื่อ EP ใหม่</p>
+                   <p className="font-heading font-semibold text-base">{epTitle}</p>
+                 </div>
+                 <div>
+                   <p className="text-xs text-muted-foreground mb-1.5">เนื้อเรื่องย่อ (แก้ไขได้)</p>
+                   <Textarea
+                     value={epSynopsis}
+                     onChange={(e) => setEpSynopsis(e.target.value)}
+                     placeholder="เรื่องย่อของ EP นี้..."
+                     className="resize-none h-24"
+                   />
+                 </div>
+                 <div className="flex gap-6 pt-1">
+                   <div className="text-center">
+                     <p className="text-2xl font-bold text-primary">{inheritedChars.length}</p>
+                     <p className="text-xs text-muted-foreground">ตัวละครเดิม</p>
+                   </div>
+                   <div className="text-center">
+                     <p className="text-2xl font-bold text-primary">{aiNewChars.length}</p>
+                     <p className="text-xs text-muted-foreground">ตัวละครใหม่</p>
+                   </div>
+                   <div className="text-center">
+                     <p className="text-2xl font-bold text-primary">{novel?.target_chapters || 10}</p>
+                     <p className="text-xs text-muted-foreground">จำนวนตอน</p>
+                   </div>
+                 </div>
+               </div>
+               <p className="text-sm text-muted-foreground text-center">
+                 ระบบจะสร้างนิยายใหม่ใน Series เดียวกัน พร้อมตัวละครที่เลือก
+               </p>
+             </div>
+           )}
         </div>
 
         {/* Footer buttons */}
@@ -385,19 +388,27 @@ ${newCharacterHints ? `คำแนะนำพิเศษ: ${newCharacterHints
           <Button variant="outline" onClick={step === 1 ? handleClose : () => setStep(s => s - 1)}>
             {step === 1 ? "ยกเลิก" : "ย้อนกลับ"}
           </Button>
-          {step < 3 ? (
-            <Button
-              onClick={() => setStep(s => s + 1)}
-              disabled={step === 1 && !epTitle.trim()}
-            >
-              ถัดไป <ChevronRight className="w-4 h-4 ml-1" />
-            </Button>
-          ) : (
-            <Button onClick={handleCreate} disabled={creating} className="gap-2">
-              {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-              สร้าง EP ใหม่
-            </Button>
-          )}
+          <div className="flex gap-2">
+            {step < 3 && (
+              <Button
+                onClick={() => setStep(s => s + 1)}
+                disabled={step === 1 && !epTitle.trim()}
+              >
+                ถัดไป <ChevronRight className="w-4 h-4 ml-1" />
+              </Button>
+            )}
+            {step === 3 && (
+              <Button variant="secondary" onClick={() => setStep(2)}>
+                ถัดไป <ChevronRight className="w-4 h-4 ml-1" />
+              </Button>
+            )}
+            {step === 3 && (
+              <Button onClick={handleCreate} disabled={creating} className="gap-2">
+                {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                ตกลง
+              </Button>
+            )}
+          </div>
         </div>
       </DialogContent>
     </Dialog>
