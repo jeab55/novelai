@@ -7,10 +7,11 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, FileText, Loader2, Trash2, Download, Copy, MoreHorizontal, Clock, Sparkles, Users, BookOpen, Layers } from "lucide-react";
+import { Plus, FileText, Loader2, Trash2, Download, Copy, MoreHorizontal, Clock, Sparkles, Users, BookOpen, Layers, GripVertical } from "lucide-react";
 import ExportDialog from "./ExportDialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { motion, AnimatePresence } from "framer-motion";
+import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import ChapterEditor from "./ChapterEditor";
 import { downloadChapterTxt, downloadChapterMd, copyChapterToClipboard, downloadAllChaptersMd } from "@/utils/exportChapter";
 import { toast } from "sonner";
@@ -132,6 +133,23 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
   });
 
   const statuses = ["ร่าง", "เขียนเสร็จ", "เผยแพร่"];
+
+  const handleDragEnd = async (result) => {
+    if (!result.destination || result.destination.index === result.source.index) return;
+    const reordered = Array.from(chapters);
+    const [moved] = reordered.splice(result.source.index, 1);
+    reordered.splice(result.destination.index, 0, moved);
+    // อัปเดต order ใหม่ทุกตอนที่เปลี่ยน
+    const updates = reordered
+      .map((ch, idx) => ({ ch, newOrder: idx + 1 }))
+      .filter(({ ch, newOrder }) => ch.order !== newOrder);
+    await Promise.all(
+      updates.map(({ ch, newOrder }) =>
+        base44.entities.Chapter.update(ch.id, { order: newOrder })
+      )
+    );
+    queryClient.invalidateQueries({ queryKey: ["chapters", selectedEpisodeTab] });
+  };
 
   if (selectedChapter) {
     return (
@@ -338,15 +356,27 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
           </Button>
         </div>
       ) : (
-        <div className="space-y-2">
-          <AnimatePresence>
+        <DragDropContext onDragEnd={handleDragEnd}>
+        <Droppable droppableId="chapters">
+          {(provided) => (
+          <div className="space-y-2" ref={provided.innerRef} {...provided.droppableProps}>
             {chapters.map((ch, i) => (
-              <motion.div
-                key={ch.id}
-                layout
-                className="group flex items-center gap-4 px-5 py-4 rounded-2xl border border-border/50 bg-card/60 hover:border-primary/30 hover:bg-card hover:shadow-sm cursor-pointer transition-all duration-200"
+              <Draggable key={ch.id} draggableId={ch.id} index={i}>
+                {(drag, snapshot) => (
+              <div
+                ref={drag.innerRef}
+                {...drag.draggableProps}
+                className={`group flex items-center gap-4 px-5 py-4 rounded-2xl border bg-card/60 hover:border-primary/30 hover:bg-card hover:shadow-sm cursor-pointer transition-all duration-200 ${snapshot.isDragging ? "border-primary/50 shadow-lg ring-2 ring-primary/20 bg-card" : "border-border/50"}`}
                 onClick={() => setSelectedChapter(ch)}
               >
+                {/* drag handle */}
+                <div
+                  {...drag.dragHandleProps}
+                  onClick={(e) => e.stopPropagation()}
+                  className="text-muted-foreground/40 hover:text-muted-foreground cursor-grab active:cursor-grabbing shrink-0 -ml-1"
+                >
+                  <GripVertical className="w-4 h-4" />
+                </div>
                 {/* ลำดับตอน */}
                 <div className="w-9 h-9 rounded-xl bg-primary/8 flex items-center justify-center text-sm font-semibold text-primary shrink-0">
                   {ch.order || i + 1}
@@ -464,10 +494,15 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
-              </motion.div>
+              </div>
+                )}
+              </Draggable>
             ))}
-          </AnimatePresence>
-        </div>
+            {provided.placeholder}
+          </div>
+          )}
+        </Droppable>
+        </DragDropContext>
       )}
     </div>
     <div className="fixed bottom-4 right-4 z-50">
