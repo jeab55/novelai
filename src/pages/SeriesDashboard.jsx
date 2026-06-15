@@ -308,8 +308,16 @@ export default function SeriesDashboard() {
     setSeriesDialog({ open: false, novel: null, selectedSeries: "", episodeNumber: "" });
   };
 
-  const novelsInSeries = novels.filter((n) => n.series_id);
-  const novelsWithoutSeries = novels.filter((n) => !n.series_id);
+  // กรองนิยายที่มีอย่างน้อย 1 ตอน
+  const novelsWithChapters = novels.filter((n) => {
+    const chapCount = chapters.filter(
+      (c) => String(c.novel_id) === String(n.id) && !c.is_deleted
+    ).length;
+    return chapCount > 0;
+  });
+
+  const novelsInSeries = novelsWithChapters.filter((n) => n.series_id);
+  const novelsWithoutSeries = novelsWithChapters.filter((n) => !n.series_id);
 
   const novelsBySeries = seriesList
     .map((s) => ({
