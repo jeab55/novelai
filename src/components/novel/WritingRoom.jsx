@@ -254,13 +254,13 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
               <button
                 key={season.id}
                 onClick={() => setSelectedSeasonTab(season.id)}
-                className={`px-3 py-1.5 text-xs rounded-md transition-all ${
+                className={`px-3 py-1.5 text-sm rounded-md transition-all ${
                   String(selectedSeasonTab) === String(season.id)
-                    ? "bg-primary text-primary-foreground font-medium shadow-sm"
+                    ? "bg-primary text-primary-foreground font-semibold shadow-sm"
                     : "text-muted-foreground hover:bg-primary/5"
                 }`}
               >
-                Season {idx + 1}: {season.title?.slice(0, 15)}{season.title?.length > 15 ? "..." : ""}
+                {season.title || `Season ${idx + 1}`}
               </button>
             ))}
           </div>
