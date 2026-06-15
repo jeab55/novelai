@@ -527,6 +527,11 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
 
   const handleCancel = () => {
     cancelledRef.current = true;
+    // รอให้ loop ตรวจสอบ cancelled แล้วจะ setStep("done") เอง
+    // แต่เราต้อง force update UI ทันที
+    setTimeout(() => {
+      setStep("done");
+    }, 500);
   };
 
   const handleClose = () => {
