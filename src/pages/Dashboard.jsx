@@ -332,12 +332,6 @@ export default function Dashboard() {
                             เรื่องสั้น
                           </div>
                         )}
-                        {(novel.auto_written || jobs[novel.id]?.status === "done") && jobs[novel.id]?.status !== "running" && (
-                          <div className="flex items-center gap-1 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 text-[11px] font-semibold px-2.5 py-1 rounded-full border border-emerald-500/30 shadow-sm">
-                            <CheckCircle2 className="w-3 h-3 text-emerald-500" />
-                            สำเร็จ
-                          </div>
-                        )}
                       </div>
 
                       {/* Content */}
