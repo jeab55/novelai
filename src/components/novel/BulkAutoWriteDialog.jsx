@@ -195,7 +195,7 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
   };
 
   // เรียก LLM พร้อม timeout 90 วินาที
-  const invokeLLMWithTimeout = async (prompt, timeoutMs = 90000) => {
+  const invokeLLMWithTimeout = async (prompt, timeoutMs = 180000) => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
     try {
@@ -242,7 +242,7 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
       expandPrompt += `[เขียนต่อจากนี้ — อย่างน้อย ${remainingWords} คำ]:\n`;
 
       try {
-        const result = await invokeLLMWithTimeout(expandPrompt, 90000);
+        const result = await invokeLLMWithTimeout(expandPrompt, 180000);
         let expansion = typeof result === "string" ? result : (result?.text || "");
         expansion = expansion.replace(/^```[\w]*\n?/m, "").replace(/\n?```$/m, "").trim();
         if (!expansion || expansion.length < 50) break;
@@ -312,7 +312,7 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
       }
 
       try {
-        const result = await invokeLLMWithTimeout(taskPrompt, 90000);
+        const result = await invokeLLMWithTimeout(taskPrompt, 180000);
         let text = typeof result === "string" ? result : (result?.text || "");
         text = text.replace(/^```[\w]*\n?/m, "").replace(/\n?```$/m, "").trim();
 
