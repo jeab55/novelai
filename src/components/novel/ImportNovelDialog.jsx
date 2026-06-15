@@ -248,6 +248,9 @@ export default function ImportNovelDialog({ open, onClose, novels = [], seriesLi
       const result = detectAndSplit(rawText, customDelimiter);
       setChapters(result);
       setStep(1);
+      toast.success(`แบ่งตอนแล้ว: ${result.length} ตอน`);
+    } else {
+      toast.error("กรุณาใส่ข้อความหรืออัพโหลดไฟล์ก่อน");
     }
   };
 

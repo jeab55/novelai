@@ -467,8 +467,8 @@ export default function SeriesDashboard() {
       <ImportNovelDialog
         open={importOpen}
         onClose={() => setImportOpen(false)}
-        novels={novels}
-        seriesList={seriesList}
+        novels={novels || []}
+        seriesList={seriesList || []}
       />
 
       <SeriesFormDialog
