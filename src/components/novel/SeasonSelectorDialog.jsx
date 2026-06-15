@@ -28,6 +28,7 @@ export default function SeasonSelectorDialog({ open, onClose, novel, onSeasonCha
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [createdSeasonId, setCreatedSeasonId] = useState(null);
   const [deleteDialog, setDeleteDialog] = useState({ open: false, season: null });
+  const [successDialog, setSuccessDialog] = useState({ open: false, seasonTitle: "" });
 
   // โหลดทุก Season ของนิยายเรื่องนี้
   const { data: seasons = [] } = useQuery({
@@ -247,6 +248,7 @@ ${charSummary || "(ยังไม่มี)"}
       setCreatedSeasonId(newSeason.id);
       setCreating(false);
       setSavedSuccess(true);
+      setSuccessDialog({ open: true, seasonTitle: seasonTitle });
       toast.success("สร้าง Season สำเร็จ");
     } catch (error) {
       console.error("Failed to create Season:", error);
@@ -265,6 +267,7 @@ ${charSummary || "(ยังไม่มี)"}
     setSeasonGenerated(false);
     setSavedSuccess(false);
     setCreatedSeasonId(null);
+    setSuccessDialog({ open: false, seasonTitle: "" });
     onClose();
   }
 
@@ -736,6 +739,35 @@ ${charSummary || "(ยังไม่มี)"}
           >
             {deleteSeasonMutation.isPending ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />กำลังลบ...</> : "ลบ Season"}
           </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+
+    {/* Success Dialog */}
+    <AlertDialog open={successDialog.open} onOpenChange={(open) => setSuccessDialog({ open, seasonTitle: successDialog.seasonTitle })}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle className="font-heading flex items-center gap-2">
+            <Check className="w-5 h-5 text-emerald-600" />
+            สร้าง Season สำเร็จ
+          </AlertDialogTitle>
+          <AlertDialogDescription className="text-center py-2">
+            ได้สร้าง Season ใหม่ "<strong>{successDialog.seasonTitle}</strong>" เรียบร้อยแล้ว
+            <br />
+            พร้อมเริ่มเขียนตอนแรกแล้ว
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter className="sm:justify-center">
+          <Button
+            onClick={() => {
+              setSuccessDialog({ open: false, seasonTitle: "" });
+              onSeasonChange?.(seasons.find(s => String(s.id) === String(createdSeasonId)) || { id: createdSeasonId });
+              onClose();
+            }}
+            className="min-w-[120px]"
+          >
+            ตกลง
+          </Button>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
