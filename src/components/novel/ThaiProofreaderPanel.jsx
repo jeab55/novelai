@@ -54,113 +54,139 @@ export default function ThaiProofreaderPanel({ content, onApplySuggestions }) {
     setChecking(true);
     try {
       // ใช้ AI ตรวจสอบคำผิดและการเว้นวรรค
-      const response = await base44.functions.invoke('analyzePlotContinuity', {
-        novel_id: 'proofread',
-        chapters: [{ content }]
-      });
-
-      // Fallback: ตรวจสอบด้วย rule-based
+      const response = await base44.functions.invoke('checkThaiSpelling', { content });
+      
       const foundSuggestions = [];
 
       // 1. ตรวจสอบคำที่เขียนผิด
-      const spellingMistakes = [];
-      Object.entries(COMMON_MISTAKES).forEach(([wrong, correct]) => {
-        const regex = new RegExp(wrong, 'g');
-        const matches = [...content.matchAll(regex)];
-        if (matches.length > 0) {
-          matches.forEach(match => {
-            spellingMistakes.push({
-              type: 'spelling',
-              wrong: wrong,
-              correct: correct,
-              position: match.index,
-              context: content.slice(Math.max(0, match.index - 20), Math.min(content.length, match.index + wrong.length + 20))
-            });
-          });
-        }
-      });
-
-      if (spellingMistakes.length > 0) {
+      if (response.spelling_errors && response.spelling_errors.length > 0) {
         foundSuggestions.push({
           group: 'spelling',
           title: 'คำที่อาจเขียนผิด',
           icon: AlertTriangle,
           color: 'orange',
-          items: spellingMistakes.slice(0, 10) // จำกัด 10 คำ
+          items: response.spelling_errors.slice(0, 10)
         });
       }
 
       // 2. ตรวจสอบการเว้นวรรค
-      const spacingIssues = [];
-      
-      // ช่องว่างเกิน
-      const multipleSpaces = [...content.matchAll(/\s{2,}/g)];
-      if (multipleSpaces.length > 0) {
-        spacingIssues.push({
-          type: 'spacing',
-          issue: 'ช่องว่างเกิน',
-          count: multipleSpaces.length,
-          suggestion: 'รวมช่องว่างหลายช่องเป็นช่องเดียว'
-        });
-      }
-
-      // ขาดช่องว่างก่อนคำบางคำ
-      SHOULD_SPACE_BEFORE.forEach(word => {
-        const regex = new RegExp(`([^\\s])${word}`, 'g');
-        const matches = [...content.matchAll(regex)];
-        if (matches.length > 0) {
-          spacingIssues.push({
-            type: 'spacing',
-            issue: `อาจต้องเว้นวรรคก่อน "${word}"`,
-            count: matches.length,
-            suggestion: `เพิ่มช่องว่างก่อน "${word}"`
-          });
-        }
-      });
-
-      if (spacingIssues.length > 0) {
+      if (response.spacing_issues && response.spacing_issues.length > 0) {
         foundSuggestions.push({
           group: 'spacing',
           title: 'การเว้นวรรค',
           icon: AlertTriangle,
           color: 'blue',
-          items: spacingIssues.slice(0, 10)
+          items: response.spacing_issues.slice(0, 10)
         });
       }
 
       // 3. ตรวจสอบสไตล์การเขียน
-      const styleIssues = [];
-      
-      // คำซ้ำ
-      const repeatedWords = [...content.matchAll(/(\w+)\s+\1/g)];
-      if (repeatedWords.length > 0) {
-        styleIssues.push({
-          type: 'style',
-          issue: 'คำซ้ำ',
-          count: repeatedWords.length,
-          suggestion: 'ตรวจสอบการใช้คำซ้ำ'
-        });
-      }
-
-      // ประโยคยาวเกินไป (ไม่มีวรรคตอนเกิน 100 ตัวอักษร)
-      const longSentences = content.split(/[.!?।]/).filter(s => s.trim().length > 100);
-      if (longSentences.length > 0) {
-        styleIssues.push({
-          type: 'style',
-          issue: 'ประโยคยาวเกินไป',
-          count: longSentences.length,
-          suggestion: 'แบ่งประโยคให้อ่านง่ายขึ้น'
-        });
-      }
-
-      if (styleIssues.length > 0) {
+      if (response.style_issues && response.style_issues.length > 0) {
         foundSuggestions.push({
           group: 'style',
           title: 'สไตล์การเขียน',
           icon: Sparkles,
           color: 'purple',
-          items: styleIssues
+          items: response.style_issues.slice(0, 10)
         });
+      }
+
+      // Fallback: ตรวจสอบด้วย rule-based ถ้า AI ไม่พบอะไร
+      if (foundSuggestions.length === 0) {
+        // ตรวจสอบคำที่เขียนผิดแบบ rule-based
+        const spellingMistakes = [];
+        Object.entries(COMMON_MISTAKES).forEach(([wrong, correct]) => {
+          const regex = new RegExp(wrong, 'g');
+          const matches = [...content.matchAll(regex)];
+          if (matches.length > 0) {
+            matches.forEach(match => {
+              spellingMistakes.push({
+                type: 'spelling',
+                wrong: wrong,
+                correct: correct,
+                position: match.index,
+                context: content.slice(Math.max(0, match.index - 20), Math.min(content.length, match.index + wrong.length + 20))
+              });
+            });
+          }
+        });
+
+        if (spellingMistakes.length > 0) {
+          foundSuggestions.push({
+            group: 'spelling',
+            title: 'คำที่อาจเขียนผิด',
+            icon: AlertTriangle,
+            color: 'orange',
+            items: spellingMistakes.slice(0, 10)
+          });
+        }
+
+        // ตรวจสอบการเว้นวรรค
+        const spacingIssues = [];
+        const multipleSpaces = [...content.matchAll(/\s{2,}/g)];
+        if (multipleSpaces.length > 0) {
+          spacingIssues.push({
+            type: 'spacing',
+            issue: 'ช่องว่างเกิน',
+            count: multipleSpaces.length,
+            suggestion: 'รวมช่องว่างหลายช่องเป็นช่องเดียว'
+          });
+        }
+
+        SHOULD_SPACE_BEFORE.forEach(word => {
+          const regex = new RegExp(`([^\\s])${word}`, 'g');
+          const matches = [...content.matchAll(regex)];
+          if (matches.length > 0) {
+            spacingIssues.push({
+              type: 'spacing',
+              issue: `อาจต้องเว้นวรรคก่อน "${word}"`,
+              count: matches.length,
+              suggestion: `เพิ่มช่องว่างก่อน "${word}"`
+            });
+          }
+        });
+
+        if (spacingIssues.length > 0) {
+          foundSuggestions.push({
+            group: 'spacing',
+            title: 'การเว้นวรรค',
+            icon: AlertTriangle,
+            color: 'blue',
+            items: spacingIssues.slice(0, 10)
+          });
+        }
+
+        // ตรวจสอบสไตล์
+        const styleIssues = [];
+        const repeatedWords = [...content.matchAll(/(\w+)\s+\1/g)];
+        if (repeatedWords.length > 0) {
+          styleIssues.push({
+            type: 'style',
+            issue: 'คำซ้ำ',
+            count: repeatedWords.length,
+            suggestion: 'ตรวจสอบการใช้คำซ้ำ'
+          });
+        }
+
+        const longSentences = content.split(/[.!?।]/).filter(s => s.trim().length > 100);
+        if (longSentences.length > 0) {
+          styleIssues.push({
+            type: 'style',
+            issue: 'ประโยคยาวเกินไป',
+            count: longSentences.length,
+            suggestion: 'แบ่งประโยคให้อ่านง่ายขึ้น'
+          });
+        }
+
+        if (styleIssues.length > 0) {
+          foundSuggestions.push({
+            group: 'style',
+            title: 'สไตล์การเขียน',
+            icon: Sparkles,
+            color: 'purple',
+            items: styleIssues
+          });
+        }
       }
 
       setSuggestions(foundSuggestions);
