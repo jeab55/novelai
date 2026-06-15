@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { saveVersion } from "@/lib/saveVersion";
 import { useAuth } from "@/lib/AuthContext";
 import ExportDialog from "./ExportDialog";
+import ThaiSpellCheckerDialog from "./ThaiSpellCheckerDialog";
 
 const countThaiWords = (text) => {
   if (!text) return 0;
@@ -73,6 +74,7 @@ export default function ShortStoryWorkspace({ novelId, novel }) {
   const [aiResult, setAiResult] = useState(null); // {text, action}
   const [continueHint, setContinueHint] = useState("");
   const [exportOpen, setExportOpen] = useState(false);
+  const [spellCheckerOpen, setSpellCheckerOpen] = useState(false);
 
   // Sync chapter content → local state
   useEffect(() => {
@@ -223,6 +225,17 @@ export default function ShortStoryWorkspace({ novelId, novel }) {
   return (
     <>
     <ExportDialog open={exportOpen} onOpenChange={setExportOpen} novel={novel} chapters={chapter ? [{ ...chapter, content }] : []} />
+    <ThaiSpellCheckerDialog
+      open={spellCheckerOpen}
+      onClose={() => setSpellCheckerOpen(false)}
+      content={content}
+      novel={novel}
+      onApplyChanges={(updatedContent) => {
+        setContent(updatedContent);
+        setWordCount(countThaiWords(updatedContent));
+        toast.success("แก้ไขคำผิดแล้ว");
+      }}
+    />
     <div className="max-w-4xl mx-auto px-4 py-6 space-y-4">
       {/* Word count progress */}
       <div className="bg-card border border-border/60 rounded-xl px-4 py-3 space-y-1.5">
@@ -280,6 +293,23 @@ export default function ShortStoryWorkspace({ novelId, novel }) {
           )}
         </div>
       )}
+
+      {/* Proofreading Tools */}
+      <div className="bg-card border border-border/60 rounded-xl p-3 mb-3">
+        <p className="text-[11px] font-semibold text-muted-foreground mb-2 px-1">ตรวจคำผิด</p>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5 text-xs border-blue-300 hover:bg-blue-50 text-blue-700"
+            onClick={() => setSpellCheckerOpen(true)}
+            title="ตรวจคำสะกดผิด คำพิมพ์ตก คำที่ใช้ผิดบริบท"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            ตรวจคำผิด
+          </Button>
+        </div>
+      </div>
 
       {/* AI Tools */}
       <div className="bg-card border border-border/60 rounded-xl p-3">
