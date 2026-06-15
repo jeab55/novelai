@@ -349,7 +349,7 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
                 onClick={() => setSeasonSelectorOpen(true)}
               >
                 <Layers className="w-3.5 h-3.5" />
-                จัดการ Season
+                เพิ่ม Season
               </Button>
             )}
           </div>
@@ -388,12 +388,12 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
       {/* Toolbar - AI Tools & Actions */}
       {chapters.length > 0 && (
         <div className="bg-gradient-to-r from-secondary/50 to-secondary/30 border border-border rounded-xl p-4 mb-6">
-          <div className="flex items-center gap-4 flex-wrap">
+          <div className="flex items-center gap-3 flex-wrap">
             {/* AI Writing Group */}
             <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1.5 mr-2">
-                <Wand2 className="w-4 h-4 text-primary" />
-                <span className="text-sm font-semibold text-primary">AI เขียน</span>
+              <div className="flex items-center gap-1.5 mr-1 px-2 py-1.5 bg-primary/10 rounded-lg">
+                <Wand2 className="w-3.5 h-3.5 text-primary" />
+                <span className="text-xs font-semibold text-primary">AI เขียน</span>
               </div>
               <Button
                 variant="outline"
@@ -420,27 +420,62 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
             {/* Divider */}
             <div className="w-px h-6 bg-border" />
 
-            {/* Tools Group */}
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1.5 h-9 text-blue-700 border-blue-300 hover:bg-blue-50"
-                onClick={() => setSpellCheckSummaryOpen(true)}
-              >
-                <CheckCircle2 className="w-4 h-4" />
-                ตรวจคำผิด
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1.5 h-9 text-muted-foreground"
-                onClick={() => setExportOpen(true)}
-              >
-                <Download className="w-4 h-4" />
-                ส่งออก
-              </Button>
-            </div>
+            {/* AI Tools Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 h-9 text-blue-700 border-blue-300 hover:bg-blue-50"
+                >
+                  <Wand2 className="w-4 h-4" />
+                  เครื่องมือ AI
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-56">
+                <DropdownMenuItem
+                  onClick={() => setSpellCheckSummaryOpen(true)}
+                  className="gap-2"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  ตรวจคำผิด
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setAiChapterGeneratorOpen(true)}
+                  className="gap-2"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  สร้างตอนด้วย AI
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setBulkAutoWriteOpen(true)}
+                  disabled={isBulkWriting}
+                  className="gap-2"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  สร้างตอนทั้งหมด
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => setExportOpen(true)}
+                  className="gap-2"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  ส่งออกไฟล์
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Quick Export */}
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5 h-9 text-muted-foreground"
+              onClick={() => setExportOpen(true)}
+            >
+              <Download className="w-4 h-4" />
+              ส่งออก
+            </Button>
           </div>
         </div>
       )}
