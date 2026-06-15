@@ -192,13 +192,35 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
         novelId={novelId}
         onInsert={(content) => {
           const chapterToOpen = { ...draftChapter, content };
-          // Close dialog first, then navigate — prevents state updates on unmounted component
           setAiDraftOpen(false);
           setTimeout(() => {
             setDraftChapter(null);
             setSelectedChapter(chapterToOpen);
           }, 0);
           toast.success("เปิด editor พร้อมร่างที่ AI สร้างแล้ว");
+        }}
+      />
+    )}
+    {newEpisodeOpen && (
+      <NewEpisodeDialog
+        open={true}
+        onClose={() => {
+          setNewEpisodeOpen(false);
+          queryClient.invalidateQueries({ queryKey: ["seasons", novelId] });
+        }}
+        novel={novel}
+      />
+    )}
+    {seasonSelectorOpen && (
+      <SeasonSelectorDialog
+        open={true}
+        onClose={() => {
+          setSeasonSelectorOpen(false);
+          queryClient.invalidateQueries({ queryKey: ["seasons", novelId] });
+        }}
+        novel={novel}
+        onSeasonSelected={(season) => {
+          window.location.href = `/novel/${season.id}`;
         }}
       />
     )}
@@ -275,30 +297,6 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
             <Layers className="w-3.5 h-3.5" />
             สร้าง EP ใหม่
           </Button>
-          {newEpisodeOpen && (
-            <NewEpisodeDialog
-              open={true}
-              onClose={() => {
-                setNewEpisodeOpen(false);
-                queryClient.invalidateQueries({ queryKey: ["seasons", novelId] });
-              }}
-              novel={novel}
-            />
-          )}
-          {seasonSelectorOpen && (
-            <SeasonSelectorDialog
-              open={true}
-              onClose={() => {
-                setSeasonSelectorOpen(false);
-                queryClient.invalidateQueries({ queryKey: ["seasons", novelId] });
-              }}
-              novel={novel}
-              onSeasonSelected={(season) => {
-                // Navigate to the new season
-                window.location.href = `/novel/${season.id}`;
-              }}
-            />
-          )}
           <Dialog open={newChapterOpen} onOpenChange={setNewChapterOpen}>
           <DialogTrigger asChild>
             <Button size="sm" className="gap-1.5">
