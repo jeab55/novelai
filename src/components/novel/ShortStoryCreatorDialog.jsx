@@ -361,15 +361,23 @@ ${content.substring(0, 3000)}
         <div className="px-6 py-4 border-t border-border/60 shrink-0 flex items-center justify-end gap-2">
           {step === "form" && (
             <>
-              <Button variant="ghost" size="sm" onClick={handleClose}>ยกเลิก</Button>
-              <Button onClick={handleCreate} disabled={!form.idea.trim()} className="gap-2 bg-sky-600 hover:bg-sky-700 text-white">
-                <Sparkles className="w-4 h-4" />
-                สร้างเรื่องสั้น
+              <Button variant="ghost" size="sm" onClick={handleClose} disabled={step === "generating"}>ยกเลิก</Button>
+              <Button 
+                onClick={handleCreate} 
+                disabled={!form.idea.trim() || step === "generating"} 
+                title={!form.idea.trim() ? "กรุณากรอกไอเดียสั้นๆ ก่อน" : ""}
+                className="gap-2 bg-sky-600 hover:bg-sky-700 text-white"
+              >
+                {step === "generating" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                {step === "generating" ? "กำลังสร้าง..." : "สร้างเรื่องสั้น"}
               </Button>
             </>
           )}
           {step === "generating" && (
-            <p className="text-xs text-muted-foreground">กรุณารอ...</p>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Loader2 className="w-3 h-3 animate-spin" />
+              กำลังสร้างเรื่องสั้น...
+            </div>
           )}
           {step === "done" && (
             <>

@@ -332,7 +332,7 @@ export default function SeriesDetail() {
                   className="gap-1.5 shrink-0"
                   onClick={generateSynopsis}
                   disabled={generatingSynopsis || !newTitle.trim()}
-                  title="ให้ AI สร้างเรื่องย่ออัตโนมัติ"
+                  title={!newTitle.trim() ? "กรุณากรอกชื่อตอนก่อน" : "ให้ AI สร้างเรื่องย่ออัตโนมัติ"}
                 >
                   {generatingSynopsis
                     ? <Loader2 className="w-4 h-4 animate-spin" />
@@ -364,6 +364,7 @@ export default function SeriesDetail() {
               <Button
                 onClick={handleAddEpisode}
                 disabled={!newTitle.trim() || createEpisodeMutation.isPending}
+                title={!newTitle.trim() ? "กรุณากรอกชื่อตอน" : ""}
               >
                 {createEpisodeMutation.isPending
                   ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />กำลังเพิ่ม...</>

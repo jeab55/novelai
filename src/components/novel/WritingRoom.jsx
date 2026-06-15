@@ -380,9 +380,10 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
                     plot_event_order: ev?.order || null,
                   });
                 }}
-                disabled={!newTitle || createChapter.isPending}
+                disabled={!newTitle.trim() || createChapter.isPending}
+                title={!newTitle.trim() ? "กรุณากรอกชื่อตอน" : ""}
               >
-                สร้างตอน
+                {createChapter.isPending ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />กำลังสร้าง...</> : "สร้างตอน"}
               </Button>
             </div>
           </DialogContent>

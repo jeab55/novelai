@@ -605,11 +605,11 @@ export default function CreateNovelWizard({ open, onOpenChange, activeWriters, o
               </Button>
             )}
             {step < 3 ? (
-              <Button className="flex-1" onClick={next}>
+              <Button className="flex-1" onClick={next} disabled={creating}>
                 ถัดไป
               </Button>
             ) : (
-              <Button className="flex-1" onClick={handleCreate} disabled={creating}>
+              <Button className="flex-1" onClick={handleCreate} disabled={creating || !form.title.trim() || !form.writer_id} title={!form.title.trim() ? "กรุณากรอกชื่อเรื่อง" : !form.writer_id ? "กรุณาเลือกนักเขียน AI" : ""}>
                 {creating ? <><Loader2 className="w-4 h-4 animate-spin mr-1.5" />กำลังสร้าง...</> : "สร้างนิยาย"}
               </Button>
             )}

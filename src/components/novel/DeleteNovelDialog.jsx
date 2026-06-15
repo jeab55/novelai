@@ -1,7 +1,7 @@
 import React from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Trash2, RotateCcw, AlertTriangle } from "lucide-react";
+import { Trash2, RotateCcw, AlertTriangle, Loader2 } from "lucide-react";
 
 /**
  * mode: "delete" | "restore" | "permanent"
@@ -54,7 +54,7 @@ export default function DeleteNovelDialog({ open, onClose, onConfirm, novel, mod
             onClick={onConfirm}
             disabled={isPending}
           >
-            {isPending ? "กำลังดำเนินการ..." : c.confirmLabel}
+            {isPending ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />กำลังดำเนินการ...</> : c.confirmLabel}
           </Button>
         </div>
       </DialogContent>

@@ -4,7 +4,7 @@ import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { BookOpen, Layers, ChevronDown, ChevronUp, MoreVertical, ImagePlus, FolderOpen, BookMarked, FolderPlus, ArrowRightLeft, ArrowUp, ArrowDown, BookPlus, Plus, Library } from "lucide-react";
+import { BookOpen, Layers, ChevronDown, ChevronUp, MoreVertical, ImagePlus, FolderOpen, BookMarked, FolderPlus, ArrowRightLeft, ArrowUp, ArrowDown, BookPlus, Plus, Library, Loader2 } from "lucide-react";
 import ImportNovelDialog from "@/components/novel/ImportNovelDialog";
 import SeriesFormDialog from "@/components/series/SeriesFormDialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -353,8 +353,10 @@ export default function SeriesDashboard() {
           </div>
         </div>
         <div className="flex gap-2 mt-4">
-          <Button variant="outline" className="flex-1" onClick={() => setSeriesDialog({ open: false, novel: null, selectedSeries: "", episodeNumber: "" })}>ยกเลิก</Button>
-          <Button className="flex-1" onClick={confirmMoveSeries} disabled={updateNovelMutation.isPending}>บันทึก</Button>
+          <Button variant="outline" className="flex-1" onClick={() => setSeriesDialog({ open: false, novel: null, selectedSeries: "", episodeNumber: "" })} disabled={updateNovelMutation.isPending}>ยกเลิก</Button>
+          <Button className="flex-1" onClick={confirmMoveSeries} disabled={updateNovelMutation.isPending || (!seriesDialog.selectedSeries || seriesDialog.selectedSeries === "__none__")}>
+            {updateNovelMutation.isPending ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />กำลังบันทึก...</> : "บันทึก"}
+          </Button>
         </div>
       </DialogContent>
     </Dialog>
@@ -379,8 +381,10 @@ export default function SeriesDashboard() {
           </SelectContent>
         </Select>
         <div className="flex gap-2 mt-4">
-          <Button variant="outline" className="flex-1" onClick={() => setMoveChapterDialog({ open: false, chapter: null, targetNovelId: "" })}>ยกเลิก</Button>
-          <Button className="flex-1" onClick={confirmMoveChapter} disabled={!moveChapterDialog.targetNovelId || updateChapterMutation.isPending}>ย้าย</Button>
+          <Button variant="outline" className="flex-1" onClick={() => setMoveChapterDialog({ open: false, chapter: null, targetNovelId: "" })} disabled={updateChapterMutation.isPending}>ยกเลิก</Button>
+          <Button className="flex-1" onClick={confirmMoveChapter} disabled={!moveChapterDialog.targetNovelId || updateChapterMutation.isPending} title={!moveChapterDialog.targetNovelId ? "กรุณาเลือกนิยายปลายทาง" : ""}>
+            {updateChapterMutation.isPending ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />กำลังย้าย...</> : "ย้าย"}
+          </Button>
         </div>
       </DialogContent>
     </Dialog>

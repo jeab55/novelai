@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Copy, X, UserPlus, Link as LinkIcon } from "lucide-react";
+import { Copy, X, UserPlus, Link as LinkIcon, Loader2 } from "lucide-react";
 
 function generateToken() {
   return Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 10);
@@ -96,8 +96,8 @@ export default function ShareNovelDialog({ open, onClose, novel }) {
                 onKeyDown={(e) => e.key === "Enter" && addEmail()}
                 className="text-sm"
               />
-              <Button size="sm" onClick={addEmail} disabled={updateNovel.isPending}>
-                เชิญ
+              <Button size="sm" onClick={addEmail} disabled={updateNovel.isPending || !emailInput.trim()}>
+                {updateNovel.isPending ? <><Loader2 className="w-3 h-3 animate-spin mr-1" />กำลังเชิญ...</> : "เชิญ"}
               </Button>
             </div>
 

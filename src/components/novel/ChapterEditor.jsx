@@ -395,9 +395,8 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
             </SelectContent>
           </Select>
         )}
-        <Button size="sm" className="gap-1.5" onClick={handleSave} disabled={saving}>
-          {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-          บันทึก
+        <Button size="sm" className="gap-1.5" onClick={handleSave} disabled={saving || !title.trim()}>
+          {saving ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /><span className="hidden sm:inline">กำลังบันทึก...</span></> : <><Save className="w-3.5 h-3.5" /><span className="hidden sm:inline">บันทึก</span></>}
         </Button>
       </div>
     </div>
@@ -544,7 +543,7 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
           })()}
           <div className="flex gap-2">
             <Button variant="ghost" className="flex-1" onClick={() => setChangeEventOpen(false)}>ยกเลิก</Button>
-            <Button className="flex-1" onClick={handleBindEvent} disabled={!selectedPlotEventId}>บันทึก</Button>
+            <Button className="flex-1" onClick={handleBindEvent} disabled={!selectedPlotEventId} title={!selectedPlotEventId ? "กรุณาเลือกเหตุการณ์" : ""}>บันทึก</Button>
           </div>
         </div>
       </DialogContent>

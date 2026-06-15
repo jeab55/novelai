@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Plus, BookOpen, Pencil, Trash2, Share2, CheckCircle2 } from "lucide-react";
+import { Plus, BookOpen, Pencil, Trash2, Share2, CheckCircle2, Loader2 } from "lucide-react";
 import DeleteNovelDialog from "@/components/novel/DeleteNovelDialog";
 import CreateNovelWizard from "@/components/novel/CreateNovelWizard";
 import ShortStoryCreatorDialog from "@/components/novel/ShortStoryCreatorDialog";
@@ -241,9 +241,10 @@ export default function Dashboard() {
             <Button
               className="w-full"
               onClick={() => updateMutation.mutate({ id: editingId, data: editForm })}
-              disabled={!editForm.title || updateMutation.isPending}
+              disabled={!editForm.title?.trim() || updateMutation.isPending}
+              title={!editForm.title?.trim() ? "กรุณากรอกชื่อเรื่อง" : ""}
             >
-              {updateMutation.isPending ? "กำลังบันทึก..." : "บันทึกการเปลี่ยนแปลง"}
+              {updateMutation.isPending ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />กำลังบันทึก...</> : "บันทึกการเปลี่ยนแปลง"}
             </Button>
           </div>
         </DialogContent>
