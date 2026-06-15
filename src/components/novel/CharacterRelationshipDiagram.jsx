@@ -58,7 +58,7 @@ export default function CharacterRelationshipDiagram({ novelId }) {
     enabled: open,
   });
 
-  // วิเคราะห์ความสัมพันธ์จากฟิลด์ relationships
+  // วิเคราะห์ความสัมพันธ์จากฟิลด์ relationships และเหตุการณ์
   const relationshipNetwork = useMemo(() => {
     const network = {};
     
@@ -66,7 +66,7 @@ export default function CharacterRelationshipDiagram({ novelId }) {
       network[char.id] = {
         character: char,
         relationships: [],
-        coAppearances: new Set(),
+        plotConnections: new Map(), // eventId -> event details
       };
 
       if (char.relationships) {
@@ -93,7 +93,7 @@ export default function CharacterRelationshipDiagram({ novelId }) {
       }
     });
 
-    // หา co-appearance ในเหตุการณ์
+    // หาความเชื่อมโยงผ่านเหตุการณ์ในเรื่อง
     events.forEach((ev) => {
       if (ev.characters_involved) {
         const involvedNames = ev.characters_involved.split(",").map((s) => s.trim());
@@ -104,12 +104,13 @@ export default function CharacterRelationshipDiagram({ novelId }) {
           )
         );
 
-        involvedChars.forEach((char1) => {
-          involvedChars.forEach((char2) => {
-            if (char1.id !== char2.id && network[char1.id]) {
-              network[char1.id].coAppearances.add(char2.id);
-            }
-          });
+        involvedChars.forEach((char) => {
+          if (network[char.id]) {
+            network[char.id].plotConnections.set(ev.id, {
+              event: ev,
+              withCharacters: involvedChars.filter((c) => c.id !== char.id),
+            });
+          }
         });
       }
     });
@@ -125,6 +126,11 @@ export default function CharacterRelationshipDiagram({ novelId }) {
       char.role.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [characters, searchTerm]);
+
+  // นับจำนวนความเชื่อมโยงในแต่ละเหตุการณ์
+  const getPlotConnectionCount = (charId) => {
+    return relationshipNetwork[charId]?.plotConnections?.size || 0;
+  };
 
   const selectedCharData = selectedChar ? relationshipNetwork[selectedChar.id] : null;
 
@@ -143,7 +149,7 @@ export default function CharacterRelationshipDiagram({ novelId }) {
             แผนภาพความสัมพันธ์ตัวละคร
           </DialogTitle>
           <p className="text-xs text-muted-foreground mt-0.5">
-            แสดงความสัมพันธ์ระหว่างตัวละคร มิตร/ศัตรู/รัก และเหตุการณ์ที่ปรากฏร่วมกัน
+            แสดงความสัมพันธ์ระหว่างตัวละครและเหตุการณ์ที่ปรากฏร่วมกันในเรื่อง
           </p>
         </DialogHeader>
 
@@ -167,7 +173,7 @@ export default function CharacterRelationshipDiagram({ novelId }) {
               {filteredCharacters.map((char) => {
                 const charData = relationshipNetwork[char.id];
                 const relCount = charData?.relationships.length || 0;
-                const coCount = charData?.coAppearances.size || 0;
+                const plotCount = charData?.plotConnections?.size || 0;
 
                 return (
                   <motion.button
@@ -187,13 +193,14 @@ export default function CharacterRelationshipDiagram({ novelId }) {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-sm truncate">{char.name}</p>
-                        <div className="flex items-center gap-2 mt-0.5">
+                        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                           <Badge className={`${roleColors[char.role] || roleColors["ตัวประกอบ"]} text-[10px] px-1.5 py-0`}>
                             {char.role}
                           </Badge>
-                          {relCount > 0 && (
-                            <span className="text-[10px] text-muted-foreground">
-                              {relCount} ความสัมพันธ์
+                          {plotCount > 0 && (
+                            <span className="text-[10px] text-primary/70 flex items-center gap-0.5">
+                              <Network className="w-2.5 h-2.5" />
+                              {plotCount} เหตุการณ์
                             </span>
                           )}
                         </div>
@@ -265,28 +272,55 @@ export default function CharacterRelationshipDiagram({ novelId }) {
                   </div>
                 )}
 
-                {/* ปรากฏร่วมกัน */}
-                {selectedCharData?.coAppearances.size > 0 && (
+                {/* ปรากฏร่วมกันในเรื่อง */}
+                {selectedCharData?.plotConnections.size > 0 && (
                   <div>
                     <h4 className="font-semibold text-sm mb-3 flex items-center gap-2">
-                      <Users className="w-4 h-4 text-primary" />
-                      ปรากฏในเหตุการณ์เดียวกัน
+                      <Network className="w-4 h-4 text-primary" />
+                      ปรากฏร่วมกันในเรื่อง ({selectedCharData.plotConnections.size} เหตุการณ์)
                     </h4>
-                    <div className="flex flex-wrap gap-2">
-                      {Array.from(selectedCharData.coAppearances).map((charId) => {
-                        const char = characters.find((c) => c.id === charId);
-                        if (!char) return null;
-                        return (
-                          <Badge
-                            key={charId}
-                            variant="outline"
-                            className="text-xs bg-accent/30 cursor-pointer hover:bg-accent/50 transition-colors"
-                            onClick={() => setSelectedChar(char)}
-                          >
-                            {char.name}
-                          </Badge>
-                        );
-                      })}
+                    <div className="space-y-2">
+                      {Array.from(selectedCharData.plotConnections.values()).slice(0, 6).map((conn, idx) => (
+                        <motion.div
+                          key={conn.event.id}
+                          initial={{ opacity: 0, y: 5 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: idx * 0.05 }}
+                          className="p-3 rounded-lg border bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700"
+                        >
+                          <div className="flex items-start gap-2">
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-sm text-slate-800 dark:text-slate-200 truncate">
+                                {conn.event.title}
+                              </p>
+                              {conn.event.description && (
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 line-clamp-2">
+                                  {conn.event.description}
+                                </p>
+                              )}
+                              {conn.withCharacters.length > 0 && (
+                                <div className="flex flex-wrap gap-1 mt-2">
+                                  {conn.withCharacters.map((c) => (
+                                    <Badge
+                                      key={c.id}
+                                      variant="outline"
+                                      className="text-[10px] bg-white dark:bg-slate-900 cursor-pointer hover:bg-primary/5 transition-colors"
+                                      onClick={() => setSelectedChar(c)}
+                                    >
+                                      {c.name}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </motion.div>
+                      ))}
+                      {selectedCharData.plotConnections.size > 6 && (
+                        <p className="text-xs text-muted-foreground text-center mt-2">
+                          + อีก {selectedCharData.plotConnections.size - 6} เหตุการณ์
+                        </p>
+                      )}
                     </div>
                   </div>
                 )}
