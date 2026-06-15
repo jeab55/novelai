@@ -22,6 +22,8 @@ export default function NewEpisodeDialog({ open, onClose, novel }) {
   const [creating, setCreating] = useState(false);
   const [generatingEp, setGeneratingEp] = useState(false);
   const [epGenerated, setEpGenerated] = useState(false);
+  const [savedSuccess, setSavedSuccess] = useState(false); // แสดงสถานะสำเร็จ
+  const [createdNovelId, setCreatedNovelId] = useState(null); // เก็บ ID นิยายที่สร้าง
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -223,10 +225,9 @@ ${charSummary || "(ยังไม่มี)"}
     }
 
     queryClient.invalidateQueries({ queryKey: ["novels"] });
-    toast.success(`สร้าง EP ใหม่ "${epTitle}" เรียบร้อยแล้ว!`);
+    setCreatedNovelId(newNovel.id);
     setCreating(false);
-    onClose();
-    navigate(`/novel/${newNovel.id}`);
+    setSavedSuccess(true); // แสดงสถานะสำเร็จ
   }
 
   function handleClose() {
@@ -236,6 +237,8 @@ ${charSummary || "(ยังไม่มี)"}
     setAiNewChars([]);
     setInheritedChars([]);
     setEpGenerated(false);
+    setSavedSuccess(false);
+    setCreatedNovelId(null);
     onClose();
   }
 
@@ -473,7 +476,7 @@ ${charSummary || "(ยังไม่มี)"}
              {step === 1 ? "ยกเลิก" : "ย้อนกลับ"}
            </Button>
            <div className="flex gap-2">
-             {step === 1 && epGenerated && (
+             {step === 1 && epGenerated && !savedSuccess && (
                <>
                  <Button
                    variant="outline"
@@ -487,6 +490,24 @@ ${charSummary || "(ยังไม่มี)"}
                  <Button
                    onClick={() => setStep(2)}
                    disabled={!epTitle.trim()}
+                 >
+                   ถัดไป <ChevronRight className="w-4 h-4 ml-1" />
+                 </Button>
+               </>
+             )}
+             {step === 1 && savedSuccess && (
+               <>
+                 <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 px-3">
+                   <Check className="w-5 h-5" />
+                   <span className="font-medium text-sm">บันทึกสำเร็จ!</span>
+                 </div>
+                 <Button
+                   onClick={() => {
+                     toast.success(`สร้าง EP ใหม่ "${epTitle}" เรียบร้อยแล้ว!`);
+                     onClose();
+                     navigate(`/novel/${createdNovelId}`);
+                   }}
+                   className="gap-1.5"
                  >
                    ถัดไป <ChevronRight className="w-4 h-4 ml-1" />
                  </Button>
