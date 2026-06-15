@@ -17,7 +17,7 @@ Deno.serve(async (req) => {
         }
 
         // แปลง base64 เป็น Uint8Array
-        const base64Data = file_data.split(',')[1] || file_data;
+        const base64Data = file_data.includes(',') ? file_data.split(',')[1] : file_data;
         const binaryString = atob(base64Data);
         const bytes = new Uint8Array(binaryString.length);
         for (let i = 0; i < binaryString.length; i++) {
@@ -34,14 +34,24 @@ Deno.serve(async (req) => {
             text = new TextDecoder().decode(bytes);
         } else if (fileName.endsWith('.docx')) {
             fileType = 'docx';
-            const mammoth = await import('npm:mammoth@1.8.0');
-            const result = await mammoth.default.extractRawText({ arrayBuffer: bytes.buffer });
-            text = result.value;
+            try {
+                const mammoth = await import('npm:mammoth@1.8.0');
+                const result = await mammoth.default.extractRawText({ arrayBuffer: bytes.buffer });
+                text = result.value || '';
+            } catch (mammothError) {
+                console.error('DOCX extraction error:', mammothError);
+                throw new Error('ไม่สามารถอ่านไฟล์ Word ได้: ' + mammothError.message);
+            }
         } else if (fileName.endsWith('.pdf')) {
             fileType = 'pdf';
-            const pdfParse = await import('npm:pdf-parse@1.1.1');
-            const pdfData = await pdfParse.default(bytes);
-            text = pdfData.text;
+            try {
+                const pdfParse = await import('npm:pdf-parse@1.1.1');
+                const pdfData = await pdfParse.default(bytes);
+                text = pdfData.text || '';
+            } catch (pdfError) {
+                console.error('PDF extraction error:', pdfError);
+                throw new Error('ไม่สามารถอ่านไฟล์ PDF ได้: ' + pdfError.message);
+            }
         } else {
             return Response.json({ 
                 error: 'Unsupported file format. Supported: TXT, MD, DOCX, PDF' 
