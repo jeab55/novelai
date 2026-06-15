@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -98,6 +98,13 @@ export default function ImportNovelDialog({ open, onClose, novels = [], seriesLi
   const [done, setDone] = useState(false);
 
   const genres = ["โรแมนติก","แฟนตาซี","อิงประวัติศาสตร์","จีนย้อนยุค","วาย","สยองขวัญ","ลึกลับ","แอ็คชั่น","ดราม่า","อื่นๆ"];
+
+  // Debug: log seriesList when dialog opens
+  React.useEffect(() => {
+    if (open) {
+      console.log('📋 ImportNovelDialog opened - seriesList:', seriesList, 'novels:', novels);
+    }
+  }, [open, seriesList, novels]);
 
   const handleSplit = () => {
     const result = detectAndSplit(rawText, customDelimiter);
@@ -493,13 +500,24 @@ export default function ImportNovelDialog({ open, onClose, novels = [], seriesLi
                   </div>
                   <div>
                     <label className="text-sm font-medium mb-1.5 block text-primary">📚 ซีรีย์ *</label>
-                    <Select value={targetSeriesId} onValueChange={setTargetSeriesId}>
-                      <SelectTrigger className="h-11"><SelectValue placeholder="เลือกซีรีย์" /></SelectTrigger>
+                    <Select value={targetSeriesId} onValueChange={(v) => {
+                      console.log('Series selected:', v);
+                      setTargetSeriesId(v);
+                    }}>
+                      <SelectTrigger className={`h-11 ${!targetSeriesId ? 'border-red-500 ring-2 ring-red-500/20' : ''}`}>
+                        <SelectValue placeholder="เลือกซีรีย์" />
+                      </SelectTrigger>
                       <SelectContent>
                         {seriesList.map((s) => <SelectItem key={s.id} value={s.id}>{s.title}</SelectItem>)}
                       </SelectContent>
                     </Select>
-                    <p className="text-xs text-muted-foreground mt-1.5">⚠️ ต้องเลือกซีรีย์ก่อนสร้างนิยาย</p>
+                    {!targetSeriesId && (
+                      <div className="mt-2 p-2 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+                        <p className="text-xs text-red-700 dark:text-red-300 font-medium">
+                          ⚠️ กรุณาเลือกซีรีย์ก่อน (จำเป็น)
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </>
               ) : (
