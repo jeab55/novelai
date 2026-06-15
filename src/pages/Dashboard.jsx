@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Plus, BookOpen, Pencil, Trash2, Share2, CheckCircle2, Loader2, Filter } from "lucide-react";
+import { Plus, BookOpen, Pencil, Trash2, Share2, CheckCircle2, Loader2 } from "lucide-react";
 import DeleteNovelDialog from "@/components/novel/DeleteNovelDialog";
 import CreateNovelWizard from "@/components/novel/CreateNovelWizard";
 import ShortStoryCreatorDialog from "@/components/novel/ShortStoryCreatorDialog";
@@ -42,7 +42,6 @@ export default function Dashboard() {
   const [editingId, setEditingId] = useState(null);
   const [deleteDialog, setDeleteDialog] = useState({ open: false, novel: null });
   const [shareDialog, setShareDialog] = useState({ open: false, novel: null });
-  const [showOnlyCompleted, setShowOnlyCompleted] = useState(false);
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
@@ -60,8 +59,8 @@ export default function Dashboard() {
     queryFn: () => base44.entities.Series.list(),
   });
 
-  const { data: novels = [], isLoading } = useQuery({
-    queryKey: ["novels", user?.id],
+  const { data: allNovels = [] } = useQuery({
+    queryKey: ["novels-all", user?.id],
     queryFn: async () => {
       const all = await base44.entities.Novel.list("-created_date");
       return all.filter((n) => {
@@ -76,6 +75,22 @@ export default function Dashboard() {
     },
     enabled: !!user,
   });
+
+  // โหลด chapters ทั้งหมดเพื่อตรวจสอบว่ามีอย่างน้อย 1 ตอน
+  const { data: allChapters = [] } = useQuery({
+    queryKey: ["chapters-all"],
+    queryFn: () => base44.entities.Chapter.list(),
+  });
+
+  // กรองนิยาย: แสดงเฉพาะ "เขียนเสร็จ" และมีอย่างน้อย 1 ตอน
+  const novels = (allNovels || []).filter((novel) => {
+    const hasChapters = (allChapters || []).some(
+      (c) => String(c.novel_id) === String(novel.id) && !c.is_deleted
+    );
+    return novel.status === "เขียนเสร็จ" && hasChapters;
+  });
+
+  const isLoading = !allNovels || !allChapters;
 
   const softDeleteMutation = useMutation({
     mutationFn: async (id) => {
@@ -273,32 +288,19 @@ export default function Dashboard() {
                   <BookOpen className="w-4 h-4" />
                   เรื่องสั้น AI
                 </Button>
-                <Button 
-                  variant="outline" 
-                  className={`gap-2 font-body transition-all ${
-                    showOnlyCompleted 
-                      ? "bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800/40" 
-                      : "border-border"
-                  }`} 
-                  onClick={() => setShowOnlyCompleted(!showOnlyCompleted)}
-                  title={showOnlyCompleted ? "แสดงนิยายทั้งหมด" : "แสดงเฉพาะนิยายที่เขียนเสร็จ"}
-                >
-                  <Filter className="w-4 h-4" />
-                  {showOnlyCompleted ? "แสดงทั้งหมด" : "เขียนเสร็จแล้ว"}
-                </Button>
+
                 <Button className="gap-2 font-body shadow-sm" onClick={() => setOpen(true)}>
                   <Plus className="w-4 h-4" />
                   สร้างเรื่องใหม่
                 </Button>
               </div>
             </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              แสดงเฉพาะนิยายที่สถานะ "เขียนเสร็จ" และมีอย่างน้อย 1 ตอน
+            </p>
           </div>
 
-          {isLoading ? (
-            <div className="flex items-center justify-center py-20">
-              <div className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
-            </div>
-          ) : novels.length === 0 ? (
+          {novels.length === 0 ? (
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center py-24">
               <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-primary/10 to-accent/30 flex items-center justify-center mx-auto mb-6 shadow-inner">
                 <BookOpen className="w-12 h-12 text-primary/50" />
@@ -312,7 +314,7 @@ export default function Dashboard() {
             </motion.div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {novels.filter(novel => showOnlyCompleted ? novel.status === "เขียนเสร็จ" : true).map((novel, i) => (
+              {novels.map((novel, i) => (
                 <motion.div
                   key={novel.id}
                   initial={{ opacity: 0, y: 20 }}
