@@ -19,7 +19,6 @@ import AiChapterGeneratorDialog from "./AiChapterGeneratorDialog";
 import AiDraftDialog from "./AiDraftDialog";
 import ContinuityChecker from "./ContinuityChecker";
 import BulkAutoWriteDialog from "./BulkAutoWriteDialog";
-import NewEpisodeDialog from "./NewEpisodeDialog";
 import SeasonSelectorDialog from "./SeasonSelectorDialog";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -40,7 +39,6 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
   const [draftChapter, setDraftChapter] = useState(null);
   const [bulkAutoWriteOpen, setBulkAutoWriteOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
-  const [newEpisodeOpen, setNewEpisodeOpen] = useState(false);
   const [seasonSelectorOpen, setSeasonSelectorOpen] = useState(false);
   const queryClient = useQueryClient();
 
@@ -226,14 +224,6 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
       }}
     />
     )}
-    <NewEpisodeDialog
-      open={newEpisodeOpen}
-      onClose={() => {
-        setNewEpisodeOpen(false);
-        queryClient.invalidateQueries({ queryKey: ["seasons", novelId] });
-      }}
-      novel={selectedSeasonNovel || novel}
-    />
     <SeasonSelectorDialog
       open={seasonSelectorOpen}
       onClose={() => {
@@ -312,15 +302,6 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
           >
             <Layers className="w-3.5 h-3.5" />
             สร้าง Season ใหม่
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-1.5 text-emerald-700 border-emerald-300 hover:bg-emerald-50 dark:text-emerald-400 dark:border-emerald-800/40 dark:hover:bg-emerald-950/20"
-            onClick={() => setNewEpisodeOpen(true)}
-          >
-            <Layers className="w-3.5 h-3.5" />
-            สร้าง EP ใหม่
           </Button>
           <Button size="sm" className="gap-1.5" onClick={() => setNewChapterOpen(true)}>
             <Plus className="w-3.5 h-3.5" />
