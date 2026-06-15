@@ -453,59 +453,60 @@ export default function ImportNovelDialog({ open, onClose, novels = [], seriesLi
 
           {/* Step 2: ตั้งค่า */}
           {step === 2 && (
-            <div className="space-y-4">
+            <div className="space-y-5">
               <div className="flex gap-2">
                 <Button
                   variant={mode === "new" ? "default" : "outline"}
-                  className="flex-1"
+                  className="flex-1 h-11"
                   onClick={() => setMode("new")}
                 >
-                  สร้างนิยายใหม่
+                  📖 สร้างนิยายใหม่
                 </Button>
                 <Button
                   variant={mode === "existing" ? "default" : "outline"}
-                  className="flex-1"
+                  className="flex-1 h-11"
                   onClick={() => setMode("existing")}
                 >
-                  เพิ่มในนิยายที่มีอยู่
+                  📁 เพิ่มในนิยายที่มีอยู่
                 </Button>
               </div>
 
               {mode === "new" ? (
                 <>
                   <div>
-                    <label className="text-sm font-medium mb-1.5 block">ชื่อนิยาย *</label>
+                    <label className="text-sm font-medium mb-1.5 block text-primary">📝 ชื่อนิยาย *</label>
                     <Input
                       value={novelTitle}
                       onChange={(e) => setNovelTitle(e.target.value)}
                       placeholder="ใส่ชื่อนิยาย"
+                      className="h-11 text-base"
                     />
                   </div>
                   <div>
-                    <label className="text-sm font-medium mb-1.5 block">แนว</label>
+                    <label className="text-sm font-medium mb-1.5 block">🎭 แนว</label>
                     <Select value={novelGenre} onValueChange={setNovelGenre}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         {genres.map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
                   <div>
-                    <label className="text-sm font-medium mb-1.5 block">ซีรีย์ *</label>
+                    <label className="text-sm font-medium mb-1.5 block text-primary">📚 ซีรีย์ *</label>
                     <Select value={targetSeriesId} onValueChange={setTargetSeriesId}>
-                      <SelectTrigger><SelectValue placeholder="เลือกซีรีย์" /></SelectTrigger>
+                      <SelectTrigger className="h-11"><SelectValue placeholder="เลือกซีรีย์" /></SelectTrigger>
                       <SelectContent>
                         {seriesList.map((s) => <SelectItem key={s.id} value={s.id}>{s.title}</SelectItem>)}
                       </SelectContent>
                     </Select>
-                    <p className="text-xs text-muted-foreground mt-1.5">ต้องเลือกซีรีย์ก่อนสร้างนิยาย</p>
+                    <p className="text-xs text-muted-foreground mt-1.5">⚠️ ต้องเลือกซีรีย์ก่อนสร้างนิยาย</p>
                   </div>
                 </>
               ) : (
                 <div>
-                  <label className="text-sm font-medium mb-1.5 block">เลือกนิยาย</label>
+                  <label className="text-sm font-medium mb-1.5 block">📁 เลือกนิยาย</label>
                   <Select value={targetNovelId} onValueChange={setTargetNovelId}>
-                    <SelectTrigger><SelectValue placeholder="เลือกนิยายปลายทาง" /></SelectTrigger>
+                    <SelectTrigger className="h-11"><SelectValue placeholder="เลือกนิยายปลายทาง" /></SelectTrigger>
                     <SelectContent>
                       {novels.map((n) => <SelectItem key={n.id} value={n.id}>{n.title}</SelectItem>)}
                     </SelectContent>
@@ -514,9 +515,15 @@ export default function ImportNovelDialog({ open, onClose, novels = [], seriesLi
                 </div>
               )}
 
-              <div className="bg-muted/40 rounded-lg p-3 text-sm text-muted-foreground space-y-1">
-                <div className="flex justify-between"><span>จำนวนตอน</span><span className="font-medium text-foreground">{chapters.length} ตอน</span></div>
-                <div className="flex justify-between"><span>รวมคำ</span><span className="font-medium text-foreground">{totalWords.toLocaleString()} คำ</span></div>
+              <div className="bg-primary/5 rounded-xl border-2 border-primary/20 p-4 text-sm space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">📄 จำนวนตอน</span>
+                  <span className="font-bold text-primary text-base">{chapters.length} ตอน</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">📊 รวมคำ</span>
+                  <span className="font-bold text-primary text-base">{totalWords.toLocaleString()} คำ</span>
+                </div>
               </div>
 
               {(mode === "new" && (!novelTitle.trim() || !targetSeriesId)) ? (
@@ -534,18 +541,18 @@ export default function ImportNovelDialog({ open, onClose, novels = [], seriesLi
               ) : null}
 
               <Button
-                className="w-full h-14 text-lg font-bold shadow-xl bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full h-16 text-xl font-bold shadow-2xl bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 onClick={() => {
-                  console.log('Import button clicked!', { mode, novelTitle, targetSeriesId, targetNovelId, chapters: chapters.length });
+                  console.log('🔘 Import button clicked!', { mode, novelTitle, targetSeriesId, targetNovelId, chapters: chapters.length });
                   handleImport();
                 }}
                 disabled={importing || (mode === "new" && (!novelTitle.trim() || !targetSeriesId)) || (mode === "existing" && !targetNovelId)}
                 size="lg"
               >
                 {importing ? (
-                  <><Loader2 className="w-5 h-5 animate-spin" />กำลังนำเข้า...</>
+                  <><Loader2 className="w-6 h-6 animate-spin" />กำลังนำเข้า...</>
                 ) : (
-                  <><FileText className="w-5 h-5" />นำเข้า {chapters.length} ตอน →</>
+                  <><FileText className="w-6 h-6" />นำเข้า {chapters.length} ตอน →</>
                 )}
               </Button>
             </div>
