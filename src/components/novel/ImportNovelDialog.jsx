@@ -112,6 +112,7 @@ export default function ImportNovelDialog({ open, onClose, novels = [], seriesLi
 
   const handleImport = async () => {
     if (importing) return;
+    console.log('Starting import...', { mode, novelTitle, targetSeriesId, targetNovelId, chapters: chapters.length });
     setImporting(true);
     try {
       let novelId = targetNovelId;
@@ -127,12 +128,14 @@ export default function ImportNovelDialog({ open, onClose, novels = [], seriesLi
           setImporting(false);
           return;
         }
+        console.log('Creating new novel...', novelTitle);
         const novel = await base44.entities.Novel.create({
           title: novelTitle.trim(),
           genre: novelGenre,
           series_id: targetSeriesId,
         });
         novelId = novel.id;
+        console.log('Novel created:', novelId);
         queryClient.invalidateQueries({ queryKey: ["novels-for-series"] });
       }
 
@@ -143,12 +146,16 @@ export default function ImportNovelDialog({ open, onClose, novels = [], seriesLi
       }
 
       // หา max order ปัจจุบัน
+      console.log('Fetching existing chapters...');
       const existing = await base44.entities.Chapter.filter({ novel_id: novelId });
       const maxOrder = existing.reduce((m, c) => Math.max(m, c.order || 0), 0);
+      console.log('Max order:', maxOrder);
 
+      console.log('Creating chapters...');
       for (let i = 0; i < chapters.length; i++) {
         const ch = chapters[i];
         const wc = countWords(ch.content);
+        console.log(`Creating chapter ${i + 1}: ${ch.title}`);
         await base44.entities.Chapter.create({
           novel_id: novelId,
           title: ch.title,
@@ -159,13 +166,15 @@ export default function ImportNovelDialog({ open, onClose, novels = [], seriesLi
         });
       }
 
+      console.log('Import complete!');
       queryClient.invalidateQueries({ queryKey: ["chapters-all"] });
       queryClient.invalidateQueries({ queryKey: ["chapters", novelId] });
       setDone(true);
       setStep(3);
       toast.success(`นำเข้า ${chapters.length} ตอนเรียบร้อยแล้ว!`);
     } catch (e) {
-      toast.error("เกิดข้อผิดพลาด: " + e.message);
+      console.error('Import error:', e);
+      toast.error("เกิดข้อผิดพลาด: " + (e.message || JSON.stringify(e)));
     } finally {
       setImporting(false);
     }
@@ -249,17 +258,21 @@ export default function ImportNovelDialog({ open, onClose, novels = [], seriesLi
   };
 
   const handleFileUploaded = () => {
+    console.log('File uploaded, rawText length:', rawText.length);
     if (rawText.trim()) {
       const result = detectAndSplit(rawText, customDelimiter);
+      console.log('Split result:', result.length, 'chapters');
       // ตั้งชื่อตอนอัตโนมัติถ้าไม่มีชื่อ
       const chaptersWithNames = result.map((ch, i) => ({
         ...ch,
         title: ch.title?.trim() ? ch.title.trim() : `ตอนที่ ${i + 1}`
       }));
+      console.log('Chapters with names:', chaptersWithNames);
       setChapters(chaptersWithNames);
       setStep(1);
       toast.success(`แบ่งตอนแล้ว: ${chaptersWithNames.length} ตอน`);
     } else {
+      console.error('No raw text!');
       toast.error("กรุณาใส่ข้อความหรืออัพโหลดไฟล์ก่อน");
     }
   };
@@ -519,7 +532,10 @@ export default function ImportNovelDialog({ open, onClose, novels = [], seriesLi
 
               <Button
                 className="w-full h-14 text-lg font-bold shadow-xl bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                onClick={handleImport}
+                onClick={() => {
+                  console.log('Import button clicked!', { mode, novelTitle, targetSeriesId, targetNovelId, chapters: chapters.length });
+                  handleImport();
+                }}
                 disabled={importing || (mode === "new" && (!novelTitle.trim() || !targetSeriesId)) || (mode === "existing" && !targetNovelId)}
                 size="lg"
               >
