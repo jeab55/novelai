@@ -20,7 +20,6 @@ import WorldBible from "@/components/novel/WorldBible";
 import Timeline from "@/components/novel/Timeline";
 import WriterManager from "@/components/novel/WriterManager";
 import ShortStoryWorkspace from "@/components/novel/ShortStoryWorkspace";
-import SeriesEpisodeNav from "@/components/novel/SeriesEpisodeNav";
 
 export default function NovelWorkspace() {
   const novelId = window.location.pathname.split("/novel/")[1]?.split("/")[0];
@@ -237,8 +236,6 @@ export default function NovelWorkspace() {
           </div>
         </div>
       </header>
-
-      <SeriesEpisodeNav novel={novel} currentNovelId={novelId} />
 
       {/* เรื่องสั้น → ShortStoryWorkspace แบบ single-page */}
       {novel.novel_type === "เรื่องสั้น" ? (
