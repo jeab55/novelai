@@ -17,8 +17,16 @@ export default function ThaiSpellCheckerDialog({ content, novel, onApplyChanges,
     try {
       const response = await base44.functions.invoke("checkThaiSpelling", { content, novel });
       setResults(response.data);
+      
+      // แจ้งเตือนถ้าไม่พบคำผิด แต่ตรวจครบแล้ว
+      if (response.data.total_errors_found === 0) {
+        toast.success(`ตรวจครบ ${response.data.total_chunks_checked} ช่วง (${response.data.total_words_checked?.toLocaleString() || '0'} คำ) ไม่พบคำผิด`);
+      } else {
+        toast.success(`ตรวจพบ ${response.data.total_errors_found} คำผิด`);
+      }
     } catch (error) {
-      toast.error("เกิดข้อผิดพลาดในการตรวจคำผิด");
+      console.error('Spell check error:', error);
+      toast.error(error.message || "เกิดข้อผิดพลาดในการตรวจคำผิด กรุณาลองใหม่อีกครั้ง");
     } finally {
       setLoading(false);
     }
@@ -36,19 +44,22 @@ export default function ThaiSpellCheckerDialog({ content, novel, onApplyChanges,
     
     let updatedContent = content;
     const allErrors = [
-      ...(results.spelling_errors || []).map(e => ({ ...e, type: "spelling" })),
-      ...(results.word_suggestions || []).map(s => ({ ...s, type: "suggestion" })),
+      ...(results.spelling_errors || []).map(e => ({ ...e, type: "spelling", index: results.spelling_errors.indexOf(e) })),
+      ...(results.garant_issues || []).map(e => ({ ...e, type: "garant", index: results.garant_issues.indexOf(e) })),
+      ...(results.tone_issues || []).map(e => ({ ...e, type: "tone", index: results.tone_issues.indexOf(e) })),
+      ...(results.word_suggestions || []).map(s => ({ ...s, type: "suggestion", index: results.word_suggestions.indexOf(s) })),
     ];
 
     // เรียงจากตำแหน่งมากไปน้อย เพื่อไม่ให้ตำแหน่งเลื่อน
-    allErrors.sort((a, b) => (b.position || 0) - (a.position || 0));
+    allErrors.sort((a, b) => (b.globalPosition || 0) - (a.globalPosition || 0));
 
     allErrors.forEach((item) => {
       const key = `${item.type}-${item.index}`;
-      if (selectedChanges.includes(key) && item.position !== undefined) {
+      if (selectedChanges.includes(key) && item.globalPosition !== undefined) {
         const wrong = item.wrong || item.original;
         const correct = item.correct || item.suggested;
-        const idx = updatedContent.indexOf(wrong, item.position);
+        // ใช้ globalPosition เพื่อหาตำแหน่งที่ถูกต้องใน content ฉบับเต็ม
+        const idx = updatedContent.indexOf(wrong, Math.max(0, item.globalPosition - 10));
         if (idx !== -1) {
           updatedContent = updatedContent.slice(0, idx) + correct + updatedContent.slice(idx + wrong.length);
         }
@@ -89,36 +100,65 @@ export default function ThaiSpellCheckerDialog({ content, novel, onApplyChanges,
 
           {results && (
             <>
-              <div className="flex items-center justify-between">
-                <div className="flex flex-wrap gap-2">
-                  <Badge variant="secondary">
-                    สะกดผิด: {results.spelling_errors?.length || 0}
-                  </Badge>
-                  <Badge variant="secondary">
-                    คำแนะนำ: {results.word_suggestions?.length || 0}
-                  </Badge>
-                  <Badge variant="secondary">
-                    การันต์: {results.garant_issues?.length || 0}
-                  </Badge>
-                  <Badge variant="secondary">
-                    ไม้ยมก: {results.yamok_issues?.length || 0}
-                  </Badge>
-                  <Badge variant="secondary">
-                    วรรณยุกต์: {results.tone_issues?.length || 0}
-                  </Badge>
+              {results.total_errors_found === 0 ? (
+                <div className="flex flex-col items-center justify-center py-8 text-center">
+                  <CheckCircle2 className="w-12 h-12 text-emerald-600 mb-3" />
+                  <h3 className="font-heading font-semibold text-lg mb-1">ไม่พบคำผิด</h3>
+                  <p className="text-sm text-muted-foreground max-w-md">
+                    ตรวจครบทุกช่วงแล้ว ({results.total_chunks_checked} ช่วง, ประมาณ {results.total_words_checked?.toLocaleString() || '0'} คำ) 
+                    <br />
+                    เนื้อหาของคุณถูกต้องตามหลักภาษาไทย
+                  </p>
                 </div>
-                <div className="flex gap-2">
-                  <Button variant="outline" onClick={() => { setSelectedChanges([]); setResults(null); }}>
-                    ตรวจใหม่
-                  </Button>
-                  <Button 
-                    onClick={handleApply} 
-                    disabled={selectedChanges.length === 0}
-                  >
-                    แก้ไข {selectedChanges.length} คำที่เลือก
-                  </Button>
+              ) : (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-2">
+                  <p className="text-sm text-amber-800">
+                    <span className="font-semibold">ตรวจพบ {results.total_errors_found} คำผิด</span>
+                    {' '}จาก {results.total_chunks_checked} ช่วง ({results.total_words_checked?.toLocaleString() || '0'} คำ)
+                  </p>
                 </div>
-              </div>
+              )}
+
+              {results.total_errors_found > 0 && (
+                <>
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    <Badge variant="secondary">
+                      ตรวจ: {results.total_chunks_checked || 0} ช่วง
+                    </Badge>
+                    <Badge variant="secondary">
+                      ~{results.total_words_checked?.toLocaleString() || '0'} คำ
+                    </Badge>
+                    <Badge variant="secondary" className={results.total_errors_found > 0 ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"}>
+                      พบ: {results.total_errors_found || 0} คำ
+                    </Badge>
+                    <div className="w-px h-6 bg-border mx-1" />
+                    <Badge variant="outline" className={results.spelling_errors?.length > 0 ? "border-destructive text-destructive" : ""}>
+                      สะกดผิด: {results.spelling_errors?.length || 0}
+                    </Badge>
+                    <Badge variant="outline" className={results.garant_issues?.length > 0 ? "border-amber-500 text-amber-700" : ""}>
+                      การันต์: {results.garant_issues?.length || 0}
+                    </Badge>
+                    <Badge variant="outline" className={results.tone_issues?.length > 0 ? "border-blue-500 text-blue-700" : ""}>
+                      วรรณยุกต์: {results.tone_issues?.length || 0}
+                    </Badge>
+                    <Badge variant="outline" className={results.spacing_issues?.length > 0 ? "border-purple-500 text-purple-700" : ""}>
+                      เว้นวรรค: {results.spacing_issues?.reduce((sum, i) => sum + i.count, 0) || 0}
+                    </Badge>
+                  </div>
+                  <div className="flex gap-2 mb-3">
+                    <Button variant="outline" onClick={() => { setSelectedChanges([]); setResults(null); }}>
+                      ตรวจใหม่
+                    </Button>
+                    <Button 
+                      onClick={handleApply} 
+                      disabled={selectedChanges.length === 0}
+                      className="bg-primary hover:bg-primary/90"
+                    >
+                      แก้ไข {selectedChanges.length} คำที่เลือก
+                    </Button>
+                  </div>
+                </>
+              )}
 
               <ScrollArea className="flex-1 max-h-[50vh]">
                 <div className="space-y-4">
