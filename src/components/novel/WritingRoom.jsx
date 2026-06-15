@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, FileText, Loader2, Trash2, Download, Copy, MoreHorizontal, Clock, Sparkles, Users, BookOpen, Layers, BookMarked } from "lucide-react";
+import { Plus, FileText, Loader2, Trash2, Download, Copy, MoreHorizontal, Clock, Sparkles, Users, BookOpen, Layers } from "lucide-react";
 import ExportDialog from "./ExportDialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { motion, AnimatePresence } from "framer-motion";
@@ -19,7 +19,6 @@ import AiDraftDialog from "./AiDraftDialog";
 import ContinuityChecker from "./ContinuityChecker";
 import BulkAutoWriteDialog from "./BulkAutoWriteDialog";
 import NewEpisodeDialog from "./NewEpisodeDialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const statusColors = {
   "ร่าง": "bg-amber-50 text-amber-700 border border-amber-200",
@@ -39,7 +38,6 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
   const [bulkAutoWriteOpen, setBulkAutoWriteOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [newEpisodeOpen, setNewEpisodeOpen] = useState(false);
-  const [selectedEpisodeId, setSelectedEpisodeId] = useState(novelId);
   const queryClient = useQueryClient();
 
   // Handle chapter navigation from other tabs (e.g. AiPlotDialog draft)
@@ -65,16 +63,6 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
       const all = await base44.entities.PlotEvent.filter({ novel_id: novelId }, "order");
       return all.filter((e) => !e.is_deleted);
     },
-  });
-
-  const { data: seriesEpisodes = [] } = useQuery({
-    queryKey: ["series-episodes", novel?.series_id],
-    queryFn: () => base44.entities.Novel.filter({ series_id: novel.series_id }),
-    enabled: !!novel?.series_id,
-    select: (data) =>
-      data
-        .filter((n) => !n.is_deleted)
-        .sort((a, b) => new Date(a.created_date) - new Date(b.created_date)),
   });
 
   // รีวิวทั้งหมด — เพื่อแสดงสัญลักษณ์ในรายการตอน
@@ -164,32 +152,6 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
       />
     )}
     <div className="max-w-4xl mx-auto px-4 py-6">
-      {/* EP selector สำหรับซีรีส์ */}
-      {seriesEpisodes.length > 1 && (
-        <div className="mb-6 pb-4 border-b border-border/30">
-          <p className="text-xs font-medium text-muted-foreground mb-2.5 flex items-center gap-1.5">
-            <BookOpen className="w-3.5 h-3.5" />
-            EP ในซีรีส์นี้
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {seriesEpisodes.map((ep, i) => (
-              <button
-                key={ep.id}
-                onClick={() => window.location.href = `/novel/${ep.id}`}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all border ${
-                  String(ep.id) === String(novelId)
-                    ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                    : "bg-card border-border/50 text-foreground hover:border-primary/40 hover:bg-primary/5"
-                }`}
-              >
-                EP{i + 1} · {ep.title.slice(0, 20)}
-                {ep.title.length > 20 ? "..." : ""}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="font-heading text-lg font-semibold">ห้องเขียน</h2>
