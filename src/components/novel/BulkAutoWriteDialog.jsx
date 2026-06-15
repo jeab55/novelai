@@ -791,19 +791,6 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
                   {doneCount + skipCount} / {progress.total} ตอน
                 </span>
               </div>
-              {step === "done" && errorCount > 0 && (
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="gap-1.5 h-7 text-xs border-amber-300 text-amber-700 hover:bg-amber-50"
-                    onClick={retryAllFailed}
-                  >
-                    <RefreshCw className="w-3 h-3" />
-                    ลองใหม่ {errorCount} ตอน
-                  </Button>
-                </div>
-              )}
               <div className="w-full bg-muted rounded-full h-2.5 overflow-hidden">
                 <div
                   className="bg-primary h-2.5 rounded-full transition-all duration-500"
@@ -872,7 +859,7 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
                         : entry.status === "skip" ? "มีแล้ว"
                         : entry.status === "generating" ? "กำลังสร้าง..."
                         : entry.status === "error" ? (
-                          <span className="text-destructive text-xs">{entry.errorMsg || "ล้มเหลว"}</span>
+                          <span className="text-destructive">{entry.errorMsg || "ล้มเหลว"}</span>
                         ) : ""}
                     </span>
                   </div>
