@@ -282,8 +282,8 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
   };
 
   // สร้างตอนเดียวพร้อม auto-retry (1-2 ครั้ง)
-  const generateSingleChapter = async ({ i, chapterTitle, linkedEvent, contextChapters, writerPrompt, existingChapter }) => {
-    const sysPrompt = buildSystemPrompt(novel, characters, worldEntries, plotEvents, contextChapters, writerPrompt);
+  const generateSingleChapter = async ({ i, chapterTitle, linkedEvent, contextChapters, writerPrompt, existingChapter, allCharacters, allWorldEntries, allPlotEvents }) => {
+    const sysPrompt = buildSystemPrompt(novel, allCharacters, allWorldEntries, allPlotEvents, contextChapters, writerPrompt);
     let taskPrompt = sysPrompt;
     taskPrompt += `\n\n[โจทย์ตอนที่ต้องร่าง — เขียนเนื้อหาเต็มตอน]\n`;
     taskPrompt += `ชื่อตอน: "${chapterTitle}"\n`;
@@ -426,9 +426,13 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
     const writerPrompt = novelWriter?.system_prompt || "";
     const writtenSoFar = [];
 
-    // ดึงข้อมูลล่าสุดจาก DB ก่อนเริ่ม
-    const freshChapters = await base44.entities.Chapter.filter({ novel_id: novelId }, "order")
-      .then((all) => all.filter((c) => !c.is_deleted));
+    // ดึงข้อมูลทั้งหมดครั้งเดียว — ลด query ซ้ำ
+    const [freshChapters, freshPlotEvents, freshCharacters, freshWorldEntries] = await Promise.all([
+      base44.entities.Chapter.filter({ novel_id: novelId }, "order").then((all) => all.filter((c) => !c.is_deleted)),
+      base44.entities.PlotEvent.filter({ novel_id: novelId }, "order").then((all) => all.filter((e) => !e.is_deleted)),
+      base44.entities.Character.filter({ novel_id: novelId }).then((all) => all.filter((c) => !c.is_deleted)),
+      base44.entities.WorldEntry.filter({ novel_id: novelId }).then((all) => all.filter((w) => !w.is_deleted)),
+    ]);
 
     // ตอนที่มีเนื้อหาแล้ว — นำมาใส่ใน log ทันทีเพื่อแสดงสถานะ
     for (let i = 1; i < startFromOrder; i++) {
@@ -456,14 +460,14 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
         continue;
       }
 
-      const linkedEvent = plotEvents.find((e) => e.order === i);
+      const linkedEvent = freshPlotEvents.find((e) => e.order === i);
 
-      // สร้างชื่อตอนถ้าไม่มีเนื้อหาเดิม
+      // สร้างชื่อตอนถ้าไม่มีเนื้อหาเดิม — ข้ามถ้ามีแล้ว (ลด LLM call)
       let chapterTitle = existing?.title || (isOneShot ? "เรื่องสั้น" : `ตอนที่ ${i}`);
       if (!existing || !existing.content?.trim()) {
         setCurrentMsg(`📝 กำลังตั้งชื่อตอนที่ ${i}/${target}...`);
         chapterTitle = await generateChapterTitle(
-          novel, characters, plotEvents,
+          novel, freshCharacters, freshPlotEvents,
           [...freshChapters.filter((c) => c.order < i && c.content && !c.is_deleted), ...writtenSoFar].sort((a, b) => a.order - b.order),
           i, linkedEvent, writerPrompt
         );
@@ -479,6 +483,7 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
 
       const result = await generateSingleChapter({
         i, chapterTitle, linkedEvent, contextChapters, writerPrompt, existingChapter: existing,
+        allCharacters: freshCharacters, allWorldEntries: freshWorldEntries, allPlotEvents: freshPlotEvents,
       });
 
       if (cancelledRef.current) break;

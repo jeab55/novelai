@@ -63,14 +63,15 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
     enabled: !!novel,
   });
 
-  // โหลด chapters ของ EP ที่เลือก
+  // โหลด chapters ของ EP ที่เลือก — cache นานขึ้น
   const { data: chapters = [], isLoading } = useQuery({
     queryKey: ["chapters", selectedEpisodeTab],
     queryFn: async () => {
       const all = await base44.entities.Chapter.filter({ novel_id: selectedEpisodeTab }, "order");
       return all.filter((c) => !c.is_deleted).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
     },
-    staleTime: 10000,
+    staleTime: 60000, // 1 นาที
+    gcTime: 300000, // 5 นาที
   });
 
   const { data: plotEvents = [] } = useQuery({
@@ -79,6 +80,8 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
       const all = await base44.entities.PlotEvent.filter({ novel_id: selectedEpisodeTab }, "order");
       return all.filter((e) => !e.is_deleted);
     },
+    staleTime: 60000,
+    gcTime: 300000,
   });
 
   // รีวิวทั้งหมด — เพื่อแสดงสัญลักษณ์ในรายการตอน
