@@ -477,10 +477,10 @@ ${charSummary || "(ยังไม่มี)"}
                  <Button
                    variant="outline"
                    className="gap-1.5"
-                   onClick={() => toast.success("บันทึกข้อมูลแล้ว")}
-                   disabled={!epTitle.trim()}
+                   onClick={handleCreate}
+                   disabled={!epTitle.trim() || creating}
                  >
-                   <Save className="w-4 h-4" />
+                   {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                    บันทึก
                  </Button>
                  <Button
