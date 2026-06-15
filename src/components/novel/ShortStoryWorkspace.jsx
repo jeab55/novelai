@@ -5,12 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Sparkles, Save, Users, ChevronDown, ChevronUp, Scissors, ArrowRight, Expand, CheckCircle2, Bot, Download } from "lucide-react";
+import { Loader2, Sparkles, Save, Users, ChevronDown, ChevronUp, Scissors, ArrowRight, Expand, CheckCircle2, Bot, Download, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { saveVersion } from "@/lib/saveVersion";
 import { useAuth } from "@/lib/AuthContext";
 import ExportDialog from "./ExportDialog";
 import ThaiSpellCheckerDialog from "./ThaiSpellCheckerDialog";
+import NovelSpellCheckSummary from "./NovelSpellCheckSummary";
 
 const countThaiWords = (text) => {
   if (!text) return 0;
@@ -75,6 +76,7 @@ export default function ShortStoryWorkspace({ novelId, novel }) {
   const [continueHint, setContinueHint] = useState("");
   const [exportOpen, setExportOpen] = useState(false);
   const [spellCheckerOpen, setSpellCheckerOpen] = useState(false);
+  const [spellCheckSummaryOpen, setSpellCheckSummaryOpen] = useState(false);
 
   // Sync chapter content → local state
   useEffect(() => {
@@ -236,6 +238,12 @@ export default function ShortStoryWorkspace({ novelId, novel }) {
         toast.success("แก้ไขคำผิดแล้ว");
       }}
     />
+    <NovelSpellCheckSummary
+      open={spellCheckSummaryOpen}
+      onClose={() => setSpellCheckSummaryOpen(false)}
+      novelId={novelId}
+      novel={novel}
+    />
     <div className="max-w-4xl mx-auto px-4 py-6 space-y-4">
       {/* Word count progress */}
       <div className="bg-card border border-border/60 rounded-xl px-4 py-3 space-y-1.5">
@@ -307,6 +315,16 @@ export default function ShortStoryWorkspace({ novelId, novel }) {
           >
             <Sparkles className="w-3.5 h-3.5" />
             ตรวจคำผิด
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5 text-xs border-blue-300 hover:bg-blue-50 text-blue-700"
+            onClick={() => setSpellCheckSummaryOpen(true)}
+            title="ดูสรุปคำผิดทั้งเรื่อง"
+          >
+            <FileText className="w-3.5 h-3.5" />
+            สรุปคำผิด
           </Button>
         </div>
       </div>
