@@ -239,6 +239,7 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
       onSeasonChange={(season) => {
         window.location.href = `/novel/${season.id}`;
       }}
+      step={0}
     />
     <NovelSpellCheckSummary
       open={spellCheckSummaryOpen}

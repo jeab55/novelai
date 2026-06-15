@@ -9,8 +9,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Sparkles, Users, Plus, Check, ChevronRight, Save, RefreshCw, Layers, BookOpen } from "lucide-react";
+import { Loader2, Sparkles, Users, Plus, Check, ChevronRight, Save, RefreshCw, Layers, BookOpen, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 export default function SeasonSelectorDialog({ open, onClose, novel, onSeasonChange }) {
   const queryClient = useQueryClient();
@@ -26,6 +27,7 @@ export default function SeasonSelectorDialog({ open, onClose, novel, onSeasonCha
   const [seasonGenerated, setSeasonGenerated] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [createdSeasonId, setCreatedSeasonId] = useState(null);
+  const [deleteDialog, setDeleteDialog] = useState({ open: false, season: null });
 
   // โหลดทุก Season ของนิยายเรื่องนี้
   const { data: seasons = [] } = useQuery({
@@ -38,6 +40,24 @@ export default function SeasonSelectorDialog({ open, onClose, novel, onSeasonCha
         .sort((a, b) => (a.season_number || 1) - (b.season_number || 1));
     },
     enabled: !!novel?.id && open,
+  });
+
+  const deleteSeasonMutation = useMutation({
+    mutationFn: async (seasonId) => {
+      // Soft delete Season
+      await base44.entities.Novel.update(seasonId, { is_deleted: true, deleted_at: new Date().toISOString() });
+      // Soft delete chapters ทั้งหมดใน Season นี้
+      const chapters = await base44.entities.Chapter.filter({ novel_id: seasonId });
+      await Promise.all(
+        chapters.map((ch) => base44.entities.Chapter.update(ch.id, { is_deleted: true }))
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["seasons", novel?.id] });
+      queryClient.invalidateQueries({ queryKey: ["episodes", novel?.series_id] });
+      toast.success("ลบ Season แล้ว (สามารถกู้คืนจากถังขยะได้)");
+      setDeleteDialog({ open: false, season: null });
+    },
   });
 
   // โหลดตัวละครจาก Season ปัจจุบัน
@@ -254,6 +274,7 @@ ${charSummary || "(ยังไม่มี)"}
   // ถ้า step = 0 แสดงหน้าเลือกรายการ Season (mode เดิม)
   if (step === 0) {
     return (
+      <>
       <Dialog open={open} onOpenChange={handleClose}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
@@ -313,9 +334,24 @@ ${charSummary || "(ยังไม่มี)"}
                           {season.target_chapters || 10} ตอน · {season.word_count_target?.toLocaleString() || 1500} คำ/ตอน
                         </p>
                       </div>
-                      {String(season.id) === String(novel?.id) && (
-                        <Badge className="bg-primary text-primary-foreground">ปัจจุบัน</Badge>
-                      )}
+                      <div className="flex items-center gap-2 shrink-0">
+                        {String(season.id) === String(novel?.id) && (
+                          <Badge className="bg-primary text-primary-foreground">ปัจจุบัน</Badge>
+                        )}
+                        {String(season.id) !== String(novel?.id) && (
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setDeleteDialog({ open: true, season });
+                            }}
+                            className="w-7 h-7 rounded-lg bg-destructive/10 hover:bg-destructive/20 flex items-center justify-center transition-all text-destructive"
+                            title="ลบ Season นี้"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
                     </div>
                   ))
                 )}
@@ -334,11 +370,37 @@ ${charSummary || "(ยังไม่มี)"}
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialog.open} onOpenChange={(open) => setDeleteDialog({ open, season: deleteDialog.season })}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-heading">ยืนยันการลบ Season</AlertDialogTitle>
+            <AlertDialogDescription>
+              คุณต้องการลบ "<strong>{deleteDialog.season?.title}</strong>" ใช่หรือไม่?
+              <br /><br />
+              การลบจะ<strong>ซ่อน</strong> Season นี้และตอนทั้งหมดใน Season นี้ (สามารถกู้คืนจากถังขยะได้)
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteSeasonMutation.mutate(deleteDialog.season?.id)}
+              disabled={deleteSeasonMutation.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteSeasonMutation.isPending ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />กำลังลบ...</> : "ลบ Season"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      </>
     );
   }
 
   // Mode: Wizard สร้าง Season ใหม่
   return (
+    <>
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col p-0 gap-0">
         <DialogHeader className="px-6 pt-6 pb-4 border-b border-border/40 shrink-0">
@@ -647,5 +709,30 @@ ${charSummary || "(ยังไม่มี)"}
         </div>
       </DialogContent>
     </Dialog>
+
+    {/* Delete Confirmation Dialog */}
+    <AlertDialog open={deleteDialog.open} onOpenChange={(open) => setDeleteDialog({ open, season: deleteDialog.season })}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle className="font-heading">ยืนยันการลบ Season</AlertDialogTitle>
+          <AlertDialogDescription>
+            คุณต้องการลบ "<strong>{deleteDialog.season?.title}</strong>" ใช่หรือไม่?
+            <br /><br />
+            การลบจะ<strong>ซ่อน</strong> Season นี้และตอนทั้งหมดใน Season นี้ (สามารถกู้คืนจากถังขยะได้)
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={() => deleteSeasonMutation.mutate(deleteDialog.season?.id)}
+            disabled={deleteSeasonMutation.isPending}
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          >
+            {deleteSeasonMutation.isPending ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />กำลังลบ...</> : "ลบ Season"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }
