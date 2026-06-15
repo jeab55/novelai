@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { BookPlus, ChevronRight, Scissors, FileText, CheckCircle2, Loader2, ChevronDown, ChevronUp } from "lucide-react";
+import { BookPlus, ChevronRight, Scissors, FileText, CheckCircle2, Loader2, ChevronDown, ChevronUp, Upload, File } from "lucide-react";
 import { toast } from "sonner";
 
 // ค้นหา delimiter ที่เป็น "ตอนที่" / "บทที่" / "Chapter" ฯลฯ
@@ -85,6 +85,8 @@ export default function ImportNovelDialog({ open, onClose, novels = [], seriesLi
   const [customDelimiter, setCustomDelimiter] = useState("");
   const [chapters, setChapters] = useState([]);
   const [expandedIdx, setExpandedIdx] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [selectedFile, setSelectedFile] = useState(null);
 
   // step 2: settings
   const [mode, setMode] = useState("new"); // "new" | "existing"
@@ -183,13 +185,56 @@ export default function ImportNovelDialog({ open, onClose, novels = [], seriesLi
 
   const totalWords = useMemo(() => chapters.reduce((s, c) => s + countWords(c.content), 0), [chapters]);
 
+  const handleFileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const validTypes = ['.txt', '.md', '.docx', '.pdf'];
+    const fileExt = '.' + file.name.split('.').pop().toLowerCase();
+    
+    if (!validTypes.includes(fileExt)) {
+      toast.error("รูปแบบไฟล์ไม่รองรับ (รองรับ: TXT, MD, DOCX, PDF)");
+      return;
+    }
+
+    setUploading(true);
+    setSelectedFile(file);
+    
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const response = await fetch('/api/functions/extractTextFromFile', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error || 'เกิดข้อผิดพลาดในการอ่านไฟล์');
+      }
+      
+      setRawText(result.text);
+      toast.success(`อ่านไฟล์สำเร็จ: ${result.character_count.toLocaleString()} ตัวอักษร`);
+      setStep(0);
+    } catch (err) {
+      toast.error(err.message);
+      setRawText("");
+    } finally {
+      setUploading(false);
+      setSelectedFile(null);
+      e.target.value = "";
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={(v) => !v && handleClose()}>
       <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="font-heading flex items-center gap-2">
             <BookPlus className="w-5 h-5 text-primary" />
-            นำเข้านิยายจากข้อความ
+            นำเข้านิยายจากไฟล์หรือข้อความ
           </DialogTitle>
         </DialogHeader>
 
@@ -214,12 +259,49 @@ export default function ImportNovelDialog({ open, onClose, novels = [], seriesLi
           {step === 0 && (
             <div className="space-y-4">
               <div>
-                <label className="text-sm font-medium mb-1.5 block">วางข้อความนิยายที่นี่</label>
+                <label className="text-sm font-medium mb-1.5 block flex items-center justify-between">
+                  <span>วางข้อความนิยายที่นี่</span>
+                  <span className="text-xs font-normal text-muted-foreground">หรือ</span>
+                </label>
+                
+                {/* File upload section */}
+                <div className="mb-3">
+                  <label className="block text-xs text-muted-foreground mb-1.5">อัพโหลดไฟล์</label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="file"
+                      accept=".txt,.md,.docx,.pdf"
+                      onChange={handleFileUpload}
+                      disabled={uploading}
+                      className="flex-1 text-sm"
+                    />
+                    {uploading && <Loader2 className="w-4 h-4 animate-spin text-primary" />}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    รองรับ: TXT, MD, DOCX, PDF
+                  </p>
+                  {selectedFile && (
+                    <div className="flex items-center gap-1.5 mt-2 text-xs text-primary">
+                      <File className="w-3 h-3" />
+                      <span>{selectedFile.name}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-border"></div>
+                  </div>
+                  <div className="relative flex justify-center text-xs">
+                    <span className="bg-background px-2 text-muted-foreground">หรือวางข้อความด้วยตนเอง</span>
+                  </div>
+                </div>
+
                 <Textarea
                   value={rawText}
                   onChange={(e) => setRawText(e.target.value)}
                   placeholder={`วางเนื้อหานิยายทั้งหมดจากแหล่งอื่นที่นี่...\n\nรูปแบบที่ระบบแบ่งตอนอัตโนมัติ:\n• ตอนที่ 1, ตอนที่ 2, ...\n• บทที่ 1, บทที่ 2, ...\n• Chapter 1, Chapter 2, ...\n• 1. Chapter Title\n• --- หรือ === (ตัวคั่น)\n\nระบบจะตรวจจับและแบ่งให้อัตโนมัติ`}
-                  className="min-h-[260px] font-mono text-sm resize-none"
+                  className="min-h-[200px] font-mono text-sm resize-none mt-3"
                 />
                 <p className="text-xs text-muted-foreground mt-1">
                   {rawText.length > 0 ? `${rawText.length.toLocaleString()} ตัวอักษร` : "วางข้อความแล้วระบบจะแบ่งตอนให้อัตโนมัติ"}
