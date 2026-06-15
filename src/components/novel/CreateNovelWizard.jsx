@@ -21,7 +21,7 @@ const STEPS = [
 ];
 
 // ─── CharacterCard ─────────────────────────────────────────────────────────
-function CharacterCard({ c, onUpdate, onRemove }) {
+function CharacterCard({ c, onUpdate, onRemove, writerSystemPrompt }) {
   const [expanded, setExpanded] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [analysis, setAnalysis] = useState(c.ai_analysis || null);
@@ -42,8 +42,11 @@ function CharacterCard({ c, onUpdate, onRemove }) {
       c.wound && `ปม/บาดแผล: ${c.wound}`,
     ].filter(Boolean).join("\n");
 
+    const writerCtx = writerSystemPrompt
+      ? `[สไตล์และโทนการเขียน]\n${writerSystemPrompt}\n\n`
+      : "";
     const result = await base44.integrations.Core.InvokeLLM({
-      prompt: `คุณคือนักวิเคราะห์ตัวละครในนิยายมืออาชีพ วิเคราะห์ตัวละครต่อไปนี้:\n\n${charDesc}\n\nวิเคราะห์ใน 4 หัวข้อ:\n1. **จุดแข็ง** — สิ่งที่น่าสนใจและโดดเด่น\n2. **Want vs Need** — ความต้องการที่รับรู้ vs ความต้องการที่แท้จริง\n3. **Character Arc** — เส้นทางการเติบโตที่เป็นไปได้\n4. **คำแนะนำ** — สิ่งที่ควรเติมเพื่อให้ตัวละครสมบูรณ์ยิ่งขึ้น\n\nตอบเป็นภาษาไทย กระชับ ตรงประเด็น`,
+      prompt: `${writerCtx}คุณคือนักวิเคราะห์ตัวละครในนิยายมืออาชีพ วิเคราะห์ตัวละครต่อไปนี้:\n\n${charDesc}\n\nวิเคราะห์ใน 4 หัวข้อ:\n1. **จุดแข็ง** — สิ่งที่น่าสนใจและโดดเด่น\n2. **Want vs Need** — ความต้องการที่รับรู้ vs ความต้องการที่แท้จริง\n3. **Character Arc** — เส้นทางการเติบโตที่เป็นไปได้\n4. **คำแนะนำ** — สิ่งที่ควรเติมเพื่อให้ตัวละครสมบูรณ์ยิ่งขึ้น\n\nตอบเป็นภาษาไทย กระชับ ตรงประเด็น สอดคล้องกับสไตล์การเขียนที่กำหนด`,
     });
     setAnalysis(result);
     setAnalysisOpen(true);
@@ -157,7 +160,7 @@ function Stepper({ currentStep }) {
 }
 
 // ─── Step 1: Novel Info ────────────────────────────────────────────────────
-function Step1({ form, setForm, chars }) {
+function Step1({ form, setForm, chars, activeWriters }) {
   const [drafting, setDrafting] = useState(false);
   const [draftError, setDraftError] = useState("");
   const [confirmMode, setConfirmMode] = useState(false); // pending overwrite confirm
@@ -179,8 +182,14 @@ function Step1({ form, setForm, chars }) {
       namedChars.length > 0 && `ตัวละครหลัก: ${namedChars.map((c) => `${c.name} (${c.role})`).join(", ")}`,
     ].filter(Boolean).join("\n");
 
+    // ดึง writer system_prompt ถ้าเลือกแล้ว
+    const selectedWriter = activeWriters?.find((w) => w.id === form.writer_id);
+    const writerCtx = selectedWriter?.system_prompt
+      ? `[สไตล์และโทนการเขียน]\n${selectedWriter.system_prompt}\n\n`
+      : "";
+
     const result = await base44.integrations.Core.InvokeLLM({
-      prompt: `คุณคือนักเขียนนิยายมืออาชีพ ช่วยร่างเรื่องย่อ${isOneShot ? "เรื่องสั้น" : "นิยาย"}เรื่องนี้:\n\n${contextParts}\n\nเขียนเรื่องย่อภาษาไทย 3-5 ประโยค กระชับ น่าสนใจ ดึงดูดให้อยากอ่าน เหมาะกับแนว${form.genre || "นิยาย"}ที่เลือก อย่าเพิ่งเปิดเผยปมสำคัญทั้งหมด ให้รู้สึกอยากติดตาม ตอบเฉพาะเรื่องย่อ ไม่ต้องมีหัวข้อหรือคำอธิบายเพิ่มเติม`,
+      prompt: `${writerCtx}คุณคือนักเขียนนิยายมืออาชีพ ช่วยร่างเรื่องย่อ${isOneShot ? "เรื่องสั้น" : "นิยาย"}เรื่องนี้:\n\n${contextParts}\n\nเขียนเรื่องย่อภาษาไทย 3-5 ประโยค กระชับ น่าสนใจ ดึงดูดให้อยากอ่าน เหมาะกับแนว${form.genre || "นิยาย"}ที่เลือก อย่าเพิ่งเปิดเผยปมสำคัญทั้งหมด ให้รู้สึกอยากติดตาม ตอบเฉพาะเรื่องย่อ ไม่ต้องมีหัวข้อหรือคำอธิบายเพิ่มเติม`,
     });
 
     // Strip code fences
@@ -365,7 +374,7 @@ function Step1({ form, setForm, chars }) {
 }
 
 // ─── Step 2: Characters ────────────────────────────────────────────────────
-function Step2({ chars, setChars }) {
+function Step2({ chars, setChars, writerSystemPrompt }) {
   const addRow = () => setChars([...chars, emptyChar()]);
   const removeRow = (i) => setChars(chars.filter((_, idx) => idx !== i));
   const updateRow = (i, field, value) => setChars(chars.map((c, idx) => idx === i ? { ...c, [field]: value } : c));
@@ -374,7 +383,7 @@ function Step2({ chars, setChars }) {
     <div className="space-y-3">
       <p className="text-sm text-muted-foreground">เพิ่มตัวละครหลัก — ข้ามได้ ปล่อยให้ AI เติมทีหลังก็ได้</p>
       {chars.map((c, i) => (
-        <CharacterCard key={i} c={c} onUpdate={(field, value) => updateRow(i, field, value)} onRemove={() => removeRow(i)} />
+        <CharacterCard key={i} c={c} onUpdate={(field, value) => updateRow(i, field, value)} onRemove={() => removeRow(i)} writerSystemPrompt={writerSystemPrompt} />
       ))}
       <Button variant="outline" size="sm" className="gap-1.5 text-xs h-7" onClick={addRow}>
         <Plus className="w-3 h-3" />เพิ่มตัวละคร
@@ -530,8 +539,8 @@ export default function CreateNovelWizard({ open, onOpenChange, activeWriters, o
 
         {/* Scrollable body */}
         <div className="flex-1 overflow-y-auto px-6 py-5">
-          {step === 1 && <Step1 form={form} setForm={setForm} chars={chars} />}
-          {step === 2 && <Step2 chars={chars} setChars={setChars} />}
+          {step === 1 && <Step1 form={form} setForm={setForm} chars={chars} activeWriters={activeWriters} />}
+          {step === 2 && <Step2 chars={chars} setChars={setChars} writerSystemPrompt={activeWriters?.find((w) => w.id === form.writer_id)?.system_prompt} />}
           {step === 3 && <Step3 form={form} setForm={setForm} chars={chars} activeWriters={activeWriters} />}
         </div>
 

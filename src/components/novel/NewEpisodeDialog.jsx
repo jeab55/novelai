@@ -63,8 +63,11 @@ export default function NewEpisodeDialog({ open, onClose, novel }) {
     setGeneratingChars(true);
     const selectedChars = existingChars.filter((c) => inheritedChars.includes(c.id));
     const charSummary = selectedChars.map((c) => `${c.name} (${c.role}) — ${c.personality || ""}`).join("\n");
-    const prompt = `
-คุณเป็นนักเขียนนิยาย ต้องการสร้างตัวละครใหม่สำหรับ EP ต่อไปของนิยาย
+    const writerCtx = writer?.system_prompt
+      ? `[สไตล์และโทนการเขียน]\n${writer.system_prompt}\n\n`
+      : "";
+
+    const prompt = `${writerCtx}คุณเป็นนักเขียนนิยาย ต้องการสร้างตัวละครใหม่สำหรับ EP ต่อไปของนิยาย
 ชื่อนิยาย: ${novel?.title}
 แนว: ${novel?.genre || ""}
 EP ใหม่ชื่อ: "${epTitle}"
@@ -74,7 +77,7 @@ ${charSummary || "(ยังไม่มี)"}
 ${newCharacterHints ? `คำแนะนำพิเศษ: ${newCharacterHints}` : ""}
 
 กรุณาสร้างตัวละครใหม่ที่จำเป็นสำหรับพล็อตของ EP นี้ (2-4 ตัว) ที่ไม่ซ้ำกับตัวละครเดิม
-ตัวละครใหม่ต้องสมเหตุสมผลกับเนื้อเรื่อง
+ตัวละครใหม่ต้องสมเหตุสมผลกับเนื้อเรื่องและสอดคล้องกับสไตล์การเขียน
     `;
     const result = await base44.integrations.Core.InvokeLLM({
       prompt,
