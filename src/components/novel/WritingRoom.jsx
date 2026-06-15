@@ -340,18 +340,32 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
             <div className="flex items-center gap-1.5 bg-secondary/50 p-1 rounded-xl flex-1">
               {seasons.length > 1 ? (
                 seasons.map((season, idx) => (
-                  <button
-                    key={season.id}
-                    onClick={() => setSelectedSeasonTab(season.id)}
-                    className={`px-3 py-1.5 text-sm rounded-lg transition-all font-medium ${
-                      String(selectedSeasonTab) === String(season.id)
-                        ? "bg-primary text-primary-foreground shadow-sm"
-                        : "text-muted-foreground hover:bg-secondary"
-                    }`}
-                  >
-                    <span className="text-primary/70 mr-1.5">#{idx + 1}</span>
-                    {season.title}
-                  </button>
+                  <div key={season.id} className="flex items-center gap-1">
+                    <button
+                      onClick={() => setSelectedSeasonTab(season.id)}
+                      className={`px-3 py-1.5 text-sm rounded-lg transition-all font-medium ${
+                        String(selectedSeasonTab) === String(season.id)
+                          ? "bg-primary text-primary-foreground shadow-sm"
+                          : "text-muted-foreground hover:bg-secondary"
+                      }`}
+                    >
+                      <span className="text-primary/70 mr-1.5">#{idx + 1}</span>
+                      {season.title}
+                    </button>
+                    {String(season.id) !== String(novelId) && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedSeasonTab(season.id);
+                          setDeleteSeasonDialogOpen(true);
+                        }}
+                        className="w-6 h-6 rounded-md hover:bg-destructive/10 text-destructive flex items-center justify-center transition-all"
+                        title="ลบ Season นี้"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
                 ))
               ) : (
                 <div className="px-3 py-1.5 text-sm text-muted-foreground">
