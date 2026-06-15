@@ -21,6 +21,7 @@ import ContinuityChecker from "./ContinuityChecker";
 import BulkAutoWriteDialog from "./BulkAutoWriteDialog";
 import SeasonSelectorDialog from "./SeasonSelectorDialog";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import NovelSpellCheckSummary from "./NovelSpellCheckSummary";
 
 const statusColors = {
   "ร่าง": "bg-amber-50 text-amber-700 border border-amber-200",
@@ -40,6 +41,7 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
   const [bulkAutoWriteOpen, setBulkAutoWriteOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [seasonSelectorOpen, setSeasonSelectorOpen] = useState(false);
+  const [spellCheckSummaryOpen, setSpellCheckSummaryOpen] = useState(false);
   const queryClient = useQueryClient();
 
   // Handle chapter navigation from other tabs (e.g. AiPlotDialog draft)
@@ -235,6 +237,12 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
         window.location.href = `/novel/${season.id}`;
       }}
     />
+    <NovelSpellCheckSummary
+      open={spellCheckSummaryOpen}
+      onClose={() => setSpellCheckSummaryOpen(false)}
+      novelId={selectedSeasonTab}
+      novel={selectedSeasonNovel || novel}
+    />
     <div className="max-w-4xl mx-auto px-4 py-6">
       {/* Season Tabs */}
       {seasons.length > 1 && (
@@ -297,6 +305,7 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
             ตอนใหม่
           </Button>
           {chapters.length > 0 && (
+            <>
             <Button
               variant="outline"
               size="sm"
@@ -306,6 +315,16 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
               <Download className="w-3.5 h-3.5" />
               ส่งออก
             </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5 text-blue-700 border-blue-300 hover:bg-blue-50"
+              onClick={() => setSpellCheckSummaryOpen(true)}
+            >
+              <FileText className="w-3.5 h-3.5" />
+              สรุปคำผิด
+            </Button>
+            </>
           )}
         </div>
       </div>
