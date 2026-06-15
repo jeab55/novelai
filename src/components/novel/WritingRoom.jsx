@@ -52,6 +52,14 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
     }
   }, [pendingOpenChapter]);
 
+  // selectedSeasonTab คือ novelId ที่เลือก (default = novelId)
+  const [selectedSeasonTab, setSelectedSeasonTab] = useState(novelId);
+
+  // Reset selectedSeasonTab เมื่อ novelId เปลี่ยน (เช่น เมื่อสลับ Season จาก parent component)
+  useEffect(() => {
+    setSelectedSeasonTab(novelId);
+  }, [novelId]);
+
   // โหลดทุก Season (Novel หลัก + novels ที่มี parent_novel_id = novelId)
   const { data: seasons = [] } = useQuery({
     queryKey: ["seasons", novelId],
@@ -80,14 +88,6 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
     staleTime: 30000,
     gcTime: 120000,
   });
-
-  // selectedSeasonTab คือ novelId ที่เลือก (default = novelId)
-  const [selectedSeasonTab, setSelectedSeasonTab] = useState(novelId);
-
-  // Reset selectedSeasonTab เมื่อ novelId เปลี่ยน (เช่น เมื่อสลับ Season จาก parent component)
-  useEffect(() => {
-    setSelectedSeasonTab(novelId);
-  }, [novelId]);
 
   // โหลด chapters ของ Season ที่เลือก — cache นานขึ้น
   const { data: chapters = [], isLoading } = useQuery({
