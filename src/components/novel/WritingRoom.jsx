@@ -45,8 +45,6 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
   const [seasonSelectorOpen, setSeasonSelectorOpen] = useState(false);
   const [spellCheckSummaryOpen, setSpellCheckSummaryOpen] = useState(false);
   const queryClient = useQueryClient();
-  const { jobs } = useBulkWrite();
-  const isBulkWriting = jobs[selectedSeasonTab]?.status === "running";
 
   // Handle chapter navigation from other tabs (e.g. AiPlotDialog draft)
   useEffect(() => {
@@ -58,6 +56,9 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
 
   // selectedSeasonTab คือ novelId ที่เลือก (default = novelId)
   const [selectedSeasonTab, setSelectedSeasonTab] = useState(novelId);
+
+  const { jobs } = useBulkWrite();
+  const isBulkWriting = jobs[selectedSeasonTab]?.status === "running";
 
   // Reset selectedSeasonTab เมื่อ novelId เปลี่ยน (เช่น เมื่อสลับ Season จาก parent component)
   useEffect(() => {
