@@ -325,7 +325,7 @@ export default function Dashboard() {
                       <div className="h-1.5 w-full bg-gradient-to-r from-primary/60 to-accent" />
 
                       {/* Badges */}
-                      <div className="absolute top-3 left-3 z-10 flex items-center gap-2">
+                      <div className="absolute top-3 right-3 z-10 flex items-center gap-2">
                         {novel.novel_type === "เรื่องสั้น" && (
                           <div className="flex items-center gap-1 bg-sky-500/15 text-sky-700 dark:text-sky-300 text-[11px] font-semibold px-2.5 py-1 rounded-full border border-sky-500/30 shadow-sm">
                             <BookOpen className="w-3 h-3 text-sky-500" />
