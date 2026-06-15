@@ -406,9 +406,25 @@ export default function SeriesDashboard() {
                   จัดการนิยาย
                 </Button>
               </Link>
-              <Button variant="outline" className="gap-2" onClick={() => {
-                const completedNovels = novels.filter(n => n.status === "เขียนเสร็จ");
-                toast.success(`พบนิยายที่เขียนเสร็จแล้ว ${completedNovels.length} เรื่อง`);
+              <Button variant="outline" className="gap-2" onClick={async () => {
+                const updatePromises = novels.map(async (novel) => {
+                  const novelChapters = chapters.filter(
+                    (c) => String(c.novel_id) === String(novel.id) && !c.is_deleted
+                  );
+                  if (novelChapters.length === 0) return;
+                  const allCompleted = novelChapters.every(
+                    (ch) => ch.status === "เขียนเสร็จ"
+                  );
+                  if (allCompleted && novel.status !== "เขียนเสร็จ") {
+                    return base44.entities.Novel.update(novel.id, { status: "เขียนเสร็จ" });
+                  }
+                  if (!allCompleted && novel.status === "เขียนเสร็จ") {
+                    return base44.entities.Novel.update(novel.id, { status: "กำลังเขียน" });
+                  }
+                });
+                await Promise.all(updatePromises);
+                queryClient.invalidateQueries({ queryKey: ["novels-for-series"] });
+                toast.success("อัพเดทสถานะนิยายเรียบร้อยแล้ว");
               }}>
                 <CheckCircle2 className="w-4 h-4" />
                 อัพเดทงานเขียนสำเร็จ
