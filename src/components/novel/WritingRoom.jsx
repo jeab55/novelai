@@ -19,6 +19,7 @@ import AiDraftDialog from "./AiDraftDialog";
 import ContinuityChecker from "./ContinuityChecker";
 import BulkAutoWriteDialog from "./BulkAutoWriteDialog";
 import NewEpisodeDialog from "./NewEpisodeDialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const statusColors = {
   "ร่าง": "bg-amber-50 text-amber-700 border border-amber-200",
@@ -28,6 +29,7 @@ const statusColors = {
 
 export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPendingOpenChapterConsumed }) {
   const [selectedChapter, setSelectedChapter] = useState(null);
+  const [selectedEpisodeTab, setSelectedEpisodeTab] = useState(novelId);
   const [newChapterOpen, setNewChapterOpen] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [selectedPlotEventId, setSelectedPlotEventId] = useState("");
@@ -48,19 +50,33 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
     }
   }, [pendingOpenChapter]);
 
-  const { data: chapters = [], isLoading } = useQuery({
-    queryKey: ["chapters", novelId],
+  // โหลดทุก EP ในซีรีย์เดียวกัน
+  const { data: episodes = [] } = useQuery({
+    queryKey: ["episodes", novel?.series_id],
     queryFn: async () => {
-      const all = await base44.entities.Chapter.filter({ novel_id: novelId }, "order");
+      if (!novel?.series_id) return [{ ...novel, id: novelId }].filter(Boolean);
+      const all = await base44.entities.Novel.list();
+      return all
+        .filter((n) => String(n.series_id) === String(novel.series_id) && !n.is_deleted)
+        .sort((a, b) => (a.created_date || "").localeCompare(b.created_date || ""));
+    },
+    enabled: !!novel,
+  });
+
+  // โหลด chapters ของ EP ที่เลือก
+  const { data: chapters = [], isLoading } = useQuery({
+    queryKey: ["chapters", selectedEpisodeTab],
+    queryFn: async () => {
+      const all = await base44.entities.Chapter.filter({ novel_id: selectedEpisodeTab }, "order");
       return all.filter((c) => !c.is_deleted).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
     },
     staleTime: 10000,
   });
 
   const { data: plotEvents = [] } = useQuery({
-    queryKey: ["plotEvents", novelId],
+    queryKey: ["plotEvents", selectedEpisodeTab],
     queryFn: async () => {
-      const all = await base44.entities.PlotEvent.filter({ novel_id: novelId }, "order");
+      const all = await base44.entities.PlotEvent.filter({ novel_id: selectedEpisodeTab }, "order");
       return all.filter((e) => !e.is_deleted);
     },
   });
@@ -90,7 +106,7 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
   const createChapter = useMutation({
     mutationFn: (data) => base44.entities.Chapter.create(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["chapters", novelId] });
+      queryClient.invalidateQueries({ queryKey: ["chapters", selectedEpisodeTab] });
       setNewChapterOpen(false);
       setNewTitle("");
       setSelectedPlotEventId("");
@@ -100,7 +116,7 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
   const deleteChapter = useMutation({
     mutationFn: (id) => base44.entities.Chapter.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["chapters", novelId] });
+      queryClient.invalidateQueries({ queryKey: ["chapters", selectedEpisodeTab] });
       setSelectedChapter(null);
     },
   });
@@ -119,7 +135,6 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
   return (
     <>
     <ExportDialog open={exportOpen} onOpenChange={setExportOpen} novel={novel} chapters={chapters} />
-    <NewEpisodeDialog open={newEpisodeOpen} onClose={() => setNewEpisodeOpen(false)} novel={novel} />
     <AiChapterGeneratorDialog
       open={aiChapterGeneratorOpen}
       onClose={() => setAiChapterGeneratorOpen(false)}
@@ -152,6 +167,23 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
       />
     )}
     <div className="max-w-4xl mx-auto px-4 py-6">
+      {/* EP Tabs */}
+      {episodes.length > 1 && (
+        <Tabs value={selectedEpisodeTab} onValueChange={setSelectedEpisodeTab} className="mb-6">
+          <TabsList className="bg-primary/10 h-auto p-1 gap-1 flex-wrap">
+            {episodes.map((ep, idx) => (
+              <TabsTrigger
+                key={ep.id}
+                value={ep.id}
+                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-xs py-1.5 px-3 h-auto rounded-lg"
+              >
+                EP{idx + 1}: {ep.title?.slice(0, 15)}{ep.title?.length > 15 ? "..." : ""}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+      )}
+
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="font-heading text-lg font-semibold">ห้องเขียน</h2>
@@ -198,6 +230,16 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
             <Layers className="w-3.5 h-3.5" />
             สร้าง EP ใหม่
           </Button>
+          {newEpisodeOpen && (
+            <NewEpisodeDialog
+              open={true}
+              onClose={() => {
+                setNewEpisodeOpen(false);
+                queryClient.invalidateQueries({ queryKey: ["episodes", novel?.series_id] });
+              }}
+              novel={novel}
+            />
+          )}
           <Dialog open={newChapterOpen} onOpenChange={setNewChapterOpen}>
           <DialogTrigger asChild>
             <Button size="sm" className="gap-1.5">
@@ -248,7 +290,7 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
                 onClick={() => {
                   const ev = plotEvents.find((e) => e.id === selectedPlotEventId);
                   createChapter.mutate({
-                    novel_id: novelId,
+                    novel_id: selectedEpisodeTab,
                     title: newTitle,
                     order: chapters.length + 1,
                     status: "ร่าง",
