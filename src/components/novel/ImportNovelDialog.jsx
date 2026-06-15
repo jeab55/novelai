@@ -329,27 +329,29 @@ export default function ImportNovelDialog({ open, onClose, novels = [], seriesLi
                   className={`min-h-[200px] font-mono text-sm resize-none ${rawText.trim() ? 'border-primary/50 ring-2 ring-primary/20' : ''}`}
                   readOnly={false}
                 />
+                
                 {rawText.trim() && !uploading && (
-                  <div className="mt-3 space-y-3">
-                    <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
-                      <div className="flex items-center justify-between mb-2">
+                  <div className="mt-4 space-y-3">
+                    <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-xl border-2 border-green-300 dark:border-green-700">
+                      <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
-                          <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400" />
-                          <span className="text-sm font-medium text-green-700 dark:text-green-400">อ่านไฟล์สำเร็จ</span>
+                          <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
+                          <span className="text-base font-semibold text-green-800 dark:text-green-300">พร้อมนำเข้าไฟล์</span>
                         </div>
-                        <span className="text-xs text-muted-foreground">{rawText.length.toLocaleString()} ตัวอักษร</span>
+                        <Badge className="bg-green-600 text-white">{rawText.length.toLocaleString()} ตัวอักษร</Badge>
                       </div>
-                      <div className="text-xs text-muted-foreground line-clamp-3 whitespace-pre-line">
-                        {rawText.slice(0, 300)}...
+                      <div className="text-sm text-green-700 dark:text-green-400 bg-white/60 dark:bg-green-900/30 rounded-lg p-3 font-mono line-clamp-3">
+                        {rawText.slice(0, 400)}...
                       </div>
                     </div>
+                    
                     <Button
-                      className="w-full gap-2"
+                      className="w-full h-12 text-base font-semibold shadow-lg"
                       onClick={handleFileUploaded}
                       size="lg"
                     >
-                      <FileText className="w-4 h-4" />
-                      เริ่มประมวลผลและแบ่งตอน
+                      <FileText className="w-5 h-5" />
+                      เริ่มประมวลผลและแบ่งตอน →
                     </Button>
                   </div>
                 )}
