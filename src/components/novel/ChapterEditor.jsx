@@ -16,6 +16,7 @@ import ReaderReviewRevisionPanel from "./ReaderReviewRevisionPanel";
 import InlineDiffViewer from "./InlineDiffViewer";
 import HistoricalFactCheckPanel from "./HistoricalFactCheckPanel";
 import ChapterIllustrationPanel from "./ChapterIllustrationPanel";
+import ThaiProofreaderPanel from "./ThaiProofreaderPanel";
 import { saveVersion } from "@/lib/saveVersion";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -68,6 +69,7 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
   const [inlineDiff, setInlineDiff] = useState(null); // { rawText, color, cleanText, originalText } | null
   const [factCheckOpen, setFactCheckOpen] = useState(false);
   const [illustrationOpen, setIllustrationOpen] = useState(false);
+  const [proofreaderOpen, setProofreaderOpen] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: plotEvents = [] } = useQuery({
@@ -316,6 +318,18 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
         >
           <ShieldCheck className="w-3.5 h-3.5" />
           ตรวจข้อเท็จจริง
+        </Button>
+
+        {/* Thai Proofreader button */}
+        <Button
+          variant="outline"
+          size="sm"
+          className={`gap-1.5 h-8 text-xs border-emerald-300 hover:bg-emerald-50 ${proofreaderOpen ? "bg-emerald-100 text-emerald-800" : "text-emerald-700"}`}
+          onClick={() => setProofreaderOpen((v) => !v)}
+          title="ตรวจคำผิดและการเว้นวรรค"
+        >
+          <CheckCircle2 className="w-3.5 h-3.5" />
+          ตรวจคำผิด
         </Button>
 
         {/* AI Draft button */}
@@ -609,6 +623,14 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
           novelId={novelId}
           onClose={() => setIllustrationOpen(false)}
         />
+      )}
+      {proofreaderOpen && (
+        <div className="border-t border-border/60 bg-card/30 p-4">
+          <ThaiProofreaderPanel
+            content={content}
+            onApplySuggestions={(updatedContent) => setContent(updatedContent)}
+          />
+        </div>
       )}
       <div className="flex flex-1 overflow-hidden">
         {/* inline diff view — แทน textarea เมื่อมี diff */}
