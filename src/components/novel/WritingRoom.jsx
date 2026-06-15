@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, FileText, Loader2, Trash2, Download, Copy, MoreHorizontal, Clock, Sparkles, Users, BookOpen, Layers, GripVertical, Layers2 } from "lucide-react";
+import { Plus, FileText, Loader2, Trash2, Download, Copy, MoreHorizontal, Clock, Sparkles, Users, BookOpen, Layers, GripVertical, Layers2, Wand2, CheckCircle2, Image as ImageIcon, Edit3 } from "lucide-react";
 import ExportDialog from "./ExportDialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { motion, AnimatePresence } from "framer-motion";
@@ -313,30 +313,30 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
       </AlertDialogContent>
     </AlertDialog>
     <div className="max-w-4xl mx-auto px-4 py-6">
-      {/* Header Section */}
-      <div className="mb-6">
-        {/* Season Tabs & Actions Row */}
+      {/* Header Card */}
+      <div className="bg-card border border-border rounded-2xl p-5 mb-6 shadow-sm">
+        {/* Season Tabs & Management */}
         <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 bg-primary/10 p-1 rounded-lg">
+          <div className="flex items-center gap-3 flex-1">
+            <div className="flex items-center gap-1.5 bg-secondary/50 p-1 rounded-xl">
               {seasons.length > 1 ? (
                 seasons.map((season, idx) => (
                   <button
                     key={season.id}
                     onClick={() => setSelectedSeasonTab(season.id)}
-                    className={`px-3 py-1.5 text-sm rounded-md transition-all font-medium ${
+                    className={`px-3 py-1.5 text-sm rounded-lg transition-all font-medium ${
                       String(selectedSeasonTab) === String(season.id)
                         ? "bg-primary text-primary-foreground shadow-sm"
-                        : "text-muted-foreground hover:bg-primary/5"
+                        : "text-muted-foreground hover:bg-secondary"
                     }`}
                   >
-                    <span className="text-primary/70 mr-1">#{idx + 1}</span>
+                    <span className="text-primary/70 mr-1.5">#{idx + 1}</span>
                     {season.title}
                   </button>
                 ))
               ) : (
                 <div className="px-3 py-1.5 text-sm text-muted-foreground">
-                  <span className="text-primary/70 mr-1">#1</span>
+                  <span className="text-primary/70 mr-1.5">#1</span>
                   {novel?.title}
                 </div>
               )}
@@ -353,33 +353,9 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
               </Button>
             )}
           </div>
-
-          {/* Quick Actions */}
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5 h-8 text-primary/70 border-primary/20"
-              onClick={() => setAiChapterGeneratorOpen(true)}
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              AI สร้างตอน
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className={`gap-1.5 h-8 text-violet-600 border-violet-200 hover:bg-violet-50 dark:text-violet-400 dark:border-violet-800/40 dark:hover:bg-violet-950/20 ${isBulkWriting ? "opacity-50 cursor-not-allowed" : ""}`}
-              onClick={() => setBulkAutoWriteOpen(true)}
-              disabled={isBulkWriting}
-              title={isBulkWriting ? "กำลังสร้างตอน... กรุณารอจนเสร็จ" : "AI สร้างตอนทั้งหมด"}
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              AI สร้างตอนทั้งหมด
-            </Button>
-          </div>
         </div>
 
-        {/* Title & Stats Row */}
+        {/* Title, Stats & Main Actions */}
         <div className="flex items-center justify-between">
           <div>
             <h2 className="font-heading text-xl font-bold text-foreground mb-1">ห้องเขียน</h2>
@@ -405,31 +381,69 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
                 ลบ Season
               </Button>
             )}
-            {chapters.length > 0 && (
-              <>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5 h-9 text-muted-foreground"
-                  onClick={() => setExportOpen(true)}
-                >
-                  <Download className="w-4 h-4" />
-                  ส่งออก
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5 h-9 text-blue-700 border-blue-300 hover:bg-blue-50"
-                  onClick={() => setSpellCheckSummaryOpen(true)}
-                >
-                  <FileText className="w-4 h-4" />
-                  สรุปคำผิด
-                </Button>
-              </>
-            )}
           </div>
         </div>
       </div>
+
+      {/* Toolbar - AI Tools & Actions */}
+      {chapters.length > 0 && (
+        <div className="bg-gradient-to-r from-secondary/50 to-secondary/30 border border-border rounded-xl p-4 mb-6">
+          <div className="flex items-center gap-4 flex-wrap">
+            {/* AI Writing Group */}
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 mr-2">
+                <Wand2 className="w-4 h-4 text-primary" />
+                <span className="text-sm font-semibold text-primary">AI เขียน</span>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 h-9 text-primary/70 border-primary/20 hover:bg-primary/5"
+                onClick={() => setAiChapterGeneratorOpen(true)}
+              >
+                <Sparkles className="w-4 h-4" />
+                สร้างตอน
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className={`gap-1.5 h-9 text-violet-600 border-violet-200 hover:bg-violet-50 dark:text-violet-400 dark:border-violet-800/40 dark:hover:bg-violet-950/20 ${isBulkWriting ? "opacity-50 cursor-not-allowed" : ""}`}
+                onClick={() => setBulkAutoWriteOpen(true)}
+                disabled={isBulkWriting}
+                title={isBulkWriting ? "กำลังสร้างตอน... กรุณารอจนเสร็จ" : "สร้างตอนทั้งหมดอัตโนมัติ"}
+              >
+                <Sparkles className="w-4 h-4" />
+                สร้างตอนทั้งหมด
+              </Button>
+            </div>
+
+            {/* Divider */}
+            <div className="w-px h-6 bg-border" />
+
+            {/* Tools Group */}
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 h-9 text-blue-700 border-blue-300 hover:bg-blue-50"
+                onClick={() => setSpellCheckSummaryOpen(true)}
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                ตรวจคำผิด
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 h-9 text-muted-foreground"
+                onClick={() => setExportOpen(true)}
+              >
+                <Download className="w-4 h-4" />
+                ส่งออก
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <Dialog open={newChapterOpen} onOpenChange={setNewChapterOpen}>
         <DialogContent className="sm:max-w-md">
@@ -523,35 +537,41 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
                 className={`group flex items-center gap-4 px-5 py-4 rounded-2xl border bg-card/60 hover:border-primary/30 hover:bg-card hover:shadow-sm cursor-pointer transition-all duration-200 ${snapshot.isDragging ? "border-primary/50 shadow-lg ring-2 ring-primary/20 bg-card" : "border-border/50"}`}
                 onClick={() => setSelectedChapter(ch)}
               >
-                {/* drag handle */}
+                {/* Drag Handle */}
                 <div
                   {...drag.dragHandleProps}
                   onClick={(e) => e.stopPropagation()}
                   className="text-muted-foreground/40 hover:text-muted-foreground cursor-grab active:cursor-grabbing shrink-0 -ml-1"
+                  title="ลากเพื่อจัดลำดับ"
                 >
                   <GripVertical className="w-4 h-4" />
                 </div>
-                {/* ลำดับตอน */}
-                <div className="w-9 h-9 rounded-xl bg-primary/8 flex items-center justify-center text-sm font-semibold text-primary shrink-0">
+                
+                {/* Chapter Number Badge */}
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center text-sm font-bold text-primary shrink-0 border border-primary/15">
                   {ch.order || i + 1}
                 </div>
-                {/* ชื่อ + คำ */}
+                
+                {/* Title & Stats */}
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-[15px] truncate text-foreground">{ch.title}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-2">
-                    <span className="font-medium text-primary/70">{(ch.word_count || 0).toLocaleString()}</span> คำ
+                  <p className="text-xs text-muted-foreground mt-1 flex items-center gap-3">
+                    <span className="flex items-center gap-1">
+                      <span className="font-medium text-primary/70">{(ch.word_count || 0).toLocaleString()}</span> คำ
+                    </span>
                     {(selectedSeasonNovel || novel)?.word_count_target && (
-                      <span className={`text-xs ${
+                      <span className={`flex items-center gap-1 ${
                         (ch.word_count || 0) >= (selectedSeasonNovel || novel).word_count_target * 0.9
                           ? "text-emerald-600 dark:text-emerald-400"
                           : "text-amber-600 dark:text-amber-400"
                       }`}>
-                        ({Math.round(((ch.word_count || 0) / (selectedSeasonNovel || novel).word_count_target) * 100)}% ของ {(selectedSeasonNovel || novel).word_count_target.toLocaleString()} คำ)
+                        <span className="text-xs">({Math.round(((ch.word_count || 0) / (selectedSeasonNovel || novel).word_count_target) * 100)}% ของเป้าหมาย)</span>
                       </span>
                     )}
                   </p>
                 </div>
 
+                {/* Action Buttons - Show on Hover */}
                 <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-all shrink-0">
                   {chaptersWithReaderReviews.has(ch.id) && (
                     <Button
@@ -598,6 +618,7 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
                         size="icon"
                         className="h-8 w-8 shrink-0 text-muted-foreground hover:bg-secondary/60"
                         onClick={(e) => e.stopPropagation()}
+                        title="เพิ่มเติม"
                       >
                         <MoreHorizontal className="w-4 h-4" />
                       </Button>
@@ -605,11 +626,11 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
                     <DropdownMenuContent align="end" className="w-52" onClick={(e) => e.stopPropagation()}>
                       <DropdownMenuItem onClick={() => downloadChapterTxt(ch.title, ch.content)}>
                         <Download className="w-3.5 h-3.5 mr-2" />
-                        ดาวน์โหลดเป็น .txt
+                        ดาวน์โหลด .txt
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => downloadChapterMd(ch.title, ch.content)}>
                         <Download className="w-3.5 h-3.5 mr-2" />
-                        ดาวน์โหลดเป็น .md
+                        ดาวน์โหลด .md
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={async () => {
