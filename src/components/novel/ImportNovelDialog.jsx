@@ -88,7 +88,7 @@ export default function ImportNovelDialog({ open, onClose, novels = [], seriesLi
   const [novelTitle, setNovelTitle] = useState("");
   const [novelGenre, setNovelGenre] = useState("โรแมนติก");
   const [targetNovelId, setTargetNovelId] = useState("");
-  const [targetSeriesId, setTargetSeriesId] = useState("__none__");
+  const [targetSeriesId, setTargetSeriesId] = useState("");
 
   const [importing, setImporting] = useState(false);
   const [done, setDone] = useState(false);
@@ -113,10 +113,15 @@ export default function ImportNovelDialog({ open, onClose, novels = [], seriesLi
           setImporting(false);
           return;
         }
+        if (!targetSeriesId) {
+          toast.error("กรุณาเลือกซีรีย์");
+          setImporting(false);
+          return;
+        }
         const novel = await base44.entities.Novel.create({
           title: novelTitle.trim(),
           genre: novelGenre,
-          series_id: targetSeriesId === "__none__" ? "" : targetSeriesId,
+          series_id: targetSeriesId,
         });
         novelId = novel.id;
         queryClient.invalidateQueries({ queryKey: ["novels-for-series"] });
@@ -166,7 +171,7 @@ export default function ImportNovelDialog({ open, onClose, novels = [], seriesLi
       setNovelTitle("");
       setNovelGenre("โรแมนติก");
       setTargetNovelId("");
-      setTargetSeriesId("__none__");
+      setTargetSeriesId("");
       setDone(false);
       setExpandedIdx(null);
       onClose();
@@ -323,14 +328,14 @@ export default function ImportNovelDialog({ open, onClose, novels = [], seriesLi
                     </Select>
                   </div>
                   <div>
-                    <label className="text-sm font-medium mb-1.5 block">ซีรีย์ (ถ้ามี)</label>
+                    <label className="text-sm font-medium mb-1.5 block">ซีรีย์ *</label>
                     <Select value={targetSeriesId} onValueChange={setTargetSeriesId}>
                       <SelectTrigger><SelectValue placeholder="เลือกซีรีย์" /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="__none__">— ไม่ระบุ —</SelectItem>
                         {seriesList.map((s) => <SelectItem key={s.id} value={s.id}>{s.title}</SelectItem>)}
                       </SelectContent>
                     </Select>
+                    <p className="text-xs text-muted-foreground mt-1.5">ต้องเลือกซีรีย์ก่อนสร้างนิยาย</p>
                   </div>
                 </>
               ) : (
@@ -354,7 +359,7 @@ export default function ImportNovelDialog({ open, onClose, novels = [], seriesLi
               <Button
                 className="w-full gap-2"
                 onClick={handleImport}
-                disabled={importing || (mode === "new" && !novelTitle.trim()) || (mode === "existing" && !targetNovelId)}
+                disabled={importing || (mode === "new" && (!novelTitle.trim() || !targetSeriesId)) || (mode === "existing" && !targetNovelId)}
               >
                 {importing ? (
                   <><Loader2 className="w-4 h-4 animate-spin" />กำลังนำเข้า...</>
