@@ -41,9 +41,27 @@ function countWords(text) {
 }
 
 export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
-  const [title, setTitle] = useState(chapter.title);
-  const [content, setContent] = useState(chapter.content || "");
-  const [status, setStatus] = useState(chapter.status || "ร่าง");
+  // Defensive: ensure chapter has required fields with defaults
+  const safeChapter = {
+    ...chapter,
+    id: chapter?.id || "",
+    title: chapter?.title || "ไม่มีชื่อ",
+    content: chapter?.content || "",
+    status: chapter?.status || "ร่าง",
+    word_count: chapter?.word_count || 0,
+    order: chapter?.order || 0,
+    illustration_urls: chapter?.illustration_urls || [],
+    plot_event_id: chapter?.plot_event_id || "",
+    plot_event_title: chapter?.plot_event_title || "",
+    plot_event_description: chapter?.plot_event_description || "",
+    plot_event_order: chapter?.plot_event_order || null,
+    previous_content: chapter?.previous_content || "",
+    editor_review: chapter?.editor_review || "",
+  };
+
+  const [title, setTitle] = useState(safeChapter.title);
+  const [content, setContent] = useState(safeChapter.content);
+  const [status, setStatus] = useState(safeChapter.status);
   const [saving, setSaving] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
   const [draftOpen, setDraftOpen] = useState(false);
@@ -55,8 +73,8 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
   const [plotEventTitle, setPlotEventTitle] = useState(chapter.plot_event_title || "");
   const [plotEventDescription, setPlotEventDescription] = useState(chapter.plot_event_description || "");
   const [plotEventOrder, setPlotEventOrder] = useState(chapter.plot_event_order || null);
-  const [previousContent, setPreviousContent] = useState(chapter.previous_content || "");
-  const [editorReview, setEditorReview] = useState(chapter.editor_review || "");
+  const [previousContent, setPreviousContent] = useState(safeChapter.previous_content);
+  const [editorReview, setEditorReview] = useState(safeChapter.editorReview);
   const [balanceOpen, setBalanceOpen] = useState(false);
   const [templateOpen, setTemplateOpen] = useState(false);
   const [autoSaveStatus, setAutoSaveStatus] = useState("saved"); // "saving" | "saved"
@@ -94,12 +112,12 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
       // snapshot ก่อนบันทึก
       await saveVersion({
         entityType: "chapter",
-        entityId: chapter.id,
+        entityId: safeChapter.id,
         novelId,
-        data: { ...chapter, title, content, status, word_count: wordCount },
-        label: `บันทึกตอน: ${title || chapter.title}`,
+        data: { ...safeChapter, title, content, status, word_count: wordCount },
+        label: `บันทึกตอน: ${title || safeChapter.title}`,
       });
-      return base44.entities.Chapter.update(chapter.id, data);
+      return base44.entities.Chapter.update(safeChapter.id, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["chapters", novelId] });
@@ -110,8 +128,12 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
   });
 
   const handleSave = () => {
+    if (!safeChapter.id) {
+      toast.error("ไม่พบข้อมูลตอน - กรุณาลองใหม่อีกครั้ง");
+      return;
+    }
     setSaving(true);
-    setInlineDiff(null); // ลบไฮไลต์เมื่อบันทึก
+    setInlineDiff(null);
     saveMutation.mutate({ title, content, status, word_count: wordCount, plot_event_id: plotEventId, plot_event_title: plotEventTitle, plot_event_description: plotEventDescription, plot_event_order: plotEventOrder });
   };
 
@@ -128,18 +150,24 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
 
   // บันทึกเนื้อหาที่ AI แก้ (cleanText ไม่มี tags) พร้อมล้างไฮไลต์
   const handleInlineDiffSave = async () => {
-    if (!inlineDiff) return;
+    if (!inlineDiff || !safeChapter.id) return;
     setSaving(true);
-    await base44.entities.Chapter.update(chapter.id, {
-      previous_content: inlineDiff.originalText,
-      content: inlineDiff.cleanText,
-      word_count: countWords(inlineDiff.cleanText),
-    });
-    queryClient.invalidateQueries({ queryKey: ["chapters", novelId] });
-    setPreviousContent(inlineDiff.originalText);
-    setInlineDiff(null);
-    setSaving(false);
-    toast.success("บันทึกแล้ว — เนื้อหาเดิมถูกเก็บไว้ใน 'ฉบับสำรอง'");
+    try {
+      await base44.entities.Chapter.update(safeChapter.id, {
+        previous_content: inlineDiff.originalText,
+        content: inlineDiff.cleanText,
+        word_count: countWords(inlineDiff.cleanText),
+      });
+      queryClient.invalidateQueries({ queryKey: ["chapters", novelId] });
+      setPreviousContent(inlineDiff.originalText);
+      setInlineDiff(null);
+      setSaving(false);
+      toast.success("บันทึกแล้ว — เนื้อหาเดิมถูกเก็บไว้ใน 'ฉบับสำรอง'");
+    } catch (error) {
+      console.error("Failed to save inline diff:", error);
+      toast.error("ไม่สามารถบันทึกได้ กรุณาลองใหม่อีกครั้ง");
+      setSaving(false);
+    }
   };
 
   // ยกเลิก diff — คืนเนื้อหาเดิม
@@ -149,13 +177,14 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
   };
 
   const handleBindEvent = () => {
+    if (!safeChapter.id) return;
     const ev = plotEvents.find((e) => e.id === selectedPlotEventId);
     if (!ev) return;
     setPlotEventId(ev.id);
     setPlotEventTitle(ev.title);
     setPlotEventDescription(ev.description || "");
     setPlotEventOrder(ev.order || null);
-    base44.entities.Chapter.update(chapter.id, {
+    base44.entities.Chapter.update(safeChapter.id, {
       plot_event_id: ev.id,
       plot_event_title: ev.title,
       plot_event_description: ev.description || "",
@@ -168,11 +197,12 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
   };
 
   const handleUnbindEvent = () => {
+    if (!safeChapter.id) return;
     setPlotEventId("");
     setPlotEventTitle("");
     setPlotEventDescription("");
     setPlotEventOrder(null);
-    base44.entities.Chapter.update(chapter.id, {
+    base44.entities.Chapter.update(safeChapter.id, {
       plot_event_id: "",
       plot_event_title: "",
       plot_event_description: "",
@@ -184,13 +214,17 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
 
   const debouncedAutoSave = useCallback(
     debounce((newContent) => {
+      if (!safeChapter.id) return;
       setAutoSaveStatus("saving");
-      base44.entities.Chapter.update(chapter.id, {
+      base44.entities.Chapter.update(safeChapter.id, {
         content: newContent,
         word_count: countWords(newContent),
-      }).then(() => setAutoSaveStatus("saved"));
+      }).then(() => setAutoSaveStatus("saved")).catch((err) => {
+        console.error("Auto-save failed:", err);
+        setAutoSaveStatus("saved");
+      });
     }, 2000),
-    [chapter.id]
+    [safeChapter.id]
   );
 
   const toolbar = (
@@ -461,7 +495,7 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
 
   // chapter object ที่ส่งไป AiDraftDialog พร้อม plot event ปัจจุบัน
   const chapterWithEvent = {
-    ...chapter,
+    ...safeChapter,
     title,
     plot_event_id: plotEventId,
     plot_event_title: plotEventTitle,
@@ -475,10 +509,10 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
       open={versionOpen}
       onClose={() => setVersionOpen(false)}
       entityType="chapter"
-      entityId={chapter.id}
+      entityId={safeChapter.id}
       novelId={novelId}
-      currentData={{ ...chapter, title, content, status, word_count: wordCount }}
-      currentLabel={title || chapter.title}
+      currentData={{ ...safeChapter, title, content, status, word_count: wordCount }}
+      currentLabel={title || safeChapter.title}
       onRestored={(type, id, data) => {
         if (data.title) setTitle(data.title);
         if (data.content !== undefined) setContent(data.content);
@@ -493,8 +527,9 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
       novel={novel || { title: "" }}
       novelId={novelId}
       onInsert={(draft) => {
-        setContent((prev) => (prev ? prev + "\n\n" + draft : draft));
-        debouncedAutoSave(content + "\n\n" + draft);
+        const newContent = content ? content + "\n\n" + draft : draft;
+        setContent(newContent);
+        if (safeChapter.id) debouncedAutoSave(newContent);
       }}
     />
 
@@ -548,7 +583,7 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
       {templateOpen && (
         <SceneTemplateDialog
           novelId={novelId}
-          chapter={chapter}
+          chapter={safeChapter}
           onTemplateComplete={(generatedContent, templateData) => {
             setContent(generatedContent);
             setTemplateOpen(false);
@@ -559,7 +594,7 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
       )}
       
       <EditorReviewPanel
-        chapter={{ ...chapter, content, editor_review: editorReview, previous_content: previousContent, plot_event_id: plotEventId, plot_event_title: plotEventTitle, plot_event_description: plotEventDescription, plot_event_order: plotEventOrder }}
+        chapter={{ ...safeChapter, content, editor_review: editorReview, previous_content: previousContent, plot_event_id: plotEventId, plot_event_title: plotEventTitle, plot_event_description: plotEventDescription, plot_event_order: plotEventOrder }}
         novel={novel || { title: "" }}
         novelId={novelId}
         onContentUpdate={(improved, oldContent) => {
@@ -574,7 +609,7 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
         }}
       />
       <AiEditorReviewPanel
-        chapter={{ ...chapter, title, content, plot_event_id: plotEventId, plot_event_title: plotEventTitle, plot_event_description: plotEventDescription, plot_event_order: plotEventOrder }}
+        chapter={{ ...safeChapter, title, content, plot_event_id: plotEventId, plot_event_title: plotEventTitle, plot_event_description: plotEventDescription, plot_event_order: plotEventOrder }}
         novel={novel || { title: "" }}
         novelId={novelId}
         onContentUpdate={(revised) => {
@@ -583,7 +618,7 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
         }}
       />
       <ReaderReviewRevisionPanel
-        chapter={{ ...chapter, title, content, plot_event_id: plotEventId, plot_event_title: plotEventTitle, plot_event_description: plotEventDescription, plot_event_order: plotEventOrder }}
+        chapter={{ ...safeChapter, title, content, plot_event_id: plotEventId, plot_event_title: plotEventTitle, plot_event_description: plotEventDescription, plot_event_order: plotEventOrder }}
         novel={novel || { title: "" }}
         novelId={novelId}
         onReviseReady={handleReviseReady}
@@ -597,7 +632,7 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
       )}
       {illustrationOpen && (
         <ChapterIllustrationPanel
-          chapter={chapter}
+          chapter={safeChapter}
           novel={novel || { title: "" }}
           novelId={novelId}
           onClose={() => setIllustrationOpen(false)}

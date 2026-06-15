@@ -23,6 +23,7 @@ import BulkAutoWriteDialog from "./BulkAutoWriteDialog";
 import SeasonSelectorDialog from "./SeasonSelectorDialog";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import NovelSpellCheckSummary from "./NovelSpellCheckSummary";
+import ErrorBoundary from "../ErrorBoundary";
 
 const statusColors = {
   "ร่าง": "bg-amber-50 text-amber-700 border border-amber-200",
@@ -96,11 +97,17 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
   const { data: chapters = [], isLoading } = useQuery({
     queryKey: ["chapters", selectedSeasonTab],
     queryFn: async () => {
-      const all = await base44.entities.Chapter.filter({ novel_id: selectedSeasonTab }, "order");
-      return all.filter((c) => !c.is_deleted).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+      if (!selectedSeasonTab) return [];
+      try {
+        const all = await base44.entities.Chapter.filter({ novel_id: selectedSeasonTab }, "order");
+        return all.filter((c) => !c.is_deleted).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+      } catch (error) {
+        console.error("Failed to load chapters:", error);
+        return [];
+      }
     },
-    staleTime: 60000, // 1 นาที
-    gcTime: 300000, // 5 นาที
+    staleTime: 60000,
+    gcTime: 300000,
   });
 
   const { data: plotEvents = [] } = useQuery({
@@ -181,16 +188,19 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
 
   if (selectedChapter) {
     return (
-      <ChapterEditor
-        chapter={selectedChapter}
-        novelId={selectedSeasonTab}
-        novel={selectedSeasonNovel || novel}
-        onBack={() => setSelectedChapter(null)}
-      />
+      <ErrorBoundary onRetry={() => setSelectedChapter(null)}>
+        <ChapterEditor
+          chapter={selectedChapter}
+          novelId={selectedSeasonTab}
+          novel={selectedSeasonNovel || novel}
+          onBack={() => setSelectedChapter(null)}
+        />
+      </ErrorBoundary>
     );
   }
 
   return (
+    <ErrorBoundary onRetry={() => window.location.reload()}>
     <>
     <ExportDialog open={exportOpen} onOpenChange={setExportOpen} novel={selectedSeasonNovel || novel} chapters={chapters} />
     <AiChapterGeneratorDialog
@@ -555,5 +565,6 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
       )}
     </div>
     </>
+    </ErrorBoundary>
   );
 }
