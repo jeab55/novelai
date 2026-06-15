@@ -112,7 +112,7 @@ export default function ImportNovelDialog({ open, onClose, novels = [], seriesLi
 
   const handleImport = async () => {
     if (importing) return;
-    console.log('Starting import...', { mode, novelTitle, targetSeriesId, targetNovelId, chapters: chapters.length });
+    console.log('🚀 Starting import...', { mode, novelTitle, targetSeriesId, targetNovelId, chapters: chapters.length });
     setImporting(true);
     try {
       let novelId = targetNovelId;
@@ -128,14 +128,14 @@ export default function ImportNovelDialog({ open, onClose, novels = [], seriesLi
           setImporting(false);
           return;
         }
-        console.log('Creating new novel...', novelTitle);
+        console.log('📖 Creating new novel...', novelTitle);
         const novel = await base44.entities.Novel.create({
           title: novelTitle.trim(),
           genre: novelGenre,
           series_id: targetSeriesId,
         });
         novelId = novel.id;
-        console.log('Novel created:', novelId);
+        console.log('✅ Novel created:', novelId);
         queryClient.invalidateQueries({ queryKey: ["novels-for-series"] });
       }
 
@@ -146,16 +146,16 @@ export default function ImportNovelDialog({ open, onClose, novels = [], seriesLi
       }
 
       // หา max order ปัจจุบัน
-      console.log('Fetching existing chapters...');
+      console.log('📋 Fetching existing chapters...');
       const existing = await base44.entities.Chapter.filter({ novel_id: novelId });
       const maxOrder = existing.reduce((m, c) => Math.max(m, c.order || 0), 0);
-      console.log('Max order:', maxOrder);
+      console.log('📊 Max order:', maxOrder);
 
-      console.log('Creating chapters...');
+      console.log('✍️ Creating chapters...');
       for (let i = 0; i < chapters.length; i++) {
         const ch = chapters[i];
         const wc = countWords(ch.content);
-        console.log(`Creating chapter ${i + 1}: ${ch.title}`);
+        console.log(`  📝 Chapter ${i + 1}: ${ch.title} (${wc} คำ)`);
         await base44.entities.Chapter.create({
           novel_id: novelId,
           title: ch.title,
@@ -166,14 +166,14 @@ export default function ImportNovelDialog({ open, onClose, novels = [], seriesLi
         });
       }
 
-      console.log('Import complete!');
+      console.log('🎉 Import complete!');
       queryClient.invalidateQueries({ queryKey: ["chapters-all"] });
       queryClient.invalidateQueries({ queryKey: ["chapters", novelId] });
       setDone(true);
       setStep(3);
       toast.success(`นำเข้า ${chapters.length} ตอนเรียบร้อยแล้ว!`);
     } catch (e) {
-      console.error('Import error:', e);
+      console.error('❌ Import error:', e);
       toast.error("เกิดข้อผิดพลาด: " + (e.message || JSON.stringify(e)));
     } finally {
       setImporting(false);
@@ -373,7 +373,10 @@ export default function ImportNovelDialog({ open, onClose, novels = [], seriesLi
                     
                     <Button
                       className="w-full h-14 text-lg font-bold shadow-xl bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 transition-all"
-                      onClick={handleFileUploaded}
+                      onClick={() => {
+                        console.log('Process button clicked!');
+                        handleFileUploaded();
+                      }}
                       size="lg"
                     >
                       <FileText className="w-5 h-5" />
