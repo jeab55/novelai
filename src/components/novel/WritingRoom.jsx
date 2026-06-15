@@ -260,7 +260,7 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
                     : "text-muted-foreground hover:bg-primary/5"
                 }`}
               >
-                {season.title || `Season ${idx + 1}`}
+                Season {idx + 1}{season.title}
               </button>
             ))}
           </div>
