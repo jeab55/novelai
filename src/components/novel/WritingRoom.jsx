@@ -447,6 +447,24 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
                 <Sparkles className="w-4 h-4" />
                 สร้างตอนทั้งหมด
               </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 h-9 text-primary/70 border-primary/20 hover:bg-primary/5"
+                onClick={() => {
+                  const last = chapters[chapters.length - 1];
+                  if (last) {
+                    setDraftChapter(last);
+                    setAiDraftOpen(true);
+                  } else {
+                    setAiChapterGeneratorOpen(true);
+                  }
+                }}
+                title="สร้างร่างตอนด้วย AI"
+              >
+                <Sparkles className="w-4 h-4" />
+                สร้างร่าง
+              </Button>
             </div>
 
             {/* Divider */}
@@ -486,6 +504,22 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
                 >
                   <Sparkles className="w-3.5 h-3.5" />
                   สร้างตอนทั้งหมด
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => {
+                    const last = chapters[chapters.length - 1];
+                    if (last) {
+                      setDraftChapter(last);
+                      setAiDraftOpen(true);
+                    } else {
+                      setAiChapterGeneratorOpen(true);
+                    }
+                  }}
+                  className="gap-2"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  สร้างร่าง
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
