@@ -44,33 +44,33 @@ function NovelCard({ novel, chapters, uploadingFor, onUploadClick, seriesList, o
   return (
     <>
       <div
-        className={`bg-card border rounded-2xl overflow-hidden transition-all duration-300 cursor-pointer flex flex-col ${
-          isOpen ? "border-primary/50 ring-2 ring-primary/20 shadow-lg" : "border-border/60 hover:shadow-xl hover:shadow-primary/5 hover:border-primary/25"
+        className={`bg-card border rounded-2xl overflow-hidden transition-all duration-300 cursor-pointer flex flex-col group ${
+          isOpen ? "border-primary/50 ring-2 ring-primary/20 shadow-xl shadow-primary/10" : "border-border/60 hover:shadow-2xl hover:shadow-primary/15 hover:border-primary/30"
         }`}
         onClick={() => setIsOpen((v) => !v)}
       >
         {/* Cover */}
-        <div className="relative h-52 overflow-hidden">
+        <div className="relative h-56 overflow-hidden">
           {novel.cover_url ? (
-            <img src={novel.cover_url} alt={novel.title} className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" />
+            <img src={novel.cover_url} alt={novel.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
           ) : (
             <div className={`w-full h-full bg-gradient-to-br ${gradient} flex items-center justify-center`}>
-              <BookOpen className="w-14 h-14 text-white/50" />
+              <BookOpen className="w-16 h-16 text-white/60" />
             </div>
           )}
 
           {/* overlay gradient for readability */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
 
           {/* 3-dot menu */}
-          <div className="absolute top-2 left-2" onClick={(e) => e.stopPropagation()}>
+          <div className="absolute top-3 right-3" onClick={(e) => e.stopPropagation()}>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="w-7 h-7 rounded-lg bg-black/40 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/60 transition-colors">
-                  <MoreVertical className="w-3.5 h-3.5" />
+                <button className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center text-white hover:bg-white/30 transition-colors">
+                  <MoreVertical className="w-4 h-4" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-48">
+              <DropdownMenuContent align="end" className="w-48">
                 <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => onUploadClick(novel.id)}>
                   <ImagePlus className="w-4 h-4" />
                   {uploadingFor === novel.id ? "กำลังอัปโหลด..." : "เปลี่ยนรูปปก"}
@@ -85,31 +85,32 @@ function NovelCard({ novel, chapters, uploadingFor, onUploadClick, seriesList, o
           </div>
 
           {/* Bottom info on cover */}
-          <div className="absolute bottom-0 left-0 right-0 px-4 pb-3">
-            <h3 className="font-heading font-bold text-white text-base leading-tight line-clamp-2 drop-shadow">{novel.title}</h3>
-            <div className="flex items-center gap-2 mt-1">
+          <div className="absolute bottom-0 left-0 right-0 px-4 pb-4">
+            <h3 className="font-heading font-bold text-white text-lg leading-tight line-clamp-2 drop-shadow-lg">{novel.title}</h3>
+            <div className="flex items-center gap-2 mt-2">
               {novel.genre && (
-                <span className="text-xs text-white/80">{novel.genre}</span>
+                <Badge className="bg-white/20 backdrop-blur-sm text-white text-xs font-normal h-6 px-2 border-0">{novel.genre}</Badge>
               )}
-              <span className="text-white/40 text-xs">·</span>
-              <span className="text-xs text-white/80">{novelChapters.length} ตอน</span>
+              <Badge className="bg-white/20 backdrop-blur-sm text-white text-xs font-normal h-6 px-2 border-0">
+                {novelChapters.length} ตอน
+              </Badge>
             </div>
           </div>
         </div>
 
         {/* Synopsis + stats */}
-        <div className="px-4 py-3 flex flex-col flex-1">
+        <div className="px-5 py-4 flex flex-col flex-1">
           {novel.synopsis && !isOpen && (
             <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">{novel.synopsis}</p>
           )}
-          <div className="mt-auto pt-3 flex items-center justify-between">
-            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-              <BookMarked className="w-3 h-3" />
-              <span>{totalWords > 0 ? `${totalWords.toLocaleString()} คำ` : "ยังไม่มีเนื้อหา"}</span>
+          <div className="mt-auto pt-4 flex items-center justify-between">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <BookMarked className="w-3.5 h-3.5" />
+              <span className="font-medium">{totalWords > 0 ? `${totalWords.toLocaleString()} คำ` : "ยังไม่มีเนื้อหา"}</span>
             </div>
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Badge variant="outline" className="text-xs font-normal h-5 px-1.5">{novel.status || "กำลังเขียน"}</Badge>
-              {isOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary" className="text-xs font-normal h-6 px-2">{novel.status || "กำลังเขียน"}</Badge>
+              {isOpen ? <ChevronUp className="w-4 h-4 text-primary" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
             </div>
           </div>
         </div>
@@ -375,28 +376,30 @@ export default function SeriesDashboard() {
 
     <AppLayout>
       <div className="max-w-6xl mx-auto px-6 py-10">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h2 className="font-heading font-bold text-2xl text-foreground tracking-tight">ห้องสมุดของฉัน</h2>
-            <p className="text-sm text-muted-foreground mt-1">
-              {novels.length > 0 ? `${novels.length} เรื่อง · คลิกที่การ์ดเพื่อดูตอน` : "ยังไม่มีนิยาย"}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button className="gap-2" variant="outline" onClick={() => setCreateSeriesOpen(true)}>
-              <Plus className="w-4 h-4" />
-              สร้างซีรีส์ใหม่
-            </Button>
-            <Button className="gap-2 bg-primary hover:bg-primary/90" onClick={() => setImportOpen(true)}>
-              <BookPlus className="w-4 h-4" />
-              นำเข้านิยายจากไฟล์
-            </Button>
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="font-heading font-bold text-2xl text-foreground tracking-tight">ห้องสมุดของฉัน</h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                {novels.length > 0 ? `${novels.length} เรื่อง · คลิกที่การ์ดเพื่อดูตอน` : "ยังไม่มีนิยาย"}
+              </p>
+            </div>
             <Link to="/">
               <Button variant="outline" className="gap-2">
                 <BookOpen className="w-4 h-4" />
                 จัดการนิยาย
               </Button>
             </Link>
+          </div>
+          <div className="flex items-center gap-3">
+            <Button className="gap-2 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-md" onClick={() => setCreateSeriesOpen(true)}>
+              <Plus className="w-4 h-4" />
+              สร้างซีรีส์ใหม่
+            </Button>
+            <Button className="gap-2 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-md" onClick={() => setImportOpen(true)}>
+              <BookPlus className="w-4 h-4" />
+              นำเข้านิยายจากไฟล์
+            </Button>
           </div>
         </div>
 
