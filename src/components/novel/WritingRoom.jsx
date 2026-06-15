@@ -313,41 +313,53 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
       </AlertDialogContent>
     </AlertDialog>
     <div className="max-w-4xl mx-auto px-4 py-6">
-      {/* Season Tabs */}
-      {seasons.length > 1 && (
-        <div className="mb-6">
-          <div className="flex items-center gap-1 bg-primary/10 p-1 rounded-lg flex-wrap">
-            {seasons.map((season, idx) => (
-              <button
-                key={season.id}
-                onClick={() => setSelectedSeasonTab(season.id)}
-                className={`px-3 py-1.5 text-sm rounded-md transition-all ${
-                  String(selectedSeasonTab) === String(season.id)
-                    ? "bg-primary text-primary-foreground font-semibold shadow-sm"
-                    : "text-muted-foreground hover:bg-primary/5"
-                }`}
+      {/* Header Section */}
+      <div className="mb-6">
+        {/* Season Tabs & Actions Row */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 bg-primary/10 p-1 rounded-lg">
+              {seasons.length > 1 ? (
+                seasons.map((season, idx) => (
+                  <button
+                    key={season.id}
+                    onClick={() => setSelectedSeasonTab(season.id)}
+                    className={`px-3 py-1.5 text-sm rounded-md transition-all font-medium ${
+                      String(selectedSeasonTab) === String(season.id)
+                        ? "bg-primary text-primary-foreground shadow-sm"
+                        : "text-muted-foreground hover:bg-primary/5"
+                    }`}
+                  >
+                    <span className="text-primary/70 mr-1">#{idx + 1}</span>
+                    {season.title}
+                  </button>
+                ))
+              ) : (
+                <div className="px-3 py-1.5 text-sm text-muted-foreground">
+                  <span className="text-primary/70 mr-1">#1</span>
+                  {novel?.title}
+                </div>
+              )}
+            </div>
+            {seasons.length > 1 && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 h-8 text-purple-700 border-purple-300 hover:bg-purple-50 dark:text-purple-400 dark:border-purple-800/40 dark:hover:bg-purple-950/20"
+                onClick={() => setSeasonSelectorOpen(true)}
               >
-                Season {idx + 1}{season.title}
-              </button>
-            ))}
+                <Layers className="w-3.5 h-3.5" />
+                จัดการ Season
+              </Button>
+            )}
           </div>
-        </div>
-      )}
 
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h2 className="font-heading text-lg font-semibold">ห้องเขียน</h2>
-          <p className="text-sm text-muted-foreground">
-            {chapters.length} ตอน · {chapters.reduce((acc, c) => acc + (c.word_count || 0), 0).toLocaleString()} คำ
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          {/* กลุ่มสร้างเนื้อหา */}
+          {/* Quick Actions */}
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
               size="sm"
-              className="gap-1.5 text-primary/70 border-primary/20"
+              className="gap-1.5 h-8 text-primary/70 border-primary/20"
               onClick={() => setAiChapterGeneratorOpen(true)}
             >
               <Sparkles className="w-3.5 h-3.5" />
@@ -356,7 +368,7 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
             <Button
               variant="outline"
               size="sm"
-              className={`gap-1.5 text-violet-600 border-violet-200 hover:bg-violet-50 dark:text-violet-400 dark:border-violet-800/40 dark:hover:bg-violet-950/20 ${isBulkWriting ? "opacity-50 cursor-not-allowed" : ""}`}
+              className={`gap-1.5 h-8 text-violet-600 border-violet-200 hover:bg-violet-50 dark:text-violet-400 dark:border-violet-800/40 dark:hover:bg-violet-950/20 ${isBulkWriting ? "opacity-50 cursor-not-allowed" : ""}`}
               onClick={() => setBulkAutoWriteOpen(true)}
               disabled={isBulkWriting}
               title={isBulkWriting ? "กำลังสร้างตอน... กรุณารอจนเสร็จ" : "AI สร้างตอนทั้งหมด"}
@@ -365,63 +377,57 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
               AI สร้างตอนทั้งหมด
             </Button>
           </div>
+        </div>
 
-          {/* กลุ่มจัดการ Season */}
-          <div className="flex items-center gap-2 border-l border-border pl-3">
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5 text-purple-700 border-purple-300 hover:bg-purple-50 dark:text-purple-400 dark:border-purple-800/40 dark:hover:bg-purple-950/20"
-              onClick={() => setSeasonSelectorOpen(true)}
-            >
-              <Layers className="w-3.5 h-3.5" />
-              สร้าง Season ใหม่
+        {/* Title & Stats Row */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="font-heading text-xl font-bold text-foreground mb-1">ห้องเขียน</h2>
+            <p className="text-sm text-muted-foreground">
+              <span className="font-semibold text-primary">{chapters.length}</span> ตอน · 
+              <span className="font-semibold text-primary ml-1">{chapters.reduce((acc, c) => acc + (c.word_count || 0), 0).toLocaleString()}</span> คำ
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button size="sm" className="gap-1.5 h-9" onClick={() => setNewChapterOpen(true)}>
+              <Plus className="w-4 h-4" />
+              ตอนใหม่
             </Button>
             {seasons.length > 1 && (
               <Button
                 variant="outline"
                 size="sm"
-                className="gap-1.5 text-destructive border-destructive/30 hover:bg-destructive/10"
+                className="gap-1.5 h-9 text-destructive border-destructive/30 hover:bg-destructive/10"
                 onClick={() => setDeleteSeasonDialogOpen(true)}
                 title="ลบ Season นี้"
               >
-                <Trash2 className="w-3.5 h-3.5" />
+                <Trash2 className="w-4 h-4" />
                 ลบ Season
               </Button>
             )}
+            {chapters.length > 0 && (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 h-9 text-muted-foreground"
+                  onClick={() => setExportOpen(true)}
+                >
+                  <Download className="w-4 h-4" />
+                  ส่งออก
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 h-9 text-blue-700 border-blue-300 hover:bg-blue-50"
+                  onClick={() => setSpellCheckSummaryOpen(true)}
+                >
+                  <FileText className="w-4 h-4" />
+                  สรุปคำผิด
+                </Button>
+              </>
+            )}
           </div>
-
-          {/* กลุ่มสร้างตอนใหม่ */}
-          <div className="border-l border-border pl-3">
-            <Button size="sm" className="gap-1.5" onClick={() => setNewChapterOpen(true)}>
-              <Plus className="w-3.5 h-3.5" />
-              ตอนใหม่
-            </Button>
-          </div>
-
-          {/* กลุ่มเครื่องมือ */}
-          {chapters.length > 0 && (
-            <div className="flex items-center gap-2 border-l border-border pl-3">
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1.5 text-muted-foreground"
-                onClick={() => setExportOpen(true)}
-              >
-                <Download className="w-3.5 h-3.5" />
-                ส่งออก
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1.5 text-blue-700 border-blue-300 hover:bg-blue-50"
-                onClick={() => setSpellCheckSummaryOpen(true)}
-              >
-                <FileText className="w-3.5 h-3.5" />
-                สรุปคำผิด
-              </Button>
-            </div>
-          )}
         </div>
       </div>
 
