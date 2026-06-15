@@ -238,7 +238,14 @@ export default function SeriesDashboard() {
 
   const confirmMoveChapter = async () => {
     if (!moveChapterDialog.targetNovelId) return;
-    await updateChapterMutation.mutateAsync({ id: moveChapterDialog.chapter.id, data: { novel_id: moveChapterDialog.targetNovelId } });
+    const targetChapters = chapters.filter(
+      (c) => String(c.novel_id) === String(moveChapterDialog.targetNovelId) && !c.is_deleted
+    );
+    const maxOrder = targetChapters.reduce((max, c) => Math.max(max, c.order || 0), 0);
+    await updateChapterMutation.mutateAsync({
+      id: moveChapterDialog.chapter.id,
+      data: { novel_id: moveChapterDialog.targetNovelId, order: maxOrder + 1 },
+    });
     toast.success(`ย้ายตอน "${moveChapterDialog.chapter.title}" เรียบร้อยแล้ว`);
     setMoveChapterDialog({ open: false, chapter: null, targetNovelId: "" });
   };
