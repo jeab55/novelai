@@ -381,9 +381,9 @@ export default function SeriesDashboard() {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" className="gap-2" onClick={() => setImportOpen(true)}>
+            <Button className="gap-2 bg-primary hover:bg-primary/90" onClick={() => setImportOpen(true)}>
               <BookPlus className="w-4 h-4" />
-              นำเข้านิยาย
+              นำเข้านิยายจากไฟล์
             </Button>
             <Link to="/">
               <Button variant="outline" className="gap-2">
