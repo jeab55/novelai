@@ -317,19 +317,32 @@ export default function ImportNovelDialog({ open, onClose, novels = [], seriesLi
                 <Textarea
                   value={rawText}
                   onChange={(e) => setRawText(e.target.value)}
-                  placeholder={`วางเนื้อหานิยายทั้งหมดจากแหล่งอื่นที่นี่...\n\nรูปแบบที่ระบบแบ่งตอนอัตโนมัติ:\n• ตอนที่ 1, ตอนที่ 2, ...\n• บทที่ 1, บทที่ 2, ...\n• Chapter 1, Chapter 2, ...\n• 1. Chapter Title\n• --- หรือ === (ตัวคั่น)\n\nระบบจะตรวจจับและแบ่งให้อัตโนมัติ`}
-                  className="min-h-[200px] font-mono text-sm resize-none mt-3"
+                  placeholder={rawText ? "" : `วางเนื้อหานิยายทั้งหมดจากแหล่งอื่นที่นี่...\n\nรูปแบบที่ระบบแบ่งตอนอัตโนมัติ:\n• ตอนที่ 1, ตอนที่ 2, ...\n• บทที่ 1, บทที่ 2, ...\n• Chapter 1, Chapter 2, ...\n• 1. Chapter Title\n• --- หรือ === (ตัวคั่น)\n\nระบบจะตรวจจับและแบ่งให้อัตโนมัติ`}
+                  className={`min-h-[200px] font-mono text-sm resize-none ${rawText.trim() ? 'border-primary/50 ring-2 ring-primary/20' : ''}`}
+                  readOnly={false}
                 />
-                <p className="text-xs text-muted-foreground mt-1">
-                  {rawText.length > 0 ? `${rawText.length.toLocaleString()} ตัวอักษร` : "วางข้อความแล้วระบบจะแบ่งตอนให้อัตโนมัติ"}
-                </p>
+                {rawText.trim() && (
+                  <div className="mt-3 p-3 bg-primary/5 rounded-lg border border-primary/20">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-primary" />
+                        <span className="text-sm font-medium text-primary">อ่านไฟล์สำเร็จ</span>
+                      </div>
+                      <span className="text-xs text-muted-foreground">{rawText.length.toLocaleString()} ตัวอักษร</span>
+                    </div>
+                    <div className="text-xs text-muted-foreground line-clamp-3 whitespace-pre-line">
+                      {rawText.slice(0, 300)}...
+                    </div>
+                  </div>
+                )}
                 {rawText.trim() && (
                   <Button
-                    className="w-full gap-2 mt-2"
+                    className="w-full gap-2 mt-3"
                     onClick={handleFileUploaded}
+                    size="lg"
                   >
                     <FileText className="w-4 h-4" />
-                    เริ่มนำเข้าไฟล์
+                    แบ่งตอนและดำเนินการนำเข้า
                   </Button>
                 )}
               </div>
