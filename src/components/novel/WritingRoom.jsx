@@ -283,17 +283,6 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
             <Sparkles className="w-3.5 h-3.5" />
             AI สร้างตอนทั้งหมด
           </Button>
-          {chapters.length > 0 && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5 text-muted-foreground"
-              onClick={() => setExportOpen(true)}
-            >
-              <Download className="w-3.5 h-3.5" />
-              ส่งออก
-            </Button>
-          )}
           <Button
             variant="outline"
             size="sm"
@@ -307,6 +296,17 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
             <Plus className="w-3.5 h-3.5" />
             ตอนใหม่
           </Button>
+          {chapters.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5 text-muted-foreground"
+              onClick={() => setExportOpen(true)}
+            >
+              <Download className="w-3.5 h-3.5" />
+              ส่งออก
+            </Button>
+          )}
         </div>
       </div>
 
