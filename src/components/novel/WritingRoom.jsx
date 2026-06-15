@@ -21,7 +21,7 @@ import ContinuityChecker from "./ContinuityChecker";
 import BulkAutoWriteDialog from "./BulkAutoWriteDialog";
 import NewEpisodeDialog from "./NewEpisodeDialog";
 import SeasonSelectorDialog from "./SeasonSelectorDialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const statusColors = {
   "ร่าง": "bg-amber-50 text-amber-700 border border-amber-200",
@@ -248,19 +248,23 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
     <div className="max-w-4xl mx-auto px-4 py-6">
       {/* Season Tabs */}
       {seasons.length > 1 && (
-        <Tabs value={selectedSeasonTab} onValueChange={setSelectedSeasonTab} className="mb-6">
-          <TabsList className="bg-primary/10 h-auto p-1 gap-1 flex-wrap">
+        <div className="mb-6">
+          <div className="flex items-center gap-1 bg-primary/10 p-1 rounded-lg flex-wrap">
             {seasons.map((season, idx) => (
-              <TabsTrigger
+              <button
                 key={season.id}
-                value={season.id}
-                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-xs py-1.5 px-3 h-auto rounded-lg"
+                onClick={() => setSelectedSeasonTab(season.id)}
+                className={`px-3 py-1.5 text-xs rounded-md transition-all ${
+                  String(selectedSeasonTab) === String(season.id)
+                    ? "bg-primary text-primary-foreground font-medium shadow-sm"
+                    : "text-muted-foreground hover:bg-primary/5"
+                }`}
               >
                 Season {idx + 1}: {season.title?.slice(0, 15)}{season.title?.length > 15 ? "..." : ""}
-              </TabsTrigger>
+              </button>
             ))}
-          </TabsList>
-        </Tabs>
+          </div>
+        </div>
       )}
 
       <div className="flex items-center justify-between mb-6">
