@@ -90,12 +90,21 @@ export default function ThaiSpellCheckerDialog({ content, novel, onApplyChanges,
           {results && (
             <>
               <div className="flex items-center justify-between">
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <Badge variant="secondary">
-                    คำผิด: {results.spelling_errors?.length || 0}
+                    สะกดผิด: {results.spelling_errors?.length || 0}
                   </Badge>
                   <Badge variant="secondary">
                     คำแนะนำ: {results.word_suggestions?.length || 0}
+                  </Badge>
+                  <Badge variant="secondary">
+                    การันต์: {results.garant_issues?.length || 0}
+                  </Badge>
+                  <Badge variant="secondary">
+                    ไม้ยมก: {results.yamok_issues?.length || 0}
+                  </Badge>
+                  <Badge variant="secondary">
+                    วรรณยุกต์: {results.tone_issues?.length || 0}
                   </Badge>
                 </div>
                 <div className="flex gap-2">
@@ -173,6 +182,63 @@ export default function ThaiSpellCheckerDialog({ content, novel, onApplyChanges,
                       <p className="text-xs text-muted-foreground mt-1">พบ {issue.count} ครั้ง</p>
                       {issue.suggestion && (
                         <p className="text-xs text-muted-foreground mt-1">{issue.suggestion}</p>
+                      )}
+                      {issue.examples && (
+                        <div className="mt-2 space-y-1">
+                          {issue.examples.map((ex, i) => (
+                            <p key={i} className="text-xs text-destructive">• {ex}</p>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+
+                  {results.garant_issues?.map((item, idx) => (
+                    <div key={`garant-${idx}`} className="p-3 rounded-lg border border-amber-200 bg-amber-50">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-amber-800">{item.word}</span>
+                        <span className="text-xs text-amber-600">({item.issue})</span>
+                      </div>
+                      <p className="text-xs text-amber-700 mt-1">
+                        ถูกต้อง: <span className="font-medium">{item.correct}</span>
+                      </p>
+                      {item.context && (
+                        <p className="text-xs text-muted-foreground mt-2">{item.context}</p>
+                      )}
+                    </div>
+                  ))}
+
+                  {results.yamok_issues?.map((item, idx) => (
+                    <div key={`yamok-${idx}`} className="p-3 rounded-lg border border-purple-200 bg-purple-50">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-purple-800">{item.word}</span>
+                      </div>
+                      <p className="text-xs text-purple-700 mt-1">
+                        {item.issue}
+                      </p>
+                      {item.suggestion && (
+                        <p className="text-xs text-purple-700 mt-1">
+                          แนะนำ: <span className="font-medium">{item.suggestion}</span>
+                        </p>
+                      )}
+                      {item.context && (
+                        <p className="text-xs text-muted-foreground mt-2">{item.context}</p>
+                      )}
+                    </div>
+                  ))}
+
+                  {results.tone_issues?.map((item, idx) => (
+                    <div key={`tone-${idx}`} className="p-3 rounded-lg border border-blue-200 bg-blue-50">
+                      <div className="flex items-center gap-2">
+                        <span className="line-through text-blue-600">{item.word}</span>
+                        <span className="text-blue-400">→</span>
+                        <span className="font-medium text-blue-800">{item.correct}</span>
+                      </div>
+                      {item.explanation && (
+                        <p className="text-xs text-blue-700 mt-1">{item.explanation}</p>
+                      )}
+                      {item.context && (
+                        <p className="text-xs text-muted-foreground mt-2">{item.context}</p>
                       )}
                     </div>
                   ))}
