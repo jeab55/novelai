@@ -217,8 +217,6 @@ export default function SeriesDashboard() {
       const all = await base44.entities.Novel.list("-created_date");
       return all.filter((n) => {
         if (n.is_deleted) return false;
-        // แสดงเฉพาะนิยายที่เขียนเสร็จแล้วหรือเผยแพร่แล้ว
-        if (n.status !== "เขียนเสร็จ" && n.status !== "เผยแพร่") return false;
         if (isAdmin) return true;
         if (String(n.created_by_id) === String(user?.id)) return true;
         if (Array.isArray(n.shared_with) && n.shared_with.includes(user?.email)) return true;

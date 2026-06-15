@@ -92,6 +92,7 @@ export default function ImportNovelDialog({ open, onClose, novels = [], seriesLi
   const [novelTitle, setNovelTitle] = useState("");
   const [novelGenre, setNovelGenre] = useState("โรแมนติก");
   const [targetNovelId, setTargetNovelId] = useState("");
+  const [targetSeriesId, setTargetSeriesId] = useState("");
 
   const [importing, setImporting] = useState(false);
   const [done, setDone] = useState(false);
@@ -118,7 +119,7 @@ export default function ImportNovelDialog({ open, onClose, novels = [], seriesLi
 
   const handleImport = async () => {
     if (importing) return;
-    console.log('🚀 Starting import...', { mode, novelTitle, targetNovelId, chapters: chapters.length });
+    console.log('🚀 Starting import...', { mode, novelTitle, targetSeriesId, targetNovelId, chapters: chapters.length });
     setImporting(true);
     try {
       let novelId = targetNovelId;
@@ -129,15 +130,20 @@ export default function ImportNovelDialog({ open, onClose, novels = [], seriesLi
           setImporting(false);
           return;
         }
+        if (!targetSeriesId) {
+          toast.error("กรุณาเลือกซีรีย์");
+          setImporting(false);
+          return;
+        }
         console.log('📖 Creating new novel...', novelTitle);
         const novel = await base44.entities.Novel.create({
           title: novelTitle.trim(),
           genre: novelGenre,
-          // ไม่สร้าง series_id - ให้นิยายอยู่เป็นอิสระ ไม่นำเข้าห้องสมุด
+          series_id: targetSeriesId,
         });
         novelId = novel.id;
         console.log('✅ Novel created:', novelId);
-        queryClient.invalidateQueries({ queryKey: ["novels"] });
+        queryClient.invalidateQueries({ queryKey: ["novels-for-series"] });
       }
 
       if (!novelId) {
@@ -176,8 +182,6 @@ export default function ImportNovelDialog({ open, onClose, novels = [], seriesLi
     } catch (e) {
       console.error('❌ Import error:', e);
       toast.error("เกิดข้อผิดพลาด: " + (e.message || JSON.stringify(e)));
-      // แสดง step ที่ 2 พร้อมข้อความ error
-      setStep(2);
     } finally {
       setImporting(false);
     }
@@ -192,6 +196,7 @@ export default function ImportNovelDialog({ open, onClose, novels = [], seriesLi
       setNovelTitle("");
       setNovelGenre("โรแมนติก");
       setTargetNovelId("");
+      setTargetSeriesId("");
       setDone(false);
       setExpandedIdx(null);
       onClose();
@@ -493,6 +498,27 @@ export default function ImportNovelDialog({ open, onClose, novels = [], seriesLi
                       </SelectContent>
                     </Select>
                   </div>
+                  <div>
+                    <label className="text-sm font-medium mb-1.5 block text-primary">📚 ซีรีย์ *</label>
+                    <Select value={targetSeriesId} onValueChange={(v) => {
+                      console.log('Series selected:', v);
+                      setTargetSeriesId(v);
+                    }}>
+                      <SelectTrigger className={`h-11 ${!targetSeriesId ? 'border-red-500 ring-2 ring-red-500/20' : ''}`}>
+                        <SelectValue placeholder="เลือกซีรีย์" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {seriesList.map((s) => <SelectItem key={s.id} value={s.id}>{s.title}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    {!targetSeriesId && (
+                      <div className="mt-2 p-2 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+                        <p className="text-xs text-red-700 dark:text-red-300 font-medium">
+                          ⚠️ กรุณาเลือกซีรีย์ก่อน (จำเป็น)
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 </>
               ) : (
                 <div>
@@ -518,10 +544,10 @@ export default function ImportNovelDialog({ open, onClose, novels = [], seriesLi
                 </div>
               </div>
 
-              {(mode === "new" && !novelTitle.trim()) ? (
+              {(mode === "new" && (!novelTitle.trim() || !targetSeriesId)) ? (
                 <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-xl border-2 border-amber-200 dark:border-amber-800 text-center">
                   <p className="text-sm text-amber-800 dark:text-amber-300 font-medium">
-                    ⚠️ กรุณากรอกชื่อนิยายก่อนนำเข้า
+                    ⚠️ กรุณากรอกชื่อนิยายและเลือกซีรีย์ก่อนนำเข้า
                   </p>
                 </div>
               ) : (mode === "existing" && !targetNovelId) ? (
@@ -535,10 +561,10 @@ export default function ImportNovelDialog({ open, onClose, novels = [], seriesLi
               <Button
                 className="w-full h-16 text-xl font-bold shadow-2xl bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 onClick={() => {
-                  console.log('🔘 Import button clicked!', { mode, novelTitle, targetNovelId, chapters: chapters.length });
+                  console.log('🔘 Import button clicked!', { mode, novelTitle, targetSeriesId, targetNovelId, chapters: chapters.length });
                   handleImport();
                 }}
-                disabled={importing || (mode === "new" && !novelTitle.trim()) || (mode === "existing" && !targetNovelId)}
+                disabled={importing || (mode === "new" && (!novelTitle.trim() || !targetSeriesId)) || (mode === "existing" && !targetNovelId)}
                 size="lg"
               >
                 {importing ? (
