@@ -5,8 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import {
   BookMarked, Clock, Settings2, Sun, Moon, Coffee,
-  Minus, Plus, X, ChevronLeft, ChevronRight
+  Minus, Plus, X, ChevronLeft, ChevronRight, Pencil, Save, XCircle, Sparkles
 } from "lucide-react";
+import { base44 } from "@/api/base44Client";
+import { toast } from "sonner";
+import ThaiSpellCheckerDialog from "@/components/novel/ThaiSpellCheckerDialog";
 
 const FONTS = [
   { label: "Sarabun", value: "'Sarabun', sans-serif" },
@@ -55,7 +58,7 @@ function countWords(text) {
   }
 }
 
-export default function ReaderDialog({ chapters, initialIndex = 0, onClose }) {
+export default function ReaderDialog({ chapters, initialIndex = 0, onClose, novelId }) {
   const [idx, setIdx] = useState(initialIndex);
   const [showSettings, setShowSettings] = useState(false);
   const [fontSize, setFontSize] = useState(18);
@@ -63,6 +66,12 @@ export default function ReaderDialog({ chapters, initialIndex = 0, onClose }) {
   const [fontIdx, setFontIdx] = useState(0);
   const [themeKey, setThemeKey] = useState("day");
   const [brightness, setBrightness] = useState(100);
+  
+  // Edit mode states
+  const [isEditing, setIsEditing] = useState(false);
+  const [editContent, setEditContent] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const [showSpellCheck, setShowSpellCheck] = useState(false);
 
   const theme = THEMES.find((t) => t.key === themeKey) || THEMES[0];
   const chapter = chapters[idx];
@@ -71,6 +80,39 @@ export default function ReaderDialog({ chapters, initialIndex = 0, onClose }) {
 
   const goNext = () => setIdx((i) => Math.min(i + 1, chapters.length - 1));
   const goPrev = () => setIdx((i) => Math.max(i - 1, 0));
+
+  const startEditing = () => {
+    setEditContent(chapter?.content || "");
+    setIsEditing(true);
+  };
+
+  const cancelEdit = () => {
+    setIsEditing(false);
+    setEditContent("");
+  };
+
+  const saveEdit = async () => {
+    if (!chapter) return;
+    setIsSaving(true);
+    try {
+      await base44.entities.Chapter.update(chapter.id, { content: editContent });
+      toast.success("บันทึกเนื้อหาแล้ว");
+      setIsEditing(false);
+      // Update the chapter in the parent component if callback provided
+      if (onClose) {
+        // Trigger refresh by closing and reopening or via parent callback
+      }
+    } catch (error) {
+      console.error('Save error:', error);
+      toast.error("ไม่สามารถบันทึกได้ กรุณาลองใหม่อีกครั้ง");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleApplySpellCheck = (updatedContent) => {
+    setEditContent(updatedContent);
+  };
 
   if (!chapter) return null;
 
@@ -123,28 +165,70 @@ export default function ReaderDialog({ chapters, initialIndex = 0, onClose }) {
 
           {/* Stats + controls */}
           <div className="flex items-center gap-3">
-            <span className="flex items-center gap-1 text-xs opacity-60" style={{ color: theme.text }}>
-              <BookMarked className="w-3 h-3" />
-              {words.toLocaleString()} คำ
-            </span>
-            <span className="flex items-center gap-1 text-xs opacity-60" style={{ color: theme.text }}>
-              <Clock className="w-3 h-3" />
-              ~{minutes} นาที
-            </span>
-            <button
-              onClick={() => setShowSettings((v) => !v)}
-              className="p-1.5 rounded-lg transition-colors"
-              style={{ color: theme.text, backgroundColor: showSettings ? theme.border : "transparent" }}
-            >
-              <Settings2 className="w-4 h-4" />
-            </button>
-            <button
-              onClick={onClose}
-              className="p-1.5 rounded-lg transition-colors"
-              style={{ color: theme.text }}
-            >
-              <X className="w-4 h-4" />
-            </button>
+            {!isEditing ? (
+              <>
+                <span className="flex items-center gap-1 text-xs opacity-60" style={{ color: theme.text }}>
+                  <BookMarked className="w-3 h-3" />
+                  {words.toLocaleString()} คำ
+                </span>
+                <span className="flex items-center gap-1 text-xs opacity-60" style={{ color: theme.text }}>
+                  <Clock className="w-3 h-3" />
+                  ~{minutes} นาที
+                </span>
+                <button
+                  onClick={startEditing}
+                  className="p-1.5 rounded-lg transition-colors hover:bg-primary/10"
+                  style={{ color: theme.text }}
+                  title="แก้ไขเนื้อหา"
+                >
+                  <Pencil className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setShowSettings((v) => !v)}
+                  className="p-1.5 rounded-lg transition-colors"
+                  style={{ color: theme.text, backgroundColor: showSettings ? theme.border : "transparent" }}
+                >
+                  <Settings2 className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={onClose}
+                  className="p-1.5 rounded-lg transition-colors"
+                  style={{ color: theme.text }}
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </>
+            ) : (
+              <>
+                <span className="text-xs opacity-60" style={{ color: theme.text }}>
+                  กำลังแก้ไข...
+                </span>
+                <button
+                  onClick={saveEdit}
+                  disabled={isSaving}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
+                  style={{ 
+                    backgroundColor: isSaving ? theme.border : "#10b981", 
+                    color: isSaving ? theme.text : "#ffffff" 
+                  }}
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  {isSaving ? "กำลังบันทึก..." : "บันทึก"}
+                </button>
+                <button
+                  onClick={cancelEdit}
+                  disabled={isSaving}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
+                  style={{ 
+                    backgroundColor: theme.border, 
+                    color: theme.text 
+                  }}
+                >
+                  <XCircle className="w-3.5 h-3.5" />
+                  ยกเลิก
+                </button>
+              </>
+            )}
           </div>
         </div>
 
@@ -260,7 +344,37 @@ export default function ReaderDialog({ chapters, initialIndex = 0, onClose }) {
             >
               {chapter.title}
             </h2>
-            {chapter.content ? (
+            
+            {isEditing ? (
+              <div className="relative">
+                <div className="flex gap-2 mb-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowSpellCheck(true)}
+                    className="text-xs"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 mr-1" />
+                    ตรวจคำถูกผิด
+                  </Button>
+                </div>
+                <textarea
+                  value={editContent}
+                  onChange={(e) => setEditContent(e.target.value)}
+                  className="w-full min-h-[60vh] p-4 rounded-lg border focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  style={{
+                    color: theme.text,
+                    backgroundColor: theme.bg,
+                    borderColor: theme.border,
+                    fontSize,
+                    fontFamily: FONTS[fontIdx].value,
+                    lineHeight,
+                    resize: "vertical",
+                  }}
+                  autoFocus
+                />
+              </div>
+            ) : chapter.content ? (
               <div
                 style={{
                   color: theme.text,
@@ -274,6 +388,17 @@ export default function ReaderDialog({ chapters, initialIndex = 0, onClose }) {
               </div>
             ) : (
               <p className="text-center opacity-50" style={{ color: theme.text }}>ยังไม่มีเนื้อหา</p>
+            )}
+
+            {/* Spell Check Dialog */}
+            {showSpellCheck && (
+              <ThaiSpellCheckerDialog
+                open={showSpellCheck}
+                onClose={() => setShowSpellCheck(false)}
+                content={editContent}
+                novel={{ id: novelId }}
+                onApplyChanges={handleApplySpellCheck}
+              />
             )}
 
             {/* Next/Prev nav at bottom */}
