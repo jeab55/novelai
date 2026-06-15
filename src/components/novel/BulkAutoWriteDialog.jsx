@@ -511,7 +511,10 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
 
     if (!cancelledRef.current) {
       toast.success(isOneShot ? "สร้างเรื่องสั้นเสร็จแล้ว!" : "สร้างตอนทั้งหมดเสร็จแล้ว!");
-      if (errorCountRef.current === 0) {
+      // ตั้ง auto_written = true เมื่อเขียนครบทุกตอน (หรือเรื่องสั้น) โดยไม่มี error
+      const totalToCreate = isOneShot ? 1 : target;
+      const allSuccess = doneCountRef.current >= totalToCreate && errorCountRef.current === 0;
+      if (allSuccess) {
         await base44.entities.Novel.update(novelId, { auto_written: true, status: isOneShot ? "เขียนเสร็จ" : "กำลังเขียน" });
         queryClient.invalidateQueries({ queryKey: ["novels"] });
       }

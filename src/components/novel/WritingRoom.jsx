@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useBulkWrite } from "@/lib/BulkWriteContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -43,6 +44,8 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
   const [seasonSelectorOpen, setSeasonSelectorOpen] = useState(false);
   const [spellCheckSummaryOpen, setSpellCheckSummaryOpen] = useState(false);
   const queryClient = useQueryClient();
+  const { jobs } = useBulkWrite();
+  const isBulkWriting = jobs[selectedSeasonTab]?.status === "running";
 
   // Handle chapter navigation from other tabs (e.g. AiPlotDialog draft)
   useEffect(() => {
@@ -285,8 +288,10 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
           <Button
             variant="outline"
             size="sm"
-            className="gap-1.5 text-violet-600 border-violet-200 hover:bg-violet-50 dark:text-violet-400 dark:border-violet-800/40 dark:hover:bg-violet-950/20"
+            className={`gap-1.5 text-violet-600 border-violet-200 hover:bg-violet-50 dark:text-violet-400 dark:border-violet-800/40 dark:hover:bg-violet-950/20 ${isBulkWriting ? "opacity-50 cursor-not-allowed" : ""}`}
             onClick={() => setBulkAutoWriteOpen(true)}
+            disabled={isBulkWriting}
+            title={isBulkWriting ? "กำลังสร้างตอน... กรุณารอจนเสร็จ" : "AI สร้างตอนทั้งหมด"}
           >
             <Sparkles className="w-3.5 h-3.5" />
             AI สร้างตอนทั้งหมด
