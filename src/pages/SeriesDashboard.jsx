@@ -1,15 +1,18 @@
 import React, { useState, useRef } from "react";
 import { base44 } from "@/api/base44Client";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { BookOpen, Layers, ChevronDown, ChevronUp, MoreVertical, ImagePlus, FolderOpen, BookMarked } from "lucide-react";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { BookOpen, Layers, ChevronDown, ChevronUp, MoreVertical, ImagePlus, FolderOpen, BookMarked, FolderPlus, Hash } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { motion, AnimatePresence } from "framer-motion";
 import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/lib/AuthContext";
 import ReaderDialog from "@/components/reader/ReaderDialog";
+import { toast } from "sonner";
 
 const genreColors = {
   "โรแมนติก": "from-pink-400 to-rose-500",
@@ -26,7 +29,7 @@ const genreColors = {
 
 
 
-function NovelCard({ novel, chapters, uploadingFor, onUploadClick }) {
+function NovelCard({ novel, chapters, uploadingFor, onUploadClick, seriesList, onMoveToSeries, onSetChapters }) {
   const [isOpen, setIsOpen] = useState(false);
   const [readerStartIdx, setReaderStartIdx] = useState(null);
   const gradient = genreColors[novel.genre] || "from-gray-400 to-slate-500";
@@ -65,10 +68,19 @@ function NovelCard({ novel, chapters, uploadingFor, onUploadClick }) {
                   <MoreVertical className="w-3.5 h-3.5" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
+              <DropdownMenuContent align="start" className="w-48">
                 <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => onUploadClick(novel.id)}>
                   <ImagePlus className="w-4 h-4" />
                   {uploadingFor === novel.id ? "กำลังอัปโหลด..." : "เปลี่ยนรูปปก"}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => onMoveToSeries(novel)}>
+                  <FolderPlus className="w-4 h-4" />
+                  ใส่ในซีรีย์
+                </DropdownMenuItem>
+                <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => onSetChapters(novel)}>
+                  <Hash className="w-4 h-4" />
+                  ตั้งค่าจำนวนตอน
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -156,6 +168,15 @@ export default function SeriesDashboard() {
   const queryClient = useQueryClient();
   const coverInputRef = useRef(null);
   const [uploadingFor, setUploadingFor] = useState(null);
+  const [seriesDialog, setSeriesDialog] = useState({ open: false, novel: null, selectedSeries: "" });
+  const [chaptersDialog, setChaptersDialog] = useState({ open: false, novel: null, value: "10" });
+
+  const updateNovelMutation = useMutation({
+    mutationFn: ({ id, data }) => base44.entities.Novel.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["novels-for-series"] });
+    },
+  });
 
   const { data: novels = [], isLoading } = useQuery({
     queryKey: ["novels-for-series", user?.id],
@@ -196,6 +217,27 @@ export default function SeriesDashboard() {
     coverInputRef.current.click();
   };
 
+  const handleMoveToSeries = (novel) => {
+    setSeriesDialog({ open: true, novel, selectedSeries: novel.series_id || "__none__" });
+  };
+
+  const handleSetChapters = (novel) => {
+    setChaptersDialog({ open: true, novel, value: (novel.target_chapters || 10).toString() });
+  };
+
+  const confirmMoveSeries = async () => {
+    const seriesId = seriesDialog.selectedSeries === "__none__" ? "" : seriesDialog.selectedSeries;
+    await updateNovelMutation.mutateAsync({ id: seriesDialog.novel.id, data: { series_id: seriesId } });
+    toast.success("อัปเดตซีรีย์เรียบร้อยแล้ว");
+    setSeriesDialog({ open: false, novel: null, selectedSeries: "" });
+  };
+
+  const confirmSetChapters = async () => {
+    await updateNovelMutation.mutateAsync({ id: chaptersDialog.novel.id, data: { target_chapters: Number(chaptersDialog.value) } });
+    toast.success("อัปเดตจำนวนตอนเรียบร้อยแล้ว");
+    setChaptersDialog({ open: false, novel: null, value: "10" });
+  };
+
   const novelsInSeries = novels.filter((n) => n.series_id);
   const novelsWithoutSeries = novels.filter((n) => !n.series_id);
 
@@ -207,6 +249,52 @@ export default function SeriesDashboard() {
     .filter((g) => g.novels.length > 0);
 
   return (
+    <>
+    {/* Move to Series Dialog */}
+    <Dialog open={seriesDialog.open} onOpenChange={(v) => !v && setSeriesDialog({ open: false, novel: null, selectedSeries: "" })}>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="font-heading">ใส่ในซีรีย์</DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-muted-foreground mb-3">เลือกซีรีย์สำหรับ <span className="font-medium text-foreground">"{seriesDialog.novel?.title}"</span></p>
+        <Select value={seriesDialog.selectedSeries} onValueChange={(v) => setSeriesDialog((d) => ({ ...d, selectedSeries: v }))}>
+          <SelectTrigger><SelectValue placeholder="เลือกซีรีย์" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__none__">— ไม่ระบุซีรีย์ —</SelectItem>
+            {seriesList.map((s) => (
+              <SelectItem key={s.id} value={s.id}>{s.title}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <div className="flex gap-2 mt-4">
+          <Button variant="outline" className="flex-1" onClick={() => setSeriesDialog({ open: false, novel: null, selectedSeries: "" })}>ยกเลิก</Button>
+          <Button className="flex-1" onClick={confirmMoveSeries} disabled={updateNovelMutation.isPending}>บันทึก</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+
+    {/* Set Chapters Dialog */}
+    <Dialog open={chaptersDialog.open} onOpenChange={(v) => !v && setChaptersDialog({ open: false, novel: null, value: "10" })}>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="font-heading">ตั้งค่าจำนวนตอน</DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-muted-foreground mb-3">จำนวนตอนเป้าหมายสำหรับ <span className="font-medium text-foreground">"{chaptersDialog.novel?.title}"</span></p>
+        <Select value={chaptersDialog.value} onValueChange={(v) => setChaptersDialog((d) => ({ ...d, value: v }))}>
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {[1, 10, 20, 30, 40].map((n) => (
+              <SelectItem key={n} value={n.toString()}>{n} ตอน</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <div className="flex gap-2 mt-4">
+          <Button variant="outline" className="flex-1" onClick={() => setChaptersDialog({ open: false, novel: null, value: "10" })}>ยกเลิก</Button>
+          <Button className="flex-1" onClick={confirmSetChapters} disabled={updateNovelMutation.isPending}>บันทึก</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+
     <AppLayout>
       <div className="max-w-6xl mx-auto px-6 py-10">
         <div className="flex items-center justify-between mb-8">
@@ -260,7 +348,7 @@ export default function SeriesDashboard() {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                   {sNovels.map((novel) => (
-                    <NovelCard key={novel.id} novel={novel} chapters={chapters} uploadingFor={uploadingFor} onUploadClick={handleUploadClick} />
+                    <NovelCard key={novel.id} novel={novel} chapters={chapters} uploadingFor={uploadingFor} onUploadClick={handleUploadClick} seriesList={seriesList} onMoveToSeries={handleMoveToSeries} onSetChapters={handleSetChapters} />
                   ))}
                 </div>
               </motion.div>
@@ -279,7 +367,7 @@ export default function SeriesDashboard() {
                 )}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                   {novelsWithoutSeries.map((novel) => (
-                    <NovelCard key={novel.id} novel={novel} chapters={chapters} uploadingFor={uploadingFor} onUploadClick={handleUploadClick} />
+                    <NovelCard key={novel.id} novel={novel} chapters={chapters} uploadingFor={uploadingFor} onUploadClick={handleUploadClick} seriesList={seriesList} onMoveToSeries={handleMoveToSeries} onSetChapters={handleSetChapters} />
                   ))}
                 </div>
               </motion.div>
@@ -301,5 +389,6 @@ export default function SeriesDashboard() {
         }}
       />
     </AppLayout>
+    </>
   );
 }
