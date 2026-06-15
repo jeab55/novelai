@@ -86,7 +86,6 @@ export default function ImportNovelDialog({ open, onClose, novels = [], seriesLi
   const [chapters, setChapters] = useState([]);
   const [expandedIdx, setExpandedIdx] = useState(null);
   const [uploading, setUploading] = useState(false);
-  const [selectedFile, setSelectedFile] = useState(null);
 
   // step 2: settings
   const [mode, setMode] = useState("new"); // "new" | "existing"
@@ -207,7 +206,6 @@ export default function ImportNovelDialog({ open, onClose, novels = [], seriesLi
     }
 
     setUploading(true);
-    setSelectedFile(file);
     
     try {
       // อ่านไฟล์เป็น base64
@@ -235,13 +233,14 @@ export default function ImportNovelDialog({ open, onClose, novels = [], seriesLi
       
       setRawText(result.text);
       toast.success(`อ่านไฟล์สำเร็จ: ${result.character_count.toLocaleString()} ตัวอักษร`);
+      // เคลียร์ไฟล์ที่เลือกแล้วแต่ไม่ reset selectedFile เพื่อให้ user เห็นว่าอัพโหลดอะไรไป
+      e.target.value = "";
     } catch (err) {
-      toast.error(err.message);
+      console.error('File upload error:', err);
+      toast.error(err.message || 'เกิดข้อผิดพลาดในการอ่านไฟล์');
       setRawText("");
     } finally {
       setUploading(false);
-      setSelectedFile(null);
-      e.target.value = "";
     }
   };
 
@@ -297,13 +296,6 @@ export default function ImportNovelDialog({ open, onClose, novels = [], seriesLi
                   <p className="text-xs text-muted-foreground mt-1">
                     รองรับ: TXT, MD, DOCX, PDF (สูงสุด 5MB)
                   </p>
-                  {selectedFile && (
-                    <div className="flex items-center gap-1.5 mt-2 text-xs text-primary">
-                      <File className="w-3 h-3" />
-                      <span>{selectedFile.name}</span>
-                      <span className="text-muted-foreground">({(selectedFile.size / 1024).toFixed(1)} KB)</span>
-                    </div>
-                  )}
                 </div>
 
                 <div className="relative">
