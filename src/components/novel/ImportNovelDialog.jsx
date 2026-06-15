@@ -101,7 +101,12 @@ export default function ImportNovelDialog({ open, onClose, novels = [], seriesLi
 
   const handleSplit = () => {
     const result = detectAndSplit(rawText, customDelimiter);
-    setChapters(result);
+    // ตั้งชื่อตอนอัตโนมัติถ้าไม่มีชื่อ
+    const chaptersWithNames = result.map((ch, i) => ({
+      ...ch,
+      title: ch.title?.trim() ? ch.title.trim() : `ตอนที่ ${i + 1}`
+    }));
+    setChapters(chaptersWithNames);
     setStep(1);
   };
 
@@ -146,7 +151,7 @@ export default function ImportNovelDialog({ open, onClose, novels = [], seriesLi
         const wc = countWords(ch.content);
         await base44.entities.Chapter.create({
           novel_id: novelId,
-          title: ch.title || `ตอนที่ ${maxOrder + i + 1}`,
+          title: ch.title,
           content: ch.content,
           order: maxOrder + i + 1,
           word_count: wc,
@@ -246,9 +251,14 @@ export default function ImportNovelDialog({ open, onClose, novels = [], seriesLi
   const handleFileUploaded = () => {
     if (rawText.trim()) {
       const result = detectAndSplit(rawText, customDelimiter);
-      setChapters(result);
+      // ตั้งชื่อตอนอัตโนมัติถ้าไม่มีชื่อ
+      const chaptersWithNames = result.map((ch, i) => ({
+        ...ch,
+        title: ch.title?.trim() ? ch.title.trim() : `ตอนที่ ${i + 1}`
+      }));
+      setChapters(chaptersWithNames);
       setStep(1);
-      toast.success(`แบ่งตอนแล้ว: ${result.length} ตอน`);
+      toast.success(`แบ่งตอนแล้ว: ${chaptersWithNames.length} ตอน`);
     } else {
       toast.error("กรุณาใส่ข้อความหรืออัพโหลดไฟล์ก่อน");
     }
