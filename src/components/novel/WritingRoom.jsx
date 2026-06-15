@@ -637,6 +637,21 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
                   </p>
                 </div>
 
+                {/* ปุ่มร่างด้วย AI — แสดงตลอดเวลา */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 h-8 text-primary/70 border-primary/20 hover:bg-primary/5 shrink-0"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setDraftChapter(ch);
+                    setAiDraftOpen(true);
+                  }}
+                  title="ร่างด้วย AI"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  ร่างด้วย AI
+                </Button>
                 {/* Action Buttons - Show on Hover */}
                 <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-all shrink-0">
                   {chaptersWithReaderReviews.has(ch.id) && (
@@ -663,20 +678,6 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
                       แก้ตามบรรณาธิการ
                     </Button>
                   )}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="gap-1.5 h-8 text-primary/70 border-primary/20 hover:bg-primary/5"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setDraftChapter(ch);
-                      setAiDraftOpen(true);
-                    }}
-                    title="ร่างด้วย AI"
-                  >
-                    <Sparkles className="w-3.5 h-3.5" />
-                    ร่างด้วย AI
-                  </Button>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button
