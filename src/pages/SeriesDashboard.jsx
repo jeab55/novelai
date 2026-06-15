@@ -4,7 +4,7 @@ import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { BookOpen, Layers, ChevronDown, ChevronUp, MoreVertical, ImagePlus, FolderOpen, BookMarked, FolderPlus, ArrowRightLeft } from "lucide-react";
+import { BookOpen, Layers, ChevronDown, ChevronUp, MoreVertical, ImagePlus, FolderOpen, BookMarked, FolderPlus, ArrowRightLeft, ArrowUp, ArrowDown } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -29,7 +29,7 @@ const genreColors = {
 
 
 
-function NovelCard({ novel, chapters, uploadingFor, onUploadClick, seriesList, onMoveToSeries, onMoveChapter }) {
+function NovelCard({ novel, chapters, uploadingFor, onUploadClick, seriesList, onMoveToSeries, onMoveChapter, onReorderChapter }) {
   const [isOpen, setIsOpen] = useState(false);
   const [readerStartIdx, setReaderStartIdx] = useState(null);
   const gradient = genreColors[novel.genre] || "from-gray-400 to-slate-500";
@@ -143,13 +143,31 @@ function NovelCard({ novel, chapters, uploadingFor, onUploadClick, seriesList, o
                         )}
                         <BookOpen className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
                       </button>
-                      <button
-                        onClick={() => onMoveChapter(ch)}
-                        title="ย้ายตอนนี้ไปนิยายเรื่องอื่น"
-                        className="opacity-0 group-hover/row:opacity-100 transition-opacity p-1.5 rounded-md hover:bg-primary/10 text-muted-foreground hover:text-primary shrink-0"
-                      >
-                        <ArrowRightLeft className="w-3.5 h-3.5" />
-                      </button>
+                      <div className="opacity-0 group-hover/row:opacity-100 transition-opacity flex items-center gap-0.5 shrink-0">
+                        <button
+                          onClick={() => onReorderChapter(ch, novelChapters, "up")}
+                          disabled={chIdx === 0}
+                          title="เลื่อนขึ้น"
+                          className="p-1.5 rounded-md hover:bg-primary/10 text-muted-foreground hover:text-primary disabled:opacity-30 disabled:pointer-events-none"
+                        >
+                          <ArrowUp className="w-3 h-3" />
+                        </button>
+                        <button
+                          onClick={() => onReorderChapter(ch, novelChapters, "down")}
+                          disabled={chIdx === novelChapters.length - 1}
+                          title="เลื่อนลง"
+                          className="p-1.5 rounded-md hover:bg-primary/10 text-muted-foreground hover:text-primary disabled:opacity-30 disabled:pointer-events-none"
+                        >
+                          <ArrowDown className="w-3 h-3" />
+                        </button>
+                        <button
+                          onClick={() => onMoveChapter(ch)}
+                          title="ย้ายตอนนี้ไปนิยายเรื่องอื่น"
+                          className="p-1.5 rounded-md hover:bg-primary/10 text-muted-foreground hover:text-primary"
+                        >
+                          <ArrowRightLeft className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
                   ))
                 )}
@@ -231,6 +249,20 @@ export default function SeriesDashboard() {
       queryClient.invalidateQueries({ queryKey: ["chapters-all"] });
     },
   });
+
+  const handleReorderChapter = async (chapter, novelChapters, direction) => {
+    const sorted = [...novelChapters].sort((a, b) => (a.order || 0) - (b.order || 0));
+    const idx = sorted.findIndex((c) => c.id === chapter.id);
+    const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= sorted.length) return;
+    const swapWith = sorted[swapIdx];
+    const orderA = chapter.order || idx + 1;
+    const orderB = swapWith.order || swapIdx + 1;
+    await Promise.all([
+      updateChapterMutation.mutateAsync({ id: chapter.id, data: { order: orderB } }),
+      updateChapterMutation.mutateAsync({ id: swapWith.id, data: { order: orderA } }),
+    ]);
+  };
 
   const handleMoveChapter = (chapter) => {
     setMoveChapterDialog({ open: true, chapter, targetNovelId: "" });
@@ -390,7 +422,7 @@ export default function SeriesDashboard() {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                   {sNovels.map((novel) => (
-                    <NovelCard key={novel.id} novel={novel} chapters={chapters} uploadingFor={uploadingFor} onUploadClick={handleUploadClick} seriesList={seriesList} onMoveToSeries={handleMoveToSeries} onMoveChapter={handleMoveChapter} />
+                    <NovelCard key={novel.id} novel={novel} chapters={chapters} uploadingFor={uploadingFor} onUploadClick={handleUploadClick} seriesList={seriesList} onMoveToSeries={handleMoveToSeries} onMoveChapter={handleMoveChapter} onReorderChapter={handleReorderChapter} />
                   ))}
                 </div>
               </motion.div>
@@ -409,7 +441,7 @@ export default function SeriesDashboard() {
                 )}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                   {novelsWithoutSeries.map((novel) => (
-                    <NovelCard key={novel.id} novel={novel} chapters={chapters} uploadingFor={uploadingFor} onUploadClick={handleUploadClick} seriesList={seriesList} onMoveToSeries={handleMoveToSeries} onMoveChapter={handleMoveChapter} />
+                    <NovelCard key={novel.id} novel={novel} chapters={chapters} uploadingFor={uploadingFor} onUploadClick={handleUploadClick} seriesList={seriesList} onMoveToSeries={handleMoveToSeries} onMoveChapter={handleMoveChapter} onReorderChapter={handleReorderChapter} />
                   ))}
                 </div>
               </motion.div>
