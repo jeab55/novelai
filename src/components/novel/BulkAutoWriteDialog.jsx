@@ -910,10 +910,23 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
           )}
           {step === "running" && (
             <>
-              <Button variant="destructive" size="sm" onClick={handleCancel} className="gap-1.5">
-                <X className="w-3.5 h-3.5" />
-                หยุดกลางคัน
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button variant="destructive" size="sm" onClick={handleCancel} className="gap-1.5">
+                  <X className="w-3.5 h-3.5" />
+                  หยุดกลางคัน
+                </Button>
+                {errorCount > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={retryAllFailed}
+                    className="gap-1.5 text-amber-700 border-amber-300 hover:bg-amber-50"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    ลองใหม่ ({errorCount})
+                  </Button>
+                )}
+              </div>
               <span className="text-xs text-muted-foreground">
                 ✅ {doneCount} เสร็จ · ⏩ {skipCount} ข้าม{errorCount > 0 ? ` · ❌ ${errorCount} ผิดพลาด` : ""}
               </span>
