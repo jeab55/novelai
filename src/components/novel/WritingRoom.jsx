@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Plus, FileText, Loader2, Trash2, Download, Copy, MoreHorizontal, Clock, Sparkles, Users, BookOpen, Layers, GripVertical } from "lucide-react";
 import ExportDialog from "./ExportDialog";
@@ -322,78 +322,77 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
             <Layers className="w-3.5 h-3.5" />
             สร้าง EP ใหม่
           </Button>
-          <Dialog open={newChapterOpen} onOpenChange={setNewChapterOpen}>
-          <DialogTrigger asChild>
-            <Button size="sm" className="gap-1.5">
-              <Plus className="w-3.5 h-3.5" />
-              ตอนใหม่
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle className="font-heading">สร้างตอนใหม่</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 mt-2">
-              <Input
-                placeholder="ชื่อตอน"
-                value={newTitle}
-                onChange={(e) => setNewTitle(e.target.value)}
-              />
-              {plotEvents.length > 0 && (
-                <div>
-                  <label className="text-sm font-medium mb-1.5 block flex items-center gap-1.5 text-muted-foreground">
-                    <Clock className="w-3.5 h-3.5" />
-                    อิงเหตุการณ์จากไทม์ไลน์ (ไม่บังคับ)
-                  </label>
-                  <Select value={selectedPlotEventId} onValueChange={setSelectedPlotEventId}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="— ไม่ผูกกับเหตุการณ์ —" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={null}>— ไม่ผูกกับเหตุการณ์ —</SelectItem>
-                      {plotEvents.map((ev) => (
-                        <SelectItem key={ev.id} value={ev.id}>
-                          <span className="font-medium text-primary/70 mr-1.5">#{ev.order}</span>
-                          {ev.title}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {selectedPlotEventId && (() => {
-                    const ev = plotEvents.find((e) => e.id === selectedPlotEventId);
-                    return ev?.description ? (
-                      <p className="text-xs text-muted-foreground mt-1.5 line-clamp-2 bg-muted/40 rounded-lg px-3 py-2">{ev.description}</p>
-                    ) : null;
-                  })()}
-                </div>
-              )}
-              <Button
-                className="w-full"
-                onClick={() => {
-                  const ev = plotEvents.find((e) => e.id === selectedPlotEventId);
-                  createChapter.mutate({
-                    novel_id: selectedSeasonTab,
-                    title: newTitle,
-                    order: chapters.length + 1,
-                    status: "ร่าง",
-                    content: "",
-                    word_count: 0,
-                    plot_event_id: ev?.id || "",
-                    plot_event_title: ev?.title || "",
-                    plot_event_description: ev?.description || "",
-                    plot_event_order: ev?.order || null,
-                  });
-                }}
-                disabled={!newTitle.trim() || createChapter.isPending}
-                title={!newTitle.trim() ? "กรุณากรอกชื่อตอน" : ""}
-              >
-                {createChapter.isPending ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />กำลังสร้าง...</> : "สร้างตอน"}
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+          <Button size="sm" className="gap-1.5" onClick={() => setNewChapterOpen(true)}>
+            <Plus className="w-3.5 h-3.5" />
+            ตอนใหม่
+          </Button>
         </div>
       </div>
+
+      <Dialog open={newChapterOpen} onOpenChange={setNewChapterOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-heading">สร้างตอนใหม่</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-2">
+            <Input
+              placeholder="ชื่อตอน"
+              value={newTitle}
+              onChange={(e) => setNewTitle(e.target.value)}
+            />
+            {plotEvents.length > 0 && (
+              <div>
+                <label className="text-sm font-medium mb-1.5 block flex items-center gap-1.5 text-muted-foreground">
+                  <Clock className="w-3.5 h-3.5" />
+                  อิงเหตุการณ์จากไทม์ไลน์ (ไม่บังคับ)
+                </label>
+                <Select value={selectedPlotEventId} onValueChange={setSelectedPlotEventId}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="— ไม่ผูกกับเหตุการณ์ —" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={null}>— ไม่ผูกกับเหตุการณ์ —</SelectItem>
+                    {plotEvents.map((ev) => (
+                      <SelectItem key={ev.id} value={ev.id}>
+                        <span className="font-medium text-primary/70 mr-1.5">#{ev.order}</span>
+                        {ev.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {selectedPlotEventId && (() => {
+                  const ev = plotEvents.find((e) => e.id === selectedPlotEventId);
+                  return ev?.description ? (
+                    <p className="text-xs text-muted-foreground mt-1.5 line-clamp-2 bg-muted/40 rounded-lg px-3 py-2">{ev.description}</p>
+                  ) : null;
+                })()}
+              </div>
+            )}
+            <Button
+              className="w-full"
+              onClick={() => {
+                const ev = plotEvents.find((e) => e.id === selectedPlotEventId);
+                createChapter.mutate({
+                  novel_id: selectedSeasonTab,
+                  title: newTitle,
+                  order: chapters.length + 1,
+                  status: "ร่าง",
+                  content: "",
+                  word_count: 0,
+                  plot_event_id: ev?.id || "",
+                  plot_event_title: ev?.title || "",
+                  plot_event_description: ev?.description || "",
+                  plot_event_order: ev?.order || null,
+                });
+              }}
+              disabled={!newTitle.trim() || createChapter.isPending}
+              title={!newTitle.trim() ? "กรุณากรอกชื่อตอน" : ""}
+            >
+              {createChapter.isPending ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />กำลังสร้าง...</> : "สร้างตอน"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {isLoading ? (
         <div className="flex justify-center py-12">
