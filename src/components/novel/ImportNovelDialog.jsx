@@ -332,7 +332,7 @@ export default function ImportNovelDialog({ open, onClose, novels = [], seriesLi
                 
                 {rawText.trim() && !uploading && (
                   <div className="mt-4 space-y-3">
-                    <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-xl border-2 border-green-300 dark:border-green-700">
+                    <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-xl border-2 border-green-300 dark:border-green-700 animate-in fade-in slide-in-from-bottom-4 duration-500">
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
                           <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
@@ -346,7 +346,7 @@ export default function ImportNovelDialog({ open, onClose, novels = [], seriesLi
                     </div>
                     
                     <Button
-                      className="w-full h-12 text-base font-semibold shadow-lg"
+                      className="w-full h-14 text-lg font-bold shadow-xl bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 transition-all"
                       onClick={handleFileUploaded}
                       size="lg"
                     >
@@ -415,9 +415,9 @@ export default function ImportNovelDialog({ open, onClose, novels = [], seriesLi
                   </div>
                 ))}
               </div>
-              <Button className="w-full gap-2" onClick={() => setStep(2)}>
-                <ChevronRight className="w-4 h-4" />
-                ถัดไป: ตั้งค่านิยาย
+              <Button className="w-full h-12 text-base font-semibold shadow-lg bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70" onClick={() => setStep(2)}>
+                <ChevronRight className="w-5 h-5" />
+                ถัดไป: ตั้งค่านิยาย →
               </Button>
             </div>
           )}
@@ -490,15 +490,30 @@ export default function ImportNovelDialog({ open, onClose, novels = [], seriesLi
                 <div className="flex justify-between"><span>รวมคำ</span><span className="font-medium text-foreground">{totalWords.toLocaleString()} คำ</span></div>
               </div>
 
+              {(mode === "new" && (!novelTitle.trim() || !targetSeriesId)) ? (
+                <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-xl border-2 border-amber-200 dark:border-amber-800 text-center">
+                  <p className="text-sm text-amber-800 dark:text-amber-300 font-medium">
+                    ⚠️ กรุณากรอกชื่อนิยายและเลือกซีรีย์ก่อนนำเข้า
+                  </p>
+                </div>
+              ) : (mode === "existing" && !targetNovelId) ? (
+                <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-xl border-2 border-amber-200 dark:border-amber-800 text-center">
+                  <p className="text-sm text-amber-800 dark:text-amber-300 font-medium">
+                    ⚠️ กรุณาเลือกนิยายปลายทางก่อนนำเข้า
+                  </p>
+                </div>
+              ) : null}
+
               <Button
-                className="w-full gap-2"
+                className="w-full h-14 text-lg font-bold shadow-xl bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 onClick={handleImport}
                 disabled={importing || (mode === "new" && (!novelTitle.trim() || !targetSeriesId)) || (mode === "existing" && !targetNovelId)}
+                size="lg"
               >
                 {importing ? (
-                  <><Loader2 className="w-4 h-4 animate-spin" />กำลังนำเข้า...</>
+                  <><Loader2 className="w-5 h-5 animate-spin" />กำลังนำเข้า...</>
                 ) : (
-                  <><FileText className="w-4 h-4" />นำเข้า {chapters.length} ตอน</>
+                  <><FileText className="w-5 h-5" />นำเข้า {chapters.length} ตอน →</>
                 )}
               </Button>
             </div>
