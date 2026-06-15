@@ -4,7 +4,7 @@ import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { BookOpen, Layers, ChevronDown, ChevronUp, MoreVertical, ImagePlus, FolderOpen, BookMarked, FolderPlus, ArrowRightLeft, ArrowUp, ArrowDown, BookPlus, Plus, Library, Loader2 } from "lucide-react";
+import { BookOpen, Layers, ChevronDown, ChevronUp, MoreVertical, ImagePlus, FolderOpen, BookMarked, FolderPlus, ArrowRightLeft, ArrowUp, ArrowDown, BookPlus, Plus, Library, Loader2, CheckCircle2 } from "lucide-react";
 import ImportNovelDialog from "@/components/novel/ImportNovelDialog";
 import SeriesFormDialog from "@/components/series/SeriesFormDialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -399,12 +399,21 @@ export default function SeriesDashboard() {
                 {novels.length > 0 ? `${novels.length} เรื่อง · คลิกที่การ์ดเพื่อดูตอน` : "ยังไม่มีนิยาย"}
               </p>
             </div>
-            <Link to="/">
-              <Button variant="outline" className="gap-2">
-                <BookOpen className="w-4 h-4" />
-                จัดการนิยาย
+            <div className="flex items-center gap-2">
+              <Link to="/">
+                <Button variant="outline" className="gap-2">
+                  <BookOpen className="w-4 h-4" />
+                  จัดการนิยาย
+                </Button>
+              </Link>
+              <Button variant="outline" className="gap-2" onClick={() => {
+                const completedNovels = novels.filter(n => n.status === "เขียนเสร็จ");
+                toast.success(`พบนิยายที่เขียนเสร็จแล้ว ${completedNovels.length} เรื่อง`);
+              }}>
+                <CheckCircle2 className="w-4 h-4" />
+                อัพเดทงานเขียนสำเร็จ
               </Button>
-            </Link>
+            </div>
           </div>
           <div className="flex items-center gap-3">
             <Button className="gap-2 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-md" onClick={() => setCreateSeriesOpen(true)}>
