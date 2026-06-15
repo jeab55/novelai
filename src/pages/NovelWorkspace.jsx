@@ -42,6 +42,8 @@ export default function NovelWorkspace() {
       return all.find((n) => String(n.id) === String(novelId));
     },
     enabled: !!novelId,
+    staleTime: 60000, // 1 นาที
+    gcTime: 300000, // 5 นาที
   });
 
   // โหลดทุก EP ในซีรีย์เดียวกัน (Novels ที่มี series_id เดียวกัน)
@@ -55,6 +57,8 @@ export default function NovelWorkspace() {
         .sort((a, b) => (a.created_date || "").localeCompare(b.created_date || ""));
     },
     enabled: !!novel,
+    staleTime: 60000, // 1 นาที
+    gcTime: 300000, // 5 นาที
   });
 
   // ถ้ามีหลาย EP ให้ใช้ selectedEpisodeId ถ้าไม่มีให้ใช้ novelId
@@ -68,6 +72,8 @@ export default function NovelWorkspace() {
       return all.filter((c) => !c.is_deleted).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
     },
     enabled: !!activeNovelId && !!novel,
+    staleTime: 30000, // 30 วินาที
+    gcTime: 300000, // 5 นาที
   });
 
   const completedCount = chapters?.filter(c => c.status === "เขียนเสร็จ").length || 0;
@@ -80,6 +86,7 @@ export default function NovelWorkspace() {
     queryFn: () => base44.entities.Writer.list(),
     enabled: !!novel?.writer_id,
     select: (data) => data.find((w) => String(w.id) === String(novel?.writer_id)),
+    staleTime: 120000, // 2 นาที
   });
 
   const softDeleteMutation = useMutation({
