@@ -40,10 +40,10 @@ const THAI_SPACING_RULES = [
 // คำที่ควรเว้นวรรค
 const SHOULD_SPACE_BEFORE = ["ครับ", "ค่ะ", "นะคะ", "นะครับ", "จ้ะ", "นะ", "หรือ", "แต่", "และ", "ก็", "จึง", "ดังนั้น", "เพราะ", "ถ้า", "เมื่อ", "_while", "แม้"];
 
-export default function ThaiProofreaderPanel({ content, onApplySuggestions }) {
+export default function ThaiProofreaderPanel({ content, onApplySuggestions, novel }) {
   const [checking, setChecking] = useState(false);
   const [suggestions, setSuggestions] = useState([]);
-  const [expandedGroups, setExpandedGroups] = useState({ spelling: true, spacing: true, style: true });
+  const [expandedGroups, setExpandedGroups] = useState({ spelling: true, words: true, spacing: true, anachronistic: true });
 
   const checkThaiProofreading = async () => {
     if (!content?.trim()) {
@@ -54,7 +54,7 @@ export default function ThaiProofreaderPanel({ content, onApplySuggestions }) {
     setChecking(true);
     try {
       // ใช้ AI ตรวจสอบคำผิดและการเว้นวรรค
-      const response = await base44.functions.invoke('checkThaiSpelling', { content });
+      const response = await base44.functions.invoke('checkThaiSpelling', { content, novel });
       
       const foundSuggestions = [];
 
@@ -62,14 +62,36 @@ export default function ThaiProofreaderPanel({ content, onApplySuggestions }) {
       if (response.spelling_errors && response.spelling_errors.length > 0) {
         foundSuggestions.push({
           group: 'spelling',
-          title: 'คำที่อาจเขียนผิด',
+          title: 'คำที่สะกดผิด',
           icon: AlertTriangle,
-          color: 'orange',
-          items: response.spelling_errors.slice(0, 10)
+          color: 'red',
+          items: response.spelling_errors.slice(0, 15)
         });
       }
 
-      // 2. ตรวจสอบการเว้นวรรค
+      // 2. คำแนะนำคำที่เหมาะสม
+      if (response.word_suggestions && response.word_suggestions.length > 0) {
+        foundSuggestions.push({
+          group: 'words',
+          title: 'คำแนะนำคำที่เหมาะสม',
+          icon: Sparkles,
+          color: 'green',
+          items: response.word_suggestions.slice(0, 15)
+        });
+      }
+
+      // 3. คำที่ไม่สอดคล้องกับยุคสมัย (สำหรับนิยายอิงประวัติศาสตร์)
+      if (response.anachronistic_words && response.anachronistic_words.length > 0) {
+        foundSuggestions.push({
+          group: 'anachronistic',
+          title: 'คำที่ไม่สอดคล้องกับยุคสมัย',
+          icon: AlertTriangle,
+          color: 'purple',
+          items: response.anachronistic_words.slice(0, 15)
+        });
+      }
+
+      // 4. ตรวจสอบการเว้นวรรค
       if (response.spacing_issues && response.spacing_issues.length > 0) {
         foundSuggestions.push({
           group: 'spacing',
@@ -80,121 +102,13 @@ export default function ThaiProofreaderPanel({ content, onApplySuggestions }) {
         });
       }
 
-      // 3. ตรวจสอบสไตล์การเขียน
-      if (response.style_issues && response.style_issues.length > 0) {
-        foundSuggestions.push({
-          group: 'style',
-          title: 'สไตล์การเขียน',
-          icon: Sparkles,
-          color: 'purple',
-          items: response.style_issues.slice(0, 10)
-        });
-      }
-
-      // Fallback: ตรวจสอบด้วย rule-based ถ้า AI ไม่พบอะไร
-      if (foundSuggestions.length === 0) {
-        // ตรวจสอบคำที่เขียนผิดแบบ rule-based
-        const spellingMistakes = [];
-        Object.entries(COMMON_MISTAKES).forEach(([wrong, correct]) => {
-          const regex = new RegExp(wrong, 'g');
-          const matches = [...content.matchAll(regex)];
-          if (matches.length > 0) {
-            matches.forEach(match => {
-              spellingMistakes.push({
-                type: 'spelling',
-                wrong: wrong,
-                correct: correct,
-                position: match.index,
-                context: content.slice(Math.max(0, match.index - 20), Math.min(content.length, match.index + wrong.length + 20))
-              });
-            });
-          }
-        });
-
-        if (spellingMistakes.length > 0) {
-          foundSuggestions.push({
-            group: 'spelling',
-            title: 'คำที่อาจเขียนผิด',
-            icon: AlertTriangle,
-            color: 'orange',
-            items: spellingMistakes.slice(0, 10)
-          });
-        }
-
-        // ตรวจสอบการเว้นวรรค
-        const spacingIssues = [];
-        const multipleSpaces = [...content.matchAll(/\s{2,}/g)];
-        if (multipleSpaces.length > 0) {
-          spacingIssues.push({
-            type: 'spacing',
-            issue: 'ช่องว่างเกิน',
-            count: multipleSpaces.length,
-            suggestion: 'รวมช่องว่างหลายช่องเป็นช่องเดียว'
-          });
-        }
-
-        SHOULD_SPACE_BEFORE.forEach(word => {
-          const regex = new RegExp(`([^\\s])${word}`, 'g');
-          const matches = [...content.matchAll(regex)];
-          if (matches.length > 0) {
-            spacingIssues.push({
-              type: 'spacing',
-              issue: `อาจต้องเว้นวรรคก่อน "${word}"`,
-              count: matches.length,
-              suggestion: `เพิ่มช่องว่างก่อน "${word}"`
-            });
-          }
-        });
-
-        if (spacingIssues.length > 0) {
-          foundSuggestions.push({
-            group: 'spacing',
-            title: 'การเว้นวรรค',
-            icon: AlertTriangle,
-            color: 'blue',
-            items: spacingIssues.slice(0, 10)
-          });
-        }
-
-        // ตรวจสอบสไตล์
-        const styleIssues = [];
-        const repeatedWords = [...content.matchAll(/(\w+)\s+\1/g)];
-        if (repeatedWords.length > 0) {
-          styleIssues.push({
-            type: 'style',
-            issue: 'คำซ้ำ',
-            count: repeatedWords.length,
-            suggestion: 'ตรวจสอบการใช้คำซ้ำ'
-          });
-        }
-
-        const longSentences = content.split(/[.!?।]/).filter(s => s.trim().length > 100);
-        if (longSentences.length > 0) {
-          styleIssues.push({
-            type: 'style',
-            issue: 'ประโยคยาวเกินไป',
-            count: longSentences.length,
-            suggestion: 'แบ่งประโยคให้อ่านง่ายขึ้น'
-          });
-        }
-
-        if (styleIssues.length > 0) {
-          foundSuggestions.push({
-            group: 'style',
-            title: 'สไตล์การเขียน',
-            icon: Sparkles,
-            color: 'purple',
-            items: styleIssues
-          });
-        }
-      }
-
       setSuggestions(foundSuggestions);
       
       if (foundSuggestions.length === 0) {
         toast.success("ไม่พบข้อผิดพลาด - เนื้อหาดีมาก! ✅");
       } else {
-        toast.info(`พบ ${foundSuggestions.reduce((sum, g) => sum + g.items.length, 0)} จุดที่ควรปรับปรุง`);
+        const totalIssues = foundSuggestions.reduce((sum, g) => sum + g.items.length, 0);
+        toast.info(`พบ ${totalIssues} จุดที่ควรปรับปรุง`);
       }
     } catch (err) {
       console.error('Proofreading error:', err);
@@ -213,16 +127,18 @@ export default function ThaiProofreaderPanel({ content, onApplySuggestions }) {
 
     suggestions.forEach(group => {
       group.items.forEach(item => {
-        if (item.type === 'spelling' && item.wrong && item.correct) {
+        // แก้คำผิด
+        if (item.wrong && item.correct) {
           const regex = new RegExp(item.wrong, 'g');
           updatedContent = updatedContent.replace(regex, item.correct);
         }
+        // แก้ไขตามคำแนะนำ
+        if (item.original && item.suggestion) {
+          const regex = new RegExp(item.original, 'g');
+          updatedContent = updatedContent.replace(regex, item.suggestion);
+        }
       });
     });
-
-    // แก้ไขการเว้นวรรค
-    updatedContent = updatedContent.replace(/\s{2,}/g, ' ');
-    updatedContent = updatedContent.trim();
 
     onApplySuggestions(updatedContent);
     toast.success("ใช้คำแนะนำทั้งหมดแล้ว");
@@ -230,12 +146,13 @@ export default function ThaiProofreaderPanel({ content, onApplySuggestions }) {
 
   const getColorClasses = (color) => {
     const classes = {
+      red: 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-700 dark:text-red-400',
       orange: 'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800 text-orange-700 dark:text-orange-400',
       blue: 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-400',
       purple: 'bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-400',
       green: 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-700 dark:text-green-400',
     };
-    return classes[color] || classes.orange;
+    return classes[color] || classes.red;
   };
 
   return (
@@ -300,26 +217,78 @@ export default function ThaiProofreaderPanel({ content, onApplySuggestions }) {
                         {group.items.map((item, idx) => (
                           <div key={idx} className="flex items-start gap-2">
                             <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0" />
-                            <div>
-                              {item.type === 'spelling' ? (
+                            <div className="flex-1">
+                              {/* คำผิด */}
+                              {item.wrong && item.correct && (
                                 <div>
-                                  <span className="line-through text-red-500">{item.wrong}</span>
-                                  {" → "}
-                                  <span className="text-green-600 font-medium">{item.correct}</span>
+                                  <div className="flex items-center gap-2">
+                                    <span className="line-through text-red-500 font-medium">{item.wrong}</span>
+                                    <span className="text-muted-foreground">→</span>
+                                    <span className="text-green-600 font-semibold">{item.correct}</span>
+                                  </div>
+                                  {item.explanation && (
+                                    <div className="text-muted-foreground mt-1 text-[11px]">
+                                      💡 {item.explanation}
+                                    </div>
+                                  )}
                                   {item.context && (
-                                    <div className="text-muted-foreground mt-1 truncate">
+                                    <div className="text-muted-foreground/60 mt-1 text-[11px] truncate bg-muted/30 px-2 py-1 rounded">
                                       ...{item.context}...
                                     </div>
                                   )}
                                 </div>
-                              ) : (
+                              )}
+                              
+                              {/* คำแนะนำ */}
+                              {item.original && item.suggested && (
                                 <div>
-                                  <span className="font-medium">{item.issue}</span>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-orange-600">{item.original}</span>
+                                    <span className="text-muted-foreground">→</span>
+                                    <span className="text-green-600 font-semibold">{item.suggested}</span>
+                                  </div>
+                                  {item.reason && (
+                                    <div className="text-muted-foreground mt-1 text-[11px]">
+                                      💡 {item.reason}
+                                    </div>
+                                  )}
+                                  {item.context && (
+                                    <div className="text-muted-foreground/60 mt-1 text-[11px] truncate bg-muted/30 px-2 py-1 rounded">
+                                      ...{item.context}...
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                              
+                              {/* คำที่ไม่สอดคล้องยุคสมัย */}
+                              {item.word && (
+                                <div>
+                                  <div className="font-medium text-purple-700 dark:text-purple-400">
+                                    ⚠️ {item.word}
+                                  </div>
+                                  {item.historical_alternative && (
+                                    <div className="mt-1">
+                                      <span className="text-muted-foreground">แนะนำใช้: </span>
+                                      <span className="text-green-600 font-semibold">{item.historical_alternative}</span>
+                                    </div>
+                                  )}
+                                  {item.context && (
+                                    <div className="text-muted-foreground/60 mt-1 text-[11px] truncate bg-muted/30 px-2 py-1 rounded">
+                                      ...{item.context}...
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                              
+                              {/* ปัญหาการเว้นวรรค */}
+                              {item.issue && (
+                                <div>
+                                  <div className="font-medium">{item.issue}</div>
                                   {item.count && (
                                     <span className="text-muted-foreground ml-1">({item.count} จุด)</span>
                                   )}
                                   {item.suggestion && (
-                                    <div className="text-muted-foreground mt-0.5">
+                                    <div className="text-muted-foreground mt-0.5 text-[11px]">
                                       💡 {item.suggestion}
                                     </div>
                                   )}

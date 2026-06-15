@@ -627,6 +627,7 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
         <div className="border-t border-border/60 bg-card/30 p-4">
           <ThaiProofreaderPanel
             content={content}
+            novel={novel}
             onApplySuggestions={(updatedContent) => setContent(updatedContent)}
           />
         </div>
