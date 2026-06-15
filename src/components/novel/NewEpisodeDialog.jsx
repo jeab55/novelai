@@ -323,6 +323,11 @@ ${charSummary || "(ยังไม่มี)"}
                       สร้างใหม่
                     </Button>
                   </div>
+                  <div className="bg-primary/5 border border-primary/10 rounded-xl p-3 mb-2">
+                    <p className="text-xs text-muted-foreground">
+                      💡 เนื้อหานี้สร้างโดย AI คุณสามารถแก้ไขชื่อตอน พล็อต หรือเรื่องย่อให้ตรงใจก่อนดำเนินการต่อ
+                    </p>
+                  </div>
                   <div>
                     <label className="text-sm font-medium mb-1.5 block">ชื่อ EP ใหม่ <span className="text-destructive">*</span></label>
                     <Input
