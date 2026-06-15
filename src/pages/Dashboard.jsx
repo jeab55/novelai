@@ -371,13 +371,13 @@ export default function Dashboard() {
                         )}
 
                         {/* Title */}
-                        <h3 className="font-heading font-bold text-lg leading-tight group-hover:text-primary transition-colors mb-2 pr-20">
+                        <h3 className="font-heading font-bold text-xl leading-tight group-hover:text-primary transition-colors mb-2 pr-20 line-clamp-2">
                           {novel.title}
                         </h3>
 
                         {/* Era */}
                         {novel.era && (
-                          <p className="text-xs text-primary/65 mb-2.5 font-medium flex items-center gap-1.5">
+                          <p className="text-xs text-primary/65 mb-3 font-medium flex items-center gap-1.5">
                             <span className="text-sm">📍</span>{novel.era}
                           </p>
                         )}
@@ -390,7 +390,7 @@ export default function Dashboard() {
                         )}
 
                         {/* Footer */}
-                        <div className="mt-auto pt-4 border-t border-border/40 flex items-center justify-between gap-3">
+                        <div className="mt-auto pt-3.5 border-t border-border/40 flex items-center justify-between gap-3 flex-wrap">
                           {novel.status === "เขียนเสร็จ" ? (
                             <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 text-xs font-bold border border-emerald-500/30 shadow-sm">
                               <CheckCircle2 className="w-3.5 h-3.5 mr-1 text-emerald-500" />
@@ -401,7 +401,7 @@ export default function Dashboard() {
                               {novel.status || "กำลังเขียน"}
                             </Badge>
                           )}
-                          <div className="flex items-center gap-2 text-xs">
+                          <div className="flex items-center gap-2 text-xs flex-wrap">
                             {getWriterName(novel.writer_id) && (
                               <span className="text-[11px] text-primary/60 font-medium bg-primary/6 border border-primary/15 px-2 py-1 rounded-full">
                                 ✍️ {getWriterName(novel.writer_id)}
