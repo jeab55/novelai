@@ -31,7 +31,6 @@ const statusColors = {
 
 export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPendingOpenChapterConsumed }) {
   const [selectedChapter, setSelectedChapter] = useState(null);
-  const [selectedEpisodeTab, setSelectedEpisodeTab] = useState(novelId);
   const [newChapterOpen, setNewChapterOpen] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [selectedPlotEventId, setSelectedPlotEventId] = useState("");
@@ -53,24 +52,29 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
     }
   }, [pendingOpenChapter]);
 
-  // โหลดทุก EP ในซีรีย์เดียวกัน
-  const { data: episodes = [] } = useQuery({
-    queryKey: ["episodes", novel?.series_id],
+  // โหลดทุก Season (Novel หลัก + novels ที่มี parent_novel_id = novelId)
+  const { data: seasons = [] } = useQuery({
+    queryKey: ["seasons", novelId],
     queryFn: async () => {
-      if (!novel?.series_id) return [{ ...novel, id: novelId }].filter(Boolean);
       const all = await base44.entities.Novel.list();
-      return all
-        .filter((n) => String(n.series_id) === String(novel.series_id) && !n.is_deleted)
-        .sort((a, b) => (a.created_date || "").localeCompare(b.created_date || ""));
+      // Season 1 คือนิยายหลัก, Season 2+ คือ novels ที่มี parent_novel_id = novelId
+      const season1 = novel;
+      const season2Plus = all.filter(
+        (n) => String(n.parent_novel_id) === String(novelId) && !n.is_deleted
+      );
+      return [season1, ...season2Plus].filter(Boolean);
     },
     enabled: !!novel,
   });
 
-  // โหลด chapters ของ EP ที่เลือก — cache นานขึ้น
+  // selectedSeasonTab คือ novelId ที่เลือก (default = novelId)
+  const [selectedSeasonTab, setSelectedSeasonTab] = useState(novelId);
+
+  // โหลด chapters ของ Season ที่เลือก — cache นานขึ้น
   const { data: chapters = [], isLoading } = useQuery({
-    queryKey: ["chapters", selectedEpisodeTab],
+    queryKey: ["chapters", selectedSeasonTab],
     queryFn: async () => {
-      const all = await base44.entities.Chapter.filter({ novel_id: selectedEpisodeTab }, "order");
+      const all = await base44.entities.Chapter.filter({ novel_id: selectedSeasonTab }, "order");
       return all.filter((c) => !c.is_deleted).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
     },
     staleTime: 60000, // 1 นาที
@@ -78,9 +82,9 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
   });
 
   const { data: plotEvents = [] } = useQuery({
-    queryKey: ["plotEvents", selectedEpisodeTab],
+    queryKey: ["plotEvents", selectedSeasonTab],
     queryFn: async () => {
-      const all = await base44.entities.PlotEvent.filter({ novel_id: selectedEpisodeTab }, "order");
+      const all = await base44.entities.PlotEvent.filter({ novel_id: selectedSeasonTab }, "order");
       return all.filter((e) => !e.is_deleted);
     },
     staleTime: 60000,
@@ -112,7 +116,7 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
   const createChapter = useMutation({
     mutationFn: (data) => base44.entities.Chapter.create(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["chapters", selectedEpisodeTab] });
+      queryClient.invalidateQueries({ queryKey: ["chapters", selectedSeasonTab] });
       setNewChapterOpen(false);
       setNewTitle("");
       setSelectedPlotEventId("");
@@ -122,7 +126,7 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
   const deleteChapter = useMutation({
     mutationFn: (id) => base44.entities.Chapter.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["chapters", selectedEpisodeTab] });
+      queryClient.invalidateQueries({ queryKey: ["chapters", selectedSeasonTab] });
       setSelectedChapter(null);
     },
   });
@@ -130,7 +134,7 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
   const updateChapterStatus = useMutation({
     mutationFn: ({ id, status }) => base44.entities.Chapter.update(id, { status }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["chapters", selectedEpisodeTab] });
+      queryClient.invalidateQueries({ queryKey: ["chapters", selectedSeasonTab] });
     },
   });
 
@@ -150,7 +154,7 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
         base44.entities.Chapter.update(ch.id, { order: newOrder })
       )
     );
-    queryClient.invalidateQueries({ queryKey: ["chapters", selectedEpisodeTab] });
+    queryClient.invalidateQueries({ queryKey: ["chapters", selectedSeasonTab] });
   };
 
   if (selectedChapter) {
@@ -199,17 +203,17 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
       />
     )}
     <div className="max-w-4xl mx-auto px-4 py-6">
-      {/* EP Tabs */}
-      {episodes.length > 1 && (
-        <Tabs value={selectedEpisodeTab} onValueChange={setSelectedEpisodeTab} className="mb-6">
+      {/* Season Tabs */}
+      {seasons.length > 1 && (
+        <Tabs value={selectedSeasonTab} onValueChange={setSelectedSeasonTab} className="mb-6">
           <TabsList className="bg-primary/10 h-auto p-1 gap-1 flex-wrap">
-            {episodes.map((ep, idx) => (
+            {seasons.map((season, idx) => (
               <TabsTrigger
-                key={ep.id}
-                value={ep.id}
+                key={season.id}
+                value={season.id}
                 className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-xs py-1.5 px-3 h-auto rounded-lg"
               >
-                EP{idx + 1}: {ep.title?.slice(0, 15)}{ep.title?.length > 15 ? "..." : ""}
+                Season {idx + 1}: {season.title?.slice(0, 15)}{season.title?.length > 15 ? "..." : ""}
               </TabsTrigger>
             ))}
           </TabsList>
@@ -276,7 +280,7 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
               open={true}
               onClose={() => {
                 setNewEpisodeOpen(false);
-                queryClient.invalidateQueries({ queryKey: ["episodes", novel?.series_id] });
+                queryClient.invalidateQueries({ queryKey: ["seasons", novelId] });
               }}
               novel={novel}
             />
@@ -286,12 +290,11 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
               open={true}
               onClose={() => {
                 setSeasonSelectorOpen(false);
-                queryClient.invalidateQueries({ queryKey: ["seasons", novel?.id] });
-                queryClient.invalidateQueries({ queryKey: ["episodes", novel?.series_id] });
+                queryClient.invalidateQueries({ queryKey: ["seasons", novelId] });
               }}
               novel={novel}
-              onSeasonChange={(season) => {
-                // Navigate to the selected season
+              onSeasonSelected={(season) => {
+                // Navigate to the new season
                 window.location.href = `/novel/${season.id}`;
               }}
             />
@@ -346,7 +349,7 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
                 onClick={() => {
                   const ev = plotEvents.find((e) => e.id === selectedPlotEventId);
                   createChapter.mutate({
-                    novel_id: selectedEpisodeTab,
+                    novel_id: selectedSeasonTab,
                     title: newTitle,
                     order: chapters.length + 1,
                     status: "ร่าง",
