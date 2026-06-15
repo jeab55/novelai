@@ -183,69 +183,76 @@ ${charSummary || "(ยังไม่มี)"}
     if (!seasonTitle.trim()) { toast.error("กรุณากรอกชื่อ Season"); return; }
     setCreating(true);
 
-    // หาเลข Season ถัดไป
-    const maxSeasonNumber = seasons.reduce((max, s) => Math.max(max, s.season_number || 1), 0);
-    const newSeasonNumber = maxSeasonNumber + 1;
+    try {
+      // หาเลข Season ถัดไป
+      const maxSeasonNumber = seasons.reduce((max, s) => Math.max(max, s.season_number || 1), 0);
+      const newSeasonNumber = maxSeasonNumber + 1;
 
-    // สร้าง Season ใหม่
-    const newSeason = await base44.entities.Novel.create({
-      title: seasonTitle,
-      genre: novel.genre,
-      synopsis: seasonSynopsis || novel.synopsis,
-      era: novel.era,
-      status: "กำลังเขียน",
-      writer_id: novel.writer_id || "", // Lock writer จาก Season 1
-      series_id: novel.series_id || "",
-      parent_novel_id: novel.id,
-      season_number: newSeasonNumber,
-      novel_type: novel.novel_type || "นิยายยาว",
-      target_chapters: parseInt(targetChapters) || novel.target_chapters || 10,
-      word_count_target: novel.word_count_target || 1500,
-      ending_type: novel.ending_type || "",
-    });
+      // สร้าง Season ใหม่
+      const newSeason = await base44.entities.Novel.create({
+        title: seasonTitle,
+        genre: novel.genre,
+        synopsis: seasonSynopsis || novel.synopsis,
+        era: novel.era,
+        status: "กำลังเขียน",
+        writer_id: novel.writer_id || "", // Lock writer จาก Season 1
+        series_id: novel.series_id || "",
+        parent_novel_id: novel.id,
+        season_number: newSeasonNumber,
+        novel_type: novel.novel_type || "นิยายยาว",
+        target_chapters: parseInt(targetChapters) || novel.target_chapters || 10,
+        word_count_target: novel.word_count_target || 1500,
+        ending_type: novel.ending_type || "",
+      });
 
-    // คัดลอกตัวละครที่เลือก
-    const charsToInherit = existingChars.filter((c) => inheritedChars.includes(c.id));
-    await Promise.all(
-      charsToInherit.map((c) =>
-        base44.entities.Character.create({
-          novel_id: newSeason.id,
-          name: c.name,
-          role: c.role,
-          age: c.age || "",
-          occupation: c.occupation || "",
-          appearance: c.appearance || "",
-          personality: c.personality || "",
-          background: c.background || "",
-          desire: c.desire || "",
-          wound: c.wound || "",
-          relationships: c.relationships || "",
-        })
-      )
-    );
+      // คัดลอกตัวละครที่เลือก
+      const charsToInherit = existingChars.filter((c) => inheritedChars.includes(c.id));
+      await Promise.all(
+        charsToInherit.map((c) =>
+          base44.entities.Character.create({
+            novel_id: newSeason.id,
+            name: c.name,
+            role: c.role,
+            age: c.age || "",
+            occupation: c.occupation || "",
+            appearance: c.appearance || "",
+            personality: c.personality || "",
+            background: c.background || "",
+            desire: c.desire || "",
+            wound: c.wound || "",
+            relationships: c.relationships || "",
+          })
+        )
+      );
 
-    // สร้างตัวละครใหม่จาก AI
-    await Promise.all(
-      aiNewChars.map((c) =>
-        base44.entities.Character.create({
-          novel_id: newSeason.id,
-          name: c.name,
-          role: c.role || "ตัวประกอบ",
-          age: c.age || "",
-          occupation: c.occupation || "",
-          appearance: c.appearance || "",
-          personality: c.personality || "",
-          background: c.background || "",
-          desire: c.desire || "",
-        })
-      )
-    );
+      // สร้างตัวละครใหม่จาก AI
+      await Promise.all(
+        aiNewChars.map((c) =>
+          base44.entities.Character.create({
+            novel_id: newSeason.id,
+            name: c.name,
+            role: c.role || "ตัวประกอบ",
+            age: c.age || "",
+            occupation: c.occupation || "",
+            appearance: c.appearance || "",
+            personality: c.personality || "",
+            background: c.background || "",
+            desire: c.desire || "",
+          })
+        )
+      );
 
-    queryClient.invalidateQueries({ queryKey: ["seasons", novel?.id] });
-    queryClient.invalidateQueries({ queryKey: ["episodes", novel?.series_id] });
-    setCreatedSeasonId(newSeason.id);
-    setCreating(false);
-    setSavedSuccess(true);
+      queryClient.invalidateQueries({ queryKey: ["seasons", novel?.id] });
+      queryClient.invalidateQueries({ queryKey: ["episodes", novel?.series_id] });
+      setCreatedSeasonId(newSeason.id);
+      setCreating(false);
+      setSavedSuccess(true);
+      toast.success("สร้าง Season สำเร็จ");
+    } catch (error) {
+      console.error("Failed to create Season:", error);
+      toast.error("ไม่สามารถสร้าง Season ได้ กรุณาลองใหม่อีกครั้ง");
+      setCreating(false);
+    }
   }
 
   function handleClose() {
