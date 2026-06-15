@@ -65,10 +65,29 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
       return [season1, ...season2Plus].filter(Boolean);
     },
     enabled: !!novel,
+    staleTime: 30000, // 30 วินาที
+    gcTime: 120000, // 2 นาที
+  });
+
+  // โหลดข้อมูล novel ของ Season ที่เลือก — เพื่อให้ได้ข้อมูลที่ถูกต้องของแต่ละ Season
+  const { data: selectedSeasonNovel } = useQuery({
+    queryKey: ["novel", selectedSeasonTab],
+    queryFn: async () => {
+      const all = await base44.entities.Novel.list();
+      return all.find((n) => String(n.id) === String(selectedSeasonTab));
+    },
+    enabled: !!selectedSeasonTab,
+    staleTime: 30000,
+    gcTime: 120000,
   });
 
   // selectedSeasonTab คือ novelId ที่เลือก (default = novelId)
   const [selectedSeasonTab, setSelectedSeasonTab] = useState(novelId);
+
+  // Reset selectedSeasonTab เมื่อ novelId เปลี่ยน (เช่น เมื่อสลับ Season จาก parent component)
+  useEffect(() => {
+    setSelectedSeasonTab(novelId);
+  }, [novelId]);
 
   // โหลด chapters ของ Season ที่เลือก — cache นานขึ้น
   const { data: chapters = [], isLoading } = useQuery({
@@ -161,8 +180,8 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
     return (
       <ChapterEditor
         chapter={selectedChapter}
-        novelId={novelId}
-        novel={novel}
+        novelId={selectedSeasonTab}
+        novel={selectedSeasonNovel || novel}
         onBack={() => setSelectedChapter(null)}
       />
     );
@@ -170,14 +189,14 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
 
   return (
     <>
-    <ExportDialog open={exportOpen} onOpenChange={setExportOpen} novel={novel} chapters={chapters} />
+    <ExportDialog open={exportOpen} onOpenChange={setExportOpen} novel={selectedSeasonNovel || novel} chapters={chapters} />
     <AiChapterGeneratorDialog
       open={aiChapterGeneratorOpen}
       onClose={() => {
         setAiChapterGeneratorOpen(false);
         queryClient.invalidateQueries({ queryKey: ["chapters", selectedSeasonTab] });
       }}
-      novel={novel}
+      novel={selectedSeasonNovel || novel}
       novelId={selectedSeasonTab}
     />
     <BulkAutoWriteDialog
@@ -186,7 +205,7 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
         setBulkAutoWriteOpen(false);
         queryClient.invalidateQueries({ queryKey: ["chapters", selectedSeasonTab] });
       }}
-      novel={novel}
+      novel={selectedSeasonNovel || novel}
       novelId={selectedSeasonTab}
     />
     {draftChapter && (
@@ -194,7 +213,7 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
       open={aiDraftOpen}
       onClose={() => { setAiDraftOpen(false); setDraftChapter(null); }}
       chapter={draftChapter}
-      novel={novel}
+      novel={selectedSeasonNovel || novel}
       novelId={selectedSeasonTab}
       onInsert={(content) => {
         const chapterToOpen = { ...draftChapter, content };
@@ -213,7 +232,7 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
         setNewEpisodeOpen(false);
         queryClient.invalidateQueries({ queryKey: ["seasons", novelId] });
       }}
-      novel={novel}
+      novel={selectedSeasonNovel || novel}
     />
     <SeasonSelectorDialog
       open={seasonSelectorOpen}
@@ -221,7 +240,7 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
         setSeasonSelectorOpen(false);
         queryClient.invalidateQueries({ queryKey: ["seasons", novelId] });
       }}
-      novel={novel}
+      novel={selectedSeasonNovel || novel}
       onSeasonChange={(season) => {
         window.location.href = `/novel/${season.id}`;
       }}
@@ -415,13 +434,13 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
                   <p className="font-semibold text-[15px] truncate text-foreground">{ch.title}</p>
                   <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-2">
                     <span className="font-medium text-primary/70">{(ch.word_count || 0).toLocaleString()}</span> คำ
-                    {novel?.word_count_target && (
+                    {(selectedSeasonNovel || novel)?.word_count_target && (
                       <span className={`text-xs ${
-                        (ch.word_count || 0) >= novel.word_count_target * 0.9
+                        (ch.word_count || 0) >= (selectedSeasonNovel || novel).word_count_target * 0.9
                           ? "text-emerald-600 dark:text-emerald-400"
                           : "text-amber-600 dark:text-amber-400"
                       }`}>
-                        ({Math.round(((ch.word_count || 0) / novel.word_count_target) * 100)}% ของ {novel.word_count_target.toLocaleString()} คำ)
+                        ({Math.round(((ch.word_count || 0) / (selectedSeasonNovel || novel).word_count_target) * 100)}% ของ {(selectedSeasonNovel || novel).word_count_target.toLocaleString()} คำ)
                       </span>
                     )}
                   </p>
@@ -537,7 +556,7 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
     <div className="fixed bottom-4 right-4 z-50">
       {selectedChapter && (
         <ContinuityChecker
-          novelId={novelId}
+          novelId={selectedSeasonTab}
           chapter={selectedChapter}
         />
       )}
