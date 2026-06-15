@@ -82,13 +82,8 @@ export default function Dashboard() {
     queryFn: () => base44.entities.Chapter.list(),
   });
 
-  // กรองนิยาย: แสดงนิยายที่มีอย่างน้อย 1 ตอน (ทุกสถานะ)
-  const novels = (allNovels || []).filter((novel) => {
-    const hasChapters = (allChapters || []).some(
-      (c) => String(c.novel_id) === String(novel.id) && !c.is_deleted
-    );
-    return hasChapters;
-  });
+  // กรองนิยาย: แสดงนิยายทั้งหมด (ทุกสถานะ ไม่ว่าจะมีตอนหรือไม่)
+  const novels = allNovels || [];
 
   const isLoading = !allNovels || !allChapters;
 
@@ -296,7 +291,7 @@ export default function Dashboard() {
               </div>
             </div>
             <p className="text-xs text-muted-foreground mt-2">
-              แสดงนิยายทั้งหมดที่มีอย่างน้อย 1 ตอน
+              แสดงนิยายทั้งหมดของคุณ
             </p>
           </div>
 
