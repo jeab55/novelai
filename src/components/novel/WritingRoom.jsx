@@ -7,8 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, FileText, Loader2, Trash2, Download, Copy, MoreHorizontal, Clock, Sparkles, Users, BookOpen, Layers, GripVertical } from "lucide-react";
+import { Plus, FileText, Loader2, Trash2, Download, Copy, MoreHorizontal, Clock, Sparkles, Users, BookOpen, Layers, GripVertical, Layers2 } from "lucide-react";
 import ExportDialog from "./ExportDialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { motion, AnimatePresence } from "framer-motion";
@@ -44,6 +45,7 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
   const [exportOpen, setExportOpen] = useState(false);
   const [seasonSelectorOpen, setSeasonSelectorOpen] = useState(false);
   const [spellCheckSummaryOpen, setSpellCheckSummaryOpen] = useState(false);
+  const [deleteSeasonDialogOpen, setDeleteSeasonDialogOpen] = useState(false);
   const queryClient = useQueryClient();
 
   // Handle chapter navigation from other tabs (e.g. AiPlotDialog draft)
@@ -161,6 +163,31 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
     },
   });
 
+  const deleteSeason = useMutation({
+    mutationFn: async () => {
+      // Soft delete Season
+      await base44.entities.Novel.update(selectedSeasonTab, { is_deleted: true, deleted_at: new Date().toISOString() });
+      // Soft delete chapters ทั้งหมดใน Season นี้
+      const chapters = await base44.entities.Chapter.filter({ novel_id: selectedSeasonTab });
+      await Promise.all(
+        chapters.map((ch) => base44.entities.Chapter.update(ch.id, { is_deleted: true }))
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["seasons", novelId] });
+      queryClient.invalidateQueries({ queryKey: ["chapters", selectedSeasonTab] });
+      toast.success("ลบ Season แล้ว (สามารถกู้คืนจากถังขยะได้)");
+      setDeleteSeasonDialogOpen(false);
+      // กลับไป Season 1 หากเป็น Season สุดท้ายที่ลบ
+      if (seasons.length > 1) {
+        const remainingSeasons = seasons.filter((s) => String(s.id) !== String(selectedSeasonTab));
+        if (remainingSeasons.length > 0) {
+          window.location.href = `/novel/${remainingSeasons[0].id}`;
+        }
+      }
+    },
+  });
+
   const updateChapterStatus = useMutation({
     mutationFn: ({ id, status }) => base44.entities.Chapter.update(id, { status }),
     onSuccess: () => {
@@ -258,6 +285,33 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
       novelId={selectedSeasonTab}
       novel={selectedSeasonNovel || novel}
     />
+    
+    {/* Delete Season Confirmation Dialog */}
+    <AlertDialog open={deleteSeasonDialogOpen} onOpenChange={setDeleteSeasonDialogOpen}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle className="font-heading flex items-center gap-2">
+            <Layers2 className="w-5 h-5 text-destructive" />
+            ยืนยันการลบ Season
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            คุณต้องการลบ Season นี้และตอนทั้งหมดใน Season นี้ใช่หรือไม่?
+            <br /><br />
+            การลบจะ<strong>ซ่อน</strong> Season นี้และตอนทั้งหมด (สามารถกู้คืนจากถังขยะได้)
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={() => deleteSeason.mutate()}
+            disabled={deleteSeason.isPending}
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          >
+            {deleteSeason.isPending ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />กำลังลบ...</> : "ลบ Season"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
     <div className="max-w-4xl mx-auto px-4 py-6">
       {/* Season Tabs */}
       {seasons.length > 1 && (
@@ -321,6 +375,18 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
             <Plus className="w-3.5 h-3.5" />
             ตอนใหม่
           </Button>
+          {seasons.length > 1 && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5 text-destructive border-destructive/30 hover:bg-destructive/10"
+              onClick={() => setDeleteSeasonDialogOpen(true)}
+              title="ลบ Season นี้"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              ลบ Season
+            </Button>
+          )}
           {chapters.length > 0 && (
             <>
             <Button
