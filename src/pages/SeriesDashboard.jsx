@@ -4,9 +4,8 @@ import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { BookOpen, Layers, ChevronDown, ChevronUp, MoreVertical, ImagePlus, FolderOpen, BookMarked, FolderPlus, ArrowRightLeft, ArrowUp, ArrowDown, BookPlus, HardDrive } from "lucide-react";
+import { BookOpen, Layers, ChevronDown, ChevronUp, MoreVertical, ImagePlus, FolderOpen, BookMarked, FolderPlus, ArrowRightLeft, ArrowUp, ArrowDown, BookPlus } from "lucide-react";
 import ImportNovelDialog from "@/components/novel/ImportNovelDialog";
-import BackupDialog from "@/components/novel/BackupDialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -195,7 +194,6 @@ export default function SeriesDashboard() {
   const [seriesDialog, setSeriesDialog] = useState({ open: false, novel: null, selectedSeries: "", episodeNumber: "" });
   const [moveChapterDialog, setMoveChapterDialog] = useState({ open: false, chapter: null, targetNovelId: "" });
   const [importOpen, setImportOpen] = useState(false);
-  const [backupOpen, setBackupOpen] = useState(false);
 
   const updateNovelMutation = useMutation({
     mutationFn: ({ id, data }) => base44.entities.Novel.update(id, data),
@@ -383,10 +381,6 @@ export default function SeriesDashboard() {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" className="gap-2" onClick={() => setBackupOpen(true)}>
-              <HardDrive className="w-4 h-4" />
-              สำรองข้อมูล
-            </Button>
             <Button variant="outline" className="gap-2" onClick={() => setImportOpen(true)}>
               <BookPlus className="w-4 h-4" />
               นำเข้านิยาย
@@ -463,11 +457,6 @@ export default function SeriesDashboard() {
           </div>
         )}
       </div>
-
-      <BackupDialog
-        open={backupOpen}
-        onClose={() => setBackupOpen(false)}
-      />
 
       <ImportNovelDialog
         open={importOpen}
