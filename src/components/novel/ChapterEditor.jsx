@@ -15,6 +15,7 @@ import InlineDiffViewer from "./InlineDiffViewer";
 import HistoricalFactCheckPanel from "./HistoricalFactCheckPanel";
 import ChapterIllustrationPanel from "./ChapterIllustrationPanel";
 import ThaiProofreaderPanel from "./ThaiProofreaderPanel";
+import ThaiSpellCheckerDialog from "./ThaiSpellCheckerDialog";
 import { saveVersion } from "@/lib/saveVersion";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -66,6 +67,7 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
   const [factCheckOpen, setFactCheckOpen] = useState(false);
   const [illustrationOpen, setIllustrationOpen] = useState(false);
   const [proofreaderOpen, setProofreaderOpen] = useState(false);
+  const [spellCheckerOpen, setSpellCheckerOpen] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: plotEvents = [] } = useQuery({
@@ -301,6 +303,18 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
           title="ตรวจคำผิดและการเว้นวรรค"
         >
           <CheckCircle2 className="w-3.5 h-3.5" />
+          ตรวจวรรค
+        </Button>
+
+        {/* Spell Checker button */}
+        <Button
+          variant="outline"
+          size="sm"
+          className={`gap-1.5 h-8 text-xs border-blue-300 hover:bg-blue-50 ${spellCheckerOpen ? "bg-blue-100 text-blue-800" : "text-blue-700"}`}
+          onClick={() => setSpellCheckerOpen(true)}
+          title="ตรวจคำสะกดผิด คำพิมพ์ตก คำที่ใช้ผิดบริบท"
+        >
+          <Sparkles className="w-3.5 h-3.5" />
           ตรวจคำผิด
         </Button>
 
@@ -598,6 +612,18 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
           />
         </div>
       )}
+      
+      <ThaiSpellCheckerDialog
+        open={spellCheckerOpen}
+        onClose={() => setSpellCheckerOpen(false)}
+        content={content}
+        novel={novel}
+        onApplyChanges={(updatedContent) => {
+          setContent(updatedContent);
+          setAutoSaveStatus("saving");
+          debouncedAutoSave(updatedContent);
+        }}
+      />
       <div className="flex flex-1 overflow-hidden">
         {/* inline diff view — แทน textarea เมื่อมี diff */}
         {inlineDiff ? (
