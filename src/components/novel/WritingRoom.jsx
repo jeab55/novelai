@@ -156,6 +156,7 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
         <div>
           <h2 className="font-heading text-lg font-semibold">ห้องเขียน</h2>
           <p className="text-sm text-muted-foreground">
+            {novel?.title && <span className="text-primary/70 font-medium mr-1">{novel.title} · </span>}
             {chapters.length} ตอน · {chapters.reduce((acc, c) => acc + (c.word_count || 0), 0).toLocaleString()} คำ
           </p>
         </div>

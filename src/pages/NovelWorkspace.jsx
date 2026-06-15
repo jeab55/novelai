@@ -26,6 +26,7 @@ export default function NovelWorkspace() {
   const novelId = window.location.pathname.split("/novel/")[1]?.split("/")[0];
   const [activeTab, setActiveTab] = useState("characters");
   const [pendingOpenChapter, setPendingOpenChapter] = useState(null);
+  const [selectedEp, setSelectedEp] = useState(null); // EP ที่เลือกใน WritingRoom (null = EP ปัจจุบัน)
   const [deleteDialog, setDeleteDialog] = useState(false);
   const [shareDialog, setShareDialog] = useState(false);
   const [novelVersionOpen, setNovelVersionOpen] = useState(false);
@@ -238,7 +239,12 @@ export default function NovelWorkspace() {
         </div>
       </header>
 
-      <SeriesEpisodeNav novel={novel} currentNovelId={novelId} />
+      <SeriesEpisodeNav
+        novel={novel}
+        currentNovelId={novelId}
+        selectedEpId={selectedEp?.id || novelId}
+        onSelectEp={(ep) => { setSelectedEp(ep); setActiveTab("writing"); }}
+      />
 
       {/* เรื่องสั้น → ShortStoryWorkspace แบบ single-page */}
       {novel.novel_type === "เรื่องสั้น" ? (
@@ -273,7 +279,12 @@ export default function NovelWorkspace() {
 
         <div className="flex-1">
           <TabsContent value="writing" className="m-0 h-full">
-            <WritingRoom novelId={novelId} novel={novel} pendingOpenChapter={pendingOpenChapter} onPendingOpenChapterConsumed={() => setPendingOpenChapter(null)} />
+            <WritingRoom
+              novelId={selectedEp ? selectedEp.id : novelId}
+              novel={selectedEp || novel}
+              pendingOpenChapter={pendingOpenChapter}
+              onPendingOpenChapterConsumed={() => setPendingOpenChapter(null)}
+            />
           </TabsContent>
           <TabsContent value="characters" className="m-0">
             <CharacterBible novelId={novelId} novel={novel} />
