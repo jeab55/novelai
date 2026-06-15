@@ -233,7 +233,6 @@ export default function ImportNovelDialog({ open, onClose, novels = [], seriesLi
       
       setRawText(result.text);
       toast.success(`อ่านไฟล์สำเร็จ: ${result.character_count.toLocaleString()} ตัวอักษร`);
-      // เคลียร์ไฟล์ที่เลือกแล้วแต่ไม่ reset selectedFile เพื่อให้ user เห็นว่าอัพโหลดอะไรไป
       e.target.value = "";
     } catch (err) {
       console.error('File upload error:', err);
@@ -241,6 +240,14 @@ export default function ImportNovelDialog({ open, onClose, novels = [], seriesLi
       setRawText("");
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleFileUploaded = () => {
+    if (rawText.trim()) {
+      const result = detectAndSplit(rawText, customDelimiter);
+      setChapters(result);
+      setStep(1);
     }
   };
 
@@ -316,6 +323,15 @@ export default function ImportNovelDialog({ open, onClose, novels = [], seriesLi
                 <p className="text-xs text-muted-foreground mt-1">
                   {rawText.length > 0 ? `${rawText.length.toLocaleString()} ตัวอักษร` : "วางข้อความแล้วระบบจะแบ่งตอนให้อัตโนมัติ"}
                 </p>
+                {rawText.trim() && (
+                  <Button
+                    className="w-full gap-2 mt-2"
+                    onClick={handleFileUploaded}
+                  >
+                    <FileText className="w-4 h-4" />
+                    เริ่มนำเข้าไฟล์
+                  </Button>
+                )}
               </div>
               <div>
                 <label className="text-sm font-medium mb-1.5 block flex items-center gap-1.5">
