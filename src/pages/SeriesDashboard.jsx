@@ -4,8 +4,9 @@ import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { BookOpen, Layers, ChevronDown, ChevronUp, MoreVertical, ImagePlus, FolderOpen, BookMarked, FolderPlus, ArrowRightLeft, ArrowUp, ArrowDown, BookPlus } from "lucide-react";
+import { BookOpen, Layers, ChevronDown, ChevronUp, MoreVertical, ImagePlus, FolderOpen, BookMarked, FolderPlus, ArrowRightLeft, ArrowUp, ArrowDown, BookPlus, Plus } from "lucide-react";
 import ImportNovelDialog from "@/components/novel/ImportNovelDialog";
+import SeriesFormDialog from "@/components/series/SeriesFormDialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -194,6 +195,7 @@ export default function SeriesDashboard() {
   const [seriesDialog, setSeriesDialog] = useState({ open: false, novel: null, selectedSeries: "", episodeNumber: "" });
   const [moveChapterDialog, setMoveChapterDialog] = useState({ open: false, chapter: null, targetNovelId: "" });
   const [importOpen, setImportOpen] = useState(false);
+  const [createSeriesOpen, setCreateSeriesOpen] = useState(false);
 
   const updateNovelMutation = useMutation({
     mutationFn: ({ id, data }) => base44.entities.Novel.update(id, data),
@@ -381,6 +383,10 @@ export default function SeriesDashboard() {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <Button className="gap-2" variant="outline" onClick={() => setCreateSeriesOpen(true)}>
+              <Plus className="w-4 h-4" />
+              สร้างซีรีส์ใหม่
+            </Button>
             <Button className="gap-2 bg-primary hover:bg-primary/90" onClick={() => setImportOpen(true)}>
               <BookPlus className="w-4 h-4" />
               นำเข้านิยายจากไฟล์
@@ -463,6 +469,15 @@ export default function SeriesDashboard() {
         onClose={() => setImportOpen(false)}
         novels={novels}
         seriesList={seriesList}
+      />
+
+      <SeriesFormDialog
+        open={createSeriesOpen}
+        onClose={() => setCreateSeriesOpen(false)}
+        onSaved={() => {
+          queryClient.invalidateQueries({ queryKey: ["series-list"] });
+          setCreateSeriesOpen(false);
+        }}
       />
 
       <input
