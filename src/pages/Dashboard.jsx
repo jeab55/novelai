@@ -255,7 +255,7 @@ export default function Dashboard() {
         <main className="max-w-6xl mx-auto px-6 py-10">
           {/* Header Section */}
           <div className="bg-gradient-to-r from-primary/5 via-secondary/30 to-primary/5 border border-border/40 rounded-2xl p-6 mb-8">
-            <div className="flex items-center justify-between">
+            <div className="flex items-start justify-between mb-4">
               <div>
                 <h2 className="font-heading font-bold text-2xl text-foreground tracking-tight mb-1">ชั้นวางหนังสือ</h2>
                 {novels.length > 0 && (
@@ -264,32 +264,32 @@ export default function Dashboard() {
                   </p>
                 )}
               </div>
-              <div className="flex items-center gap-2">
-                <Button 
-                  variant="outline" 
-                  className="gap-2 font-body border-sky-300 text-sky-700 hover:bg-sky-50 dark:text-sky-400 dark:border-sky-800/40 dark:hover:bg-sky-950/20" 
-                  onClick={() => setShortStoryOpen(true)}
-                >
-                  <BookOpen className="w-4 h-4" />
-                  เรื่องสั้น AI
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className={`gap-2 font-body transition-all ${
-                    showOnlyCompleted 
-                      ? "bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800/40" 
-                      : "border-border"
-                  }`} 
-                  onClick={() => setShowOnlyCompleted(!showOnlyCompleted)}
-                >
-                  <Filter className="w-4 h-4" />
-                  {showOnlyCompleted ? "แสดงทั้งหมด" : "เขียนเสร็จแล้ว"}
-                </Button>
-                <Button className="gap-2 font-body shadow-sm" onClick={() => setOpen(true)}>
-                  <Plus className="w-4 h-4" />
-                  สร้างเรื่องใหม่
-                </Button>
-              </div>
+              <Button 
+                variant="outline" 
+                className="gap-2 font-body border-sky-300 text-sky-700 hover:bg-sky-50 dark:text-sky-400 dark:border-sky-800/40 dark:hover:bg-sky-950/20" 
+                onClick={() => setShortStoryOpen(true)}
+              >
+                <BookOpen className="w-4 h-4" />
+                เรื่องสั้น AI
+              </Button>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button 
+                variant="outline" 
+                className={`gap-2 font-body transition-all ${
+                  showOnlyCompleted 
+                    ? "bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800/40" 
+                    : "border-border"
+                }`} 
+                onClick={() => setShowOnlyCompleted(!showOnlyCompleted)}
+              >
+                <Filter className="w-4 h-4" />
+                {showOnlyCompleted ? "แสดงทั้งหมด" : "เขียนเสร็จแล้ว"}
+              </Button>
+              <Button className="gap-2 font-body shadow-sm" onClick={() => setOpen(true)}>
+                <Plus className="w-4 h-4" />
+                สร้างเรื่องใหม่
+              </Button>
             </div>
           </div>
 
