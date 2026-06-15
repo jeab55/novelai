@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription
 } from "@/components/ui/dialog";
@@ -8,19 +8,20 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Sparkles, Users, Plus, Check, ChevronRight } from "lucide-react";
+import { Loader2, Sparkles, Users, Plus, Check, ChevronRight, Save, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 
 export default function NewEpisodeDialog({ open, onClose, novel }) {
-  const [step, setStep] = useState(1); // 1=setup, 2=characters, 3=creating
+  const [step, setStep] = useState(1); // 1=setup, 2=characters, 3=confirm
   const [epTitle, setEpTitle] = useState("");
   const [epSynopsis, setEpSynopsis] = useState("");
-  const [newCharacterHints, setNewCharacterHints] = useState("");
-  const [inheritedChars, setInheritedChars] = useState([]); // ตัวละครที่เลือกนำข้ามมา
-  const [aiNewChars, setAiNewChars] = useState([]); // ตัวละครใหม่ที่ AI สร้าง
+  const [inheritedChars, setInheritedChars] = useState([]);
+  const [aiNewChars, setAiNewChars] = useState([]);
   const [generatingChars, setGeneratingChars] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [generatingEp, setGeneratingEp] = useState(false);
+  const [epGenerated, setEpGenerated] = useState(false);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -55,11 +56,36 @@ export default function NewEpisodeDialog({ open, onClose, novel }) {
     );
   }
 
+  async function handleGenerateEp() {
+    setGeneratingEp(true);
+    const writerCtx = writer?.system_prompt
+      ? `[สไตล์และโทนการเขียน]\n${writer.system_prompt}\n\n`
+      : "";
+    const charSummary = existingChars.map((c) => `${c.name} (${c.role})`).join(", ");
+
+    const result = await base44.integrations.Core.InvokeLLM({
+      prompt: `${writerCtx}คุณเป็นนักเขียนนิยาย ต้องการสร้างข้อมูลสำหรับ EP ถัดไปของนิยาย
+ชื่อนิยาย: ${novel?.title}
+แนว: ${novel?.genre || ""}
+เรื่องย่อนิยาย: ${novel?.synopsis || ""}
+ตัวละครหลักที่มีอยู่: ${charSummary || "(ยังไม่มี)"}
+
+กรุณาสร้างชื่อ EP และเรื่องย่อสำหรับ EP ถัดไปที่ต่อเนื่องจากนิยายนี้ ให้สอดคล้องกับสไตล์การเขียนและแนวนิยาย`,
+      response_json_schema: {
+        type: "object",
+        properties: {
+          title: { type: "string" },
+          synopsis: { type: "string" },
+        },
+      },
+    });
+    setEpTitle(result.title || "");
+    setEpSynopsis(result.synopsis || "");
+    setEpGenerated(true);
+    setGeneratingEp(false);
+  }
+
   async function handleGenerateNewChars() {
-    if (!epSynopsis.trim()) {
-      toast.error("กรุณากรอกเนื้อเรื่องย่อก่อน");
-      return;
-    }
     setGeneratingChars(true);
     const selectedChars = existingChars.filter((c) => inheritedChars.includes(c.id));
     const charSummary = selectedChars.map((c) => `${c.name} (${c.role}) — ${c.personality || ""}`).join("\n");
@@ -67,20 +93,16 @@ export default function NewEpisodeDialog({ open, onClose, novel }) {
       ? `[สไตล์และโทนการเขียน]\n${writer.system_prompt}\n\n`
       : "";
 
-    const prompt = `${writerCtx}คุณเป็นนักเขียนนิยาย ต้องการสร้างตัวละครใหม่สำหรับ EP ต่อไปของนิยาย
+    const result = await base44.integrations.Core.InvokeLLM({
+      prompt: `${writerCtx}คุณเป็นนักเขียนนิยาย ต้องการสร้างตัวละครใหม่สำหรับ EP ต่อไปของนิยาย
 ชื่อนิยาย: ${novel?.title}
 แนว: ${novel?.genre || ""}
 EP ใหม่ชื่อ: "${epTitle}"
 เนื้อเรื่องย่อ EP ใหม่: ${epSynopsis}
 ตัวละครเดิมที่มีอยู่: 
 ${charSummary || "(ยังไม่มี)"}
-${newCharacterHints ? `คำแนะนำพิเศษ: ${newCharacterHints}` : ""}
 
-กรุณาสร้างตัวละครใหม่ที่จำเป็นสำหรับพล็อตของ EP นี้ (2-4 ตัว) ที่ไม่ซ้ำกับตัวละครเดิม
-ตัวละครใหม่ต้องสมเหตุสมผลกับเนื้อเรื่องและสอดคล้องกับสไตล์การเขียน
-    `;
-    const result = await base44.integrations.Core.InvokeLLM({
-      prompt,
+กรุณาสร้างตัวละครใหม่ที่จำเป็นสำหรับพล็อตของ EP นี้ (2-4 ตัว) ที่ไม่ซ้ำกับตัวละครเดิม`,
       response_json_schema: {
         type: "object",
         properties: {
@@ -186,9 +208,9 @@ ${newCharacterHints ? `คำแนะนำพิเศษ: ${newCharacterHints
     setStep(1);
     setEpTitle("");
     setEpSynopsis("");
-    setNewCharacterHints("");
     setAiNewChars([]);
     setInheritedChars([]);
+    setEpGenerated(false);
     onClose();
   }
 
@@ -230,31 +252,68 @@ ${newCharacterHints ? `คำแนะนำพิเศษ: ${newCharacterHints
           {/* Step 1: กำหนด EP */}
           {step === 1 && (
             <div className="space-y-4">
-              <div>
-                <label className="text-sm font-medium mb-1.5 block">ชื่อ EP ใหม่ <span className="text-destructive">*</span></label>
-                <Input
-                  placeholder="เช่น ฤดูใบไม้ร่วงแห่งความรัก EP.2"
-                  value={epTitle}
-                  onChange={(e) => setEpTitle(e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-1.5 block">เนื้อเรื่องย่อ EP ใหม่</label>
-                <Textarea
-                  placeholder="บอกเล่าเนื้อเรื่องคร่าวๆ ของ EP ใหม่นี้ เพื่อให้ AI ช่วยสร้างตัวละครใหม่ที่เหมาะสม..."
-                  value={epSynopsis}
-                  onChange={(e) => setEpSynopsis(e.target.value)}
-                  className="h-28 resize-none"
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-1.5 block text-muted-foreground">คำแนะนำสำหรับตัวละครใหม่ (ไม่บังคับ)</label>
-                <Input
-                  placeholder="เช่น ต้องการตัวร้ายใหม่ เป็นพ่อค้า, ผู้ช่วยนางเอกจากต่างเมือง..."
-                  value={newCharacterHints}
-                  onChange={(e) => setNewCharacterHints(e.target.value)}
-                />
-              </div>
+              {!epGenerated ? (
+                <div className="flex flex-col items-center justify-center py-10 gap-4 text-center">
+                  <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center">
+                    <Sparkles className="w-7 h-7 text-primary" />
+                  </div>
+                  <div>
+                    <p className="font-heading font-semibold text-base mb-1">ให้ AI สร้างข้อมูล EP ใหม่</p>
+                    <p className="text-sm text-muted-foreground">
+                      AI จะใช้สไตล์ของ{writer ? <span className="text-primary font-medium"> {writer.name}</span> : "นักเขียน AI ที่เลือกไว้"}<br />
+                      สร้างชื่อ EP และเรื่องย่อที่ต่อเนื่องจาก "{novel?.title}" อัตโนมัติ
+                    </p>
+                  </div>
+                  <Button
+                    onClick={handleGenerateEp}
+                    disabled={generatingEp}
+                    size="lg"
+                    className="gap-2 px-8 mt-2"
+                  >
+                    {generatingEp
+                      ? <><Loader2 className="w-4 h-4 animate-spin" />กำลังสร้าง EP...</>
+                      : <><Sparkles className="w-4 h-4" />สร้าง EP ใหม่</>}
+                  </Button>
+                  {!writer && (
+                    <p className="text-xs text-muted-foreground/70">
+                      💡 เลือก AI Writer ให้นิยายนี้เพื่อให้ผลลัพธ์ดียิ่งขึ้น
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium text-muted-foreground">แก้ไขข้อมูลได้ตามต้องการ</p>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="gap-1.5 text-xs h-7 text-muted-foreground"
+                      onClick={handleGenerateEp}
+                      disabled={generatingEp}
+                    >
+                      {generatingEp ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                      สร้างใหม่
+                    </Button>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-1.5 block">ชื่อ EP ใหม่ <span className="text-destructive">*</span></label>
+                    <Input
+                      placeholder="เช่น ฤดูใบไม้ร่วงแห่งความรัก EP.2"
+                      value={epTitle}
+                      onChange={(e) => setEpTitle(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-1.5 block">เนื้อเรื่องย่อ EP ใหม่</label>
+                    <Textarea
+                      placeholder="เรื่องย่อของ EP นี้..."
+                      value={epSynopsis}
+                      onChange={(e) => setEpSynopsis(e.target.value)}
+                      className="h-32 resize-none"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -384,32 +443,43 @@ ${newCharacterHints ? `คำแนะนำพิเศษ: ${newCharacterHints
         </div>
 
         {/* Footer buttons */}
-        <div className="px-6 py-4 border-t border-border/40 shrink-0 flex justify-between gap-3">
-          <Button variant="outline" onClick={step === 1 ? handleClose : () => setStep(s => s - 1)}>
-            {step === 1 ? "ยกเลิก" : "ย้อนกลับ"}
-          </Button>
-          <div className="flex gap-2">
-            {step < 3 && (
-              <Button
-                onClick={() => setStep(s => s + 1)}
-                disabled={step === 1 && !epTitle.trim()}
-              >
-                ถัดไป <ChevronRight className="w-4 h-4 ml-1" />
-              </Button>
-            )}
-            {step === 3 && (
-              <Button variant="secondary" onClick={() => setStep(2)}>
-                ถัดไป <ChevronRight className="w-4 h-4 ml-1" />
-              </Button>
-            )}
-            {step === 3 && (
-              <Button onClick={handleCreate} disabled={creating} className="gap-2">
-                {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                ตกลง
-              </Button>
-            )}
-          </div>
-        </div>
+         <div className="px-6 py-4 border-t border-border/40 shrink-0 flex justify-between gap-3">
+           <Button variant="outline" onClick={step === 1 ? handleClose : () => setStep(s => s - 1)}>
+             {step === 1 ? "ยกเลิก" : "ย้อนกลับ"}
+           </Button>
+           <div className="flex gap-2">
+             {step === 1 && epGenerated && (
+               <>
+                 <Button
+                   variant="outline"
+                   className="gap-1.5"
+                   onClick={() => toast.success("บันทึกข้อมูลแล้ว")}
+                   disabled={!epTitle.trim()}
+                 >
+                   <Save className="w-4 h-4" />
+                   บันทึก
+                 </Button>
+                 <Button
+                   onClick={() => setStep(2)}
+                   disabled={!epTitle.trim()}
+                 >
+                   ถัดไป <ChevronRight className="w-4 h-4 ml-1" />
+                 </Button>
+               </>
+             )}
+             {step === 2 && (
+               <Button onClick={() => setStep(3)}>
+                 ถัดไป <ChevronRight className="w-4 h-4 ml-1" />
+               </Button>
+             )}
+             {step === 3 && (
+               <Button onClick={handleCreate} disabled={creating} className="gap-2">
+                 {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                 ตกลง สร้าง EP
+               </Button>
+             )}
+           </div>
+         </div>
       </DialogContent>
     </Dialog>
   );
