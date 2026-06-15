@@ -4,7 +4,7 @@ import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { BookOpen, Layers, ChevronDown, ChevronUp, MoreVertical, ImagePlus, FolderOpen, BookMarked, FolderPlus, Hash } from "lucide-react";
+import { BookOpen, Layers, ChevronDown, ChevronUp, MoreVertical, ImagePlus, FolderOpen, BookMarked, FolderPlus, ArrowRightLeft } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -29,7 +29,7 @@ const genreColors = {
 
 
 
-function NovelCard({ novel, chapters, uploadingFor, onUploadClick, seriesList, onMoveToSeries }) {
+function NovelCard({ novel, chapters, uploadingFor, onUploadClick, seriesList, onMoveToSeries, onMoveChapter }) {
   const [isOpen, setIsOpen] = useState(false);
   const [readerStartIdx, setReaderStartIdx] = useState(null);
   const gradient = genreColors[novel.genre] || "from-gray-400 to-slate-500";
@@ -129,20 +129,28 @@ function NovelCard({ novel, chapters, uploadingFor, onUploadClick, seriesList, o
                   <p className="text-xs text-muted-foreground text-center py-4">ยังไม่มีตอน</p>
                 ) : (
                   novelChapters.map((ch, chIdx) => (
-                    <button
-                      key={ch.id}
-                      onClick={() => setReaderStartIdx(chIdx)}
-                      className="w-full flex items-center gap-2.5 px-2 py-2.5 rounded-lg hover:bg-accent/70 transition-colors text-left group"
-                    >
-                      <span className="w-6 h-6 rounded-md bg-primary/10 text-primary text-xs font-bold flex items-center justify-center shrink-0">
-                        {ch.order || chIdx + 1}
-                      </span>
-                      <span className="flex-1 text-sm truncate group-hover:text-primary transition-colors">{ch.title}</span>
-                      {ch.word_count > 0 && (
-                        <span className="text-xs text-muted-foreground shrink-0">{ch.word_count.toLocaleString()} คำ</span>
-                      )}
-                      <BookOpen className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
-                    </button>
+                    <div key={ch.id} className="flex items-center gap-1 group/row">
+                      <button
+                        onClick={() => setReaderStartIdx(chIdx)}
+                        className="flex-1 flex items-center gap-2.5 px-2 py-2.5 rounded-lg hover:bg-accent/70 transition-colors text-left group min-w-0"
+                      >
+                        <span className="w-6 h-6 rounded-md bg-primary/10 text-primary text-xs font-bold flex items-center justify-center shrink-0">
+                          {ch.order || chIdx + 1}
+                        </span>
+                        <span className="flex-1 text-sm truncate group-hover:text-primary transition-colors">{ch.title}</span>
+                        {ch.word_count > 0 && (
+                          <span className="text-xs text-muted-foreground shrink-0">{ch.word_count.toLocaleString()} คำ</span>
+                        )}
+                        <BookOpen className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
+                      </button>
+                      <button
+                        onClick={() => onMoveChapter(ch)}
+                        title="ย้ายตอนนี้ไปนิยายเรื่องอื่น"
+                        className="opacity-0 group-hover/row:opacity-100 transition-opacity p-1.5 rounded-md hover:bg-primary/10 text-muted-foreground hover:text-primary shrink-0"
+                      >
+                        <ArrowRightLeft className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   ))
                 )}
               </div>
@@ -165,6 +173,7 @@ export default function SeriesDashboard() {
   const coverInputRef = useRef(null);
   const [uploadingFor, setUploadingFor] = useState(null);
   const [seriesDialog, setSeriesDialog] = useState({ open: false, novel: null, selectedSeries: "", episodeNumber: "" });
+  const [moveChapterDialog, setMoveChapterDialog] = useState({ open: false, chapter: null, targetNovelId: "" });
 
   const updateNovelMutation = useMutation({
     mutationFn: ({ id, data }) => base44.entities.Novel.update(id, data),
@@ -214,6 +223,24 @@ export default function SeriesDashboard() {
 
   const handleMoveToSeries = (novel) => {
     setSeriesDialog({ open: true, novel, selectedSeries: novel.series_id || "__none__", episodeNumber: novel.episode_number?.toString() || "" });
+  };
+
+  const updateChapterMutation = useMutation({
+    mutationFn: ({ id, data }) => base44.entities.Chapter.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["chapters-all"] });
+    },
+  });
+
+  const handleMoveChapter = (chapter) => {
+    setMoveChapterDialog({ open: true, chapter, targetNovelId: "" });
+  };
+
+  const confirmMoveChapter = async () => {
+    if (!moveChapterDialog.targetNovelId) return;
+    await updateChapterMutation.mutateAsync({ id: moveChapterDialog.chapter.id, data: { novel_id: moveChapterDialog.targetNovelId } });
+    toast.success(`ย้ายตอน "${moveChapterDialog.chapter.title}" เรียบร้อยแล้ว`);
+    setMoveChapterDialog({ open: false, chapter: null, targetNovelId: "" });
   };
 
   const confirmMoveSeries = async () => {
@@ -277,6 +304,32 @@ export default function SeriesDashboard() {
       </DialogContent>
     </Dialog>
 
+    {/* Move Chapter Dialog */}
+    <Dialog open={moveChapterDialog.open} onOpenChange={(v) => !v && setMoveChapterDialog({ open: false, chapter: null, targetNovelId: "" })}>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="font-heading">ย้ายตอนไปนิยายเรื่องอื่น</DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-muted-foreground mb-3">
+          ย้าย <span className="font-medium text-foreground">"{moveChapterDialog.chapter?.title}"</span> ไปไว้ในนิยาย:
+        </p>
+        <Select value={moveChapterDialog.targetNovelId} onValueChange={(v) => setMoveChapterDialog((d) => ({ ...d, targetNovelId: v }))}>
+          <SelectTrigger><SelectValue placeholder="เลือกนิยายปลายทาง" /></SelectTrigger>
+          <SelectContent>
+            {novels
+              .filter((n) => String(n.id) !== String(moveChapterDialog.chapter?.novel_id))
+              .map((n) => (
+                <SelectItem key={n.id} value={n.id}>{n.title}</SelectItem>
+              ))}
+          </SelectContent>
+        </Select>
+        <div className="flex gap-2 mt-4">
+          <Button variant="outline" className="flex-1" onClick={() => setMoveChapterDialog({ open: false, chapter: null, targetNovelId: "" })}>ยกเลิก</Button>
+          <Button className="flex-1" onClick={confirmMoveChapter} disabled={!moveChapterDialog.targetNovelId || updateChapterMutation.isPending}>ย้าย</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+
     <AppLayout>
       <div className="max-w-6xl mx-auto px-6 py-10">
         <div className="flex items-center justify-between mb-8">
@@ -330,7 +383,7 @@ export default function SeriesDashboard() {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                   {sNovels.map((novel) => (
-                    <NovelCard key={novel.id} novel={novel} chapters={chapters} uploadingFor={uploadingFor} onUploadClick={handleUploadClick} seriesList={seriesList} onMoveToSeries={handleMoveToSeries} />
+                    <NovelCard key={novel.id} novel={novel} chapters={chapters} uploadingFor={uploadingFor} onUploadClick={handleUploadClick} seriesList={seriesList} onMoveToSeries={handleMoveToSeries} onMoveChapter={handleMoveChapter} />
                   ))}
                 </div>
               </motion.div>
@@ -349,7 +402,7 @@ export default function SeriesDashboard() {
                 )}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                   {novelsWithoutSeries.map((novel) => (
-                    <NovelCard key={novel.id} novel={novel} chapters={chapters} uploadingFor={uploadingFor} onUploadClick={handleUploadClick} seriesList={seriesList} onMoveToSeries={handleMoveToSeries} />
+                    <NovelCard key={novel.id} novel={novel} chapters={chapters} uploadingFor={uploadingFor} onUploadClick={handleUploadClick} seriesList={seriesList} onMoveToSeries={handleMoveToSeries} onMoveChapter={handleMoveChapter} />
                   ))}
                 </div>
               </motion.div>
