@@ -303,6 +303,14 @@ export default function ImportNovelDialog({ open, onClose, novels = [], seriesLi
                   <p className="text-xs text-muted-foreground mt-1">
                     รองรับ: TXT, MD, DOCX, PDF (สูงสุด 5MB)
                   </p>
+                  {uploading && (
+                    <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                      <div className="flex items-center gap-2 text-sm text-blue-700 dark:text-blue-300">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>กำลังอ่านไฟล์...</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="relative">
@@ -321,29 +329,29 @@ export default function ImportNovelDialog({ open, onClose, novels = [], seriesLi
                   className={`min-h-[200px] font-mono text-sm resize-none ${rawText.trim() ? 'border-primary/50 ring-2 ring-primary/20' : ''}`}
                   readOnly={false}
                 />
-                {rawText.trim() && (
-                  <div className="mt-3 p-3 bg-primary/5 rounded-lg border border-primary/20">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-primary" />
-                        <span className="text-sm font-medium text-primary">อ่านไฟล์สำเร็จ</span>
+                {rawText.trim() && !uploading && (
+                  <div className="mt-3 space-y-3">
+                    <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400" />
+                          <span className="text-sm font-medium text-green-700 dark:text-green-400">อ่านไฟล์สำเร็จ</span>
+                        </div>
+                        <span className="text-xs text-muted-foreground">{rawText.length.toLocaleString()} ตัวอักษร</span>
                       </div>
-                      <span className="text-xs text-muted-foreground">{rawText.length.toLocaleString()} ตัวอักษร</span>
+                      <div className="text-xs text-muted-foreground line-clamp-3 whitespace-pre-line">
+                        {rawText.slice(0, 300)}...
+                      </div>
                     </div>
-                    <div className="text-xs text-muted-foreground line-clamp-3 whitespace-pre-line">
-                      {rawText.slice(0, 300)}...
-                    </div>
+                    <Button
+                      className="w-full gap-2"
+                      onClick={handleFileUploaded}
+                      size="lg"
+                    >
+                      <FileText className="w-4 h-4" />
+                      เริ่มประมวลผลและแบ่งตอน
+                    </Button>
                   </div>
-                )}
-                {rawText.trim() && (
-                  <Button
-                    className="w-full gap-2 mt-3"
-                    onClick={handleFileUploaded}
-                    size="lg"
-                  >
-                    <FileText className="w-4 h-4" />
-                    แบ่งตอนและดำเนินการนำเข้า
-                  </Button>
                 )}
               </div>
               <div>
