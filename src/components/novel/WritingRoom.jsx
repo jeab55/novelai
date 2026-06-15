@@ -260,7 +260,7 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
             onClick={() => setSeasonSelectorOpen(true)}
           >
             <Layers className="w-3.5 h-3.5" />
-            Season
+            สร้าง Season ใหม่
           </Button>
           <Button
             variant="outline"
@@ -284,9 +284,13 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
           {seasonSelectorOpen && (
             <SeasonSelectorDialog
               open={true}
-              onClose={() => setSeasonSelectorOpen(false)}
-              novelId={novelId}
-              onSeasonSelected={(season) => {
+              onClose={() => {
+                setSeasonSelectorOpen(false);
+                queryClient.invalidateQueries({ queryKey: ["seasons", novel?.id] });
+                queryClient.invalidateQueries({ queryKey: ["episodes", novel?.series_id] });
+              }}
+              novel={novel}
+              onSeasonChange={(season) => {
                 // Navigate to the selected season
                 window.location.href = `/novel/${season.id}`;
               }}
