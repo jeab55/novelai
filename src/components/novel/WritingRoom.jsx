@@ -124,6 +124,15 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
     },
   });
 
+  const updateChapterStatus = useMutation({
+    mutationFn: ({ id, status }) => base44.entities.Chapter.update(id, { status }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["chapters", selectedEpisodeTab] });
+    },
+  });
+
+  const statuses = ["ร่าง", "เขียนเสร็จ", "เผยแพร่"];
+
   if (selectedChapter) {
     return (
       <ChapterEditor
@@ -358,9 +367,24 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
                     )}
                   </p>
                 </div>
-                <Badge className={`${statusColors[ch.status] || statusColors["ร่าง"]} text-xs font-medium px-2.5 py-0.5 rounded-full`}>
-                  {ch.status || "ร่าง"}
-                </Badge>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                    <Badge className={`${statusColors[ch.status] || statusColors["ร่าง"]} text-xs font-medium px-2.5 py-0.5 rounded-full cursor-pointer hover:opacity-80 transition-opacity`}>
+                      {ch.status || "ร่าง"}
+                    </Badge>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                    {statuses.filter((s) => s !== (ch.status || "ร่าง")).map((s) => (
+                      <DropdownMenuItem
+                        key={s}
+                        onClick={() => updateChapterStatus.mutate({ id: ch.id, status: s })}
+                      >
+                        <Badge className={`${statusColors[s]} text-xs mr-2`}>{s}</Badge>
+                        เปลี่ยนเป็น {s}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
                 <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-all shrink-0">
                   {chaptersWithReaderReviews.has(ch.id) && (
                     <Button
