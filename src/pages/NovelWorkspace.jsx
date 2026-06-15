@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Feather, PenTool, Users, Globe, Clock, Bot, Trash2, Share2, History, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Feather, PenTool, Users, Globe, Clock, Bot, Trash2, Share2, History, CheckCircle2, BookOpen } from "lucide-react";
 import VersionHistoryDialog from "@/components/novel/VersionHistoryDialog";
 import { saveVersion } from "@/lib/saveVersion";
 import { useNavigate } from "react-router-dom";
@@ -24,6 +24,7 @@ import ShortStoryWorkspace from "@/components/novel/ShortStoryWorkspace";
 export default function NovelWorkspace() {
   const novelId = window.location.pathname.split("/novel/")[1]?.split("/")[0];
   const [activeTab, setActiveTab] = useState("characters");
+  const [selectedEpisodeId, setSelectedEpisodeId] = useState(null);
   const [pendingOpenChapter, setPendingOpenChapter] = useState(null);
   const [deleteDialog, setDeleteDialog] = useState(false);
   const [shareDialog, setShareDialog] = useState(false);
@@ -43,20 +44,36 @@ export default function NovelWorkspace() {
     enabled: !!novelId,
   });
 
-  // โหลดจำนวนตอนที่เขียนเสร็จ
-  const { data: chapters } = useQuery({
-    queryKey: ["chapters", novelId],
+  // โหลดทุก EP ในซีรีย์เดียวกัน (Novels ที่มี series_id เดียวกัน)
+  const { data: episodes = [] } = useQuery({
+    queryKey: ["episodes", novel?.series_id],
     queryFn: async () => {
-      const all = await base44.entities.Chapter.filter({ novel_id: novelId }, "order");
+      if (!novel?.series_id) return [novel].filter(Boolean);
+      const all = await base44.entities.Novel.list();
+      return all
+        .filter((n) => String(n.series_id) === String(novel.series_id) && !n.is_deleted)
+        .sort((a, b) => (a.created_date || "").localeCompare(b.created_date || ""));
+    },
+    enabled: !!novel,
+  });
+
+  // ถ้ามีหลาย EP ให้ใช้ selectedEpisodeId ถ้าไม่มีให้ใช้ novelId
+  const activeNovelId = selectedEpisodeId || novelId;
+
+  // โหลดจำนวนตอนที่เขียนเสร็จ — ใช้ activeNovelId
+  const { data: chapters } = useQuery({
+    queryKey: ["chapters", activeNovelId],
+    queryFn: async () => {
+      const all = await base44.entities.Chapter.filter({ novel_id: activeNovelId }, "order");
       return all.filter((c) => !c.is_deleted).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
     },
-    enabled: !!novelId && !!novel,
+    enabled: !!activeNovelId && !!novel,
   });
 
   const completedCount = chapters?.filter(c => c.status === "เขียนเสร็จ").length || 0;
   const targetCount = novel?.target_chapters || 0;
   const progressPct = targetCount > 0 ? Math.round((completedCount / targetCount) * 100) : 0;
-  const isBulkWriting = jobs[novelId]?.status === "running";
+  const isBulkWriting = jobs[activeNovelId]?.status === "running";
 
   const { data: novelWriter } = useQuery({
     queryKey: ["writers-all"],
@@ -162,9 +179,25 @@ export default function NovelWorkspace() {
               <Feather className="w-4 h-4 text-primary" />
             </div>
             <div className="min-w-0 flex-1">
+              {/* EP Selector Tabs */}
+              {episodes.length > 1 && (
+                <div className="flex items-center gap-1 mb-2 overflow-x-auto">
+                  {episodes.map((ep, idx) => (
+                    <Button
+                      key={ep.id}
+                      variant={String(ep.id) === String(activeNovelId) ? "default" : "outline"}
+                      size="sm"
+                      className="h-7 text-xs shrink-0"
+                      onClick={() => setSelectedEpisodeId(ep.id)}
+                    >
+                      EP{idx + 1}: {ep.title?.slice(0, 20)}{ep.title?.length > 20 ? "..." : ""}
+                    </Button>
+                  ))}
+                </div>
+              )}
               <div className="flex items-center gap-2">
                 <h1 className="font-heading font-semibold text-base truncate">{novel.title}</h1>
-                {(novel.auto_written || (jobs[novelId]?.status === "done")) && (
+                {(novel.auto_written || (jobs[activeNovelId]?.status === "done")) && (
                   <span className="inline-flex items-center gap-1 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-500/30 shadow-sm shrink-0">
                     <CheckCircle2 className="w-2.5 h-2.5 text-emerald-500" />
                     สร้างเสร็จ
@@ -270,21 +303,21 @@ export default function NovelWorkspace() {
 
         <div className="flex-1">
           <TabsContent value="writing" className="m-0 h-full">
-            <WritingRoom novelId={novelId} novel={novel} pendingOpenChapter={pendingOpenChapter} onPendingOpenChapterConsumed={() => setPendingOpenChapter(null)} />
+            <WritingRoom novelId={activeNovelId} novel={novel} pendingOpenChapter={pendingOpenChapter} onPendingOpenChapterConsumed={() => setPendingOpenChapter(null)} />
           </TabsContent>
           <TabsContent value="characters" className="m-0">
-            <CharacterBible novelId={novelId} novel={novel} />
+            <CharacterBible novelId={activeNovelId} novel={novel} />
           </TabsContent>
           <TabsContent value="world" className="m-0">
             <WorldBible
-              novelId={novelId}
+              novelId={activeNovelId}
               onNavigateToTimeline={(eventId) => setActiveTab("timeline")}
               novel={novel}
             />
           </TabsContent>
           <TabsContent value="timeline" className="m-0">
             <Timeline
-              novelId={novelId}
+              novelId={activeNovelId}
               novel={novel}
               onOpenChapter={(ch) => { setPendingOpenChapter(ch); setActiveTab("writing"); }}
               onNavigateToWorldBible={() => setActiveTab("world")}
