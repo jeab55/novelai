@@ -4,7 +4,8 @@ import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { BookOpen, Layers, ChevronDown, ChevronUp, MoreVertical, ImagePlus, FolderOpen, BookMarked, FolderPlus, ArrowRightLeft, ArrowUp, ArrowDown } from "lucide-react";
+import { BookOpen, Layers, ChevronDown, ChevronUp, MoreVertical, ImagePlus, FolderOpen, BookMarked, FolderPlus, ArrowRightLeft, ArrowUp, ArrowDown, BookPlus } from "lucide-react";
+import ImportNovelDialog from "@/components/novel/ImportNovelDialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -192,6 +193,7 @@ export default function SeriesDashboard() {
   const [uploadingFor, setUploadingFor] = useState(null);
   const [seriesDialog, setSeriesDialog] = useState({ open: false, novel: null, selectedSeries: "", episodeNumber: "" });
   const [moveChapterDialog, setMoveChapterDialog] = useState({ open: false, chapter: null, targetNovelId: "" });
+  const [importOpen, setImportOpen] = useState(false);
 
   const updateNovelMutation = useMutation({
     mutationFn: ({ id, data }) => base44.entities.Novel.update(id, data),
@@ -378,12 +380,18 @@ export default function SeriesDashboard() {
               {novels.length > 0 ? `${novels.length} เรื่อง · คลิกที่การ์ดเพื่อดูตอน` : "ยังไม่มีนิยาย"}
             </p>
           </div>
-          <Link to="/">
-            <Button variant="outline" className="gap-2">
-              <BookOpen className="w-4 h-4" />
-              จัดการนิยาย
+          <div className="flex items-center gap-2">
+            <Button variant="outline" className="gap-2" onClick={() => setImportOpen(true)}>
+              <BookPlus className="w-4 h-4" />
+              นำเข้านิยาย
             </Button>
-          </Link>
+            <Link to="/">
+              <Button variant="outline" className="gap-2">
+                <BookOpen className="w-4 h-4" />
+                จัดการนิยาย
+              </Button>
+            </Link>
+          </div>
         </div>
 
         {isLoading ? (
@@ -449,6 +457,13 @@ export default function SeriesDashboard() {
           </div>
         )}
       </div>
+
+      <ImportNovelDialog
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        novels={novels}
+        seriesList={seriesList}
+      />
 
       <input
         ref={coverInputRef}
