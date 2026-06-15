@@ -6,9 +6,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Plus, X, Sparkles, Loader2, ChevronDown, ChevronUp, Check, Users, BookOpen, Feather } from "lucide-react";
+import { Plus, X, Sparkles, Loader2, ChevronDown, ChevronUp, Check, Users, BookOpen, Feather, Library } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { toast } from "sonner";
+import SeasonSelectorDialog from "./SeasonSelectorDialog";
 
 const GENRES = ["โรแมนติก", "แฟนตาซี", "อิงประวัติศาสตร์", "จีนย้อนยุค", "วาย", "สยองขวัญ", "ลึกลับ", "แอ็คชั่น", "ดราม่า", "อื่นๆ"];
 const CHAR_ROLES = ["ตัวเอก", "ตัวรอง", "ตัวร้าย", "ตัวประกอบ"];
@@ -163,7 +164,8 @@ function Stepper({ currentStep }) {
 function Step1({ form, setForm, chars, activeWriters }) {
   const [drafting, setDrafting] = useState(false);
   const [draftError, setDraftError] = useState("");
-  const [confirmMode, setConfirmMode] = useState(false); // pending overwrite confirm
+  const [confirmMode, setConfirmMode] = useState(false);
+  const [seasonSelectorOpen, setSeasonSelectorOpen] = useState(false);
 
   const handleDraftSynopsis = async (append = false) => {
     setConfirmMode(false);
@@ -225,40 +227,68 @@ function Step1({ form, setForm, chars, activeWriters }) {
   return (
     <div className="space-y-4">
       {/* ประเภทงาน */}
-      <div>
-        <label className="text-sm font-medium mb-2 block">ประเภทงาน <span className="text-destructive">*</span></label>
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={() => setForm({ ...form, novel_type: "นิยายยาว", target_chapters: "10", word_count_target: "1500" })}
-            className={`flex flex-col items-start gap-1.5 rounded-xl border px-4 py-3 text-left transition-all ${
-              !isOneShot ? "border-primary bg-primary/5 ring-1 ring-primary/20" : "border-border/60 hover:border-primary/30 hover:bg-muted/30"
-            }`}
-          >
-            <div className="flex items-center gap-2">
-              <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${!isOneShot ? "border-primary bg-primary" : "border-muted-foreground/30"}`}>
-                {!isOneShot && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+      <div className="space-y-3">
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full gap-2 border-dashed"
+          onClick={() => setSeasonSelectorOpen(true)}
+        >
+          <Library className="w-4 h-4" />
+          {form.parent_novel_id ? `Season ${form.season_number || 2}: กำลังสร้างภาคต่อ` : "สร้าง Season ใหม่ (ภาคต่อ)"}
+        </Button>
+        {seasonSelectorOpen && (
+          <SeasonSelectorDialog
+            open={true}
+            onClose={() => setSeasonSelectorOpen(false)}
+            novelId={form.parent_novel_id || activeWriters?.[0]?.id}
+            onSeasonSelected={(season) => {
+              setForm({ 
+                ...form, 
+                parent_novel_id: season.parent_novel_id || season.id,
+                season_number: (season.season_number || 1) + 1,
+                writer_id: season.writer_id || form.writer_id
+              });
+              setSeasonSelectorOpen(false);
+              toast.success(`สร้างภาคต่อจาก ${season.title}`);
+            }}
+          />
+        )}
+        <div>
+          <label className="text-sm font-medium mb-2 block">ประเภทงาน <span className="text-destructive">*</span></label>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setForm({ ...form, novel_type: "นิยายยาว", target_chapters: "10", word_count_target: "1500" })}
+              className={`flex flex-col items-start gap-1.5 rounded-xl border px-4 py-3 text-left transition-all ${
+                !isOneShot ? "border-primary bg-primary/5 ring-1 ring-primary/20" : "border-border/60 hover:border-primary/30 hover:bg-muted/30"
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${!isOneShot ? "border-primary bg-primary" : "border-muted-foreground/30"}`}>
+                  {!isOneShot && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                </div>
+                <span className={`text-sm font-medium ${!isOneShot ? "text-primary" : ""}`}>นิยายหลายตอน</span>
               </div>
-              <span className={`text-sm font-medium ${!isOneShot ? "text-primary" : ""}`}>นิยายหลายตอน</span>
-            </div>
-            <p className="text-xs text-muted-foreground ml-6">10-40 ตอน แบ่งเป็นตอนย่อย</p>
-          </button>
+              <p className="text-xs text-muted-foreground ml-6">10-40 ตอน แบ่งเป็นตอนย่อย</p>
+            </button>
 
-          <button
-            type="button"
-            onClick={() => setForm({ ...form, novel_type: "เรื่องสั้น", target_chapters: "1", word_count_target: "3000" })}
-            className={`flex flex-col items-start gap-1.5 rounded-xl border px-4 py-3 text-left transition-all ${
-              isOneShot ? "border-primary bg-primary/5 ring-1 ring-primary/20" : "border-border/60 hover:border-primary/30 hover:bg-muted/30"
-            }`}
-          >
-            <div className="flex items-center gap-2">
-              <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${isOneShot ? "border-primary bg-primary" : "border-muted-foreground/30"}`}>
-                {isOneShot && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+            <button
+              type="button"
+              onClick={() => setForm({ ...form, novel_type: "เรื่องสั้น", target_chapters: "1", word_count_target: "3000" })}
+              className={`flex flex-col items-start gap-1.5 rounded-xl border px-4 py-3 text-left transition-all ${
+                isOneShot ? "border-primary bg-primary/5 ring-1 ring-primary/20" : "border-border/60 hover:border-primary/30 hover:bg-muted/30"
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${isOneShot ? "border-primary bg-primary" : "border-muted-foreground/30"}`}>
+                  {isOneShot && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                </div>
+                <span className={`text-sm font-medium ${isOneShot ? "text-primary" : ""}`}>เรื่องสั้นจบในตอนเดียว</span>
               </div>
-              <span className={`text-sm font-medium ${isOneShot ? "text-primary" : ""}`}>เรื่องสั้นจบในตอนเดียว</span>
-            </div>
-            <p className="text-xs text-muted-foreground ml-6">One-shot จบสมบูรณ์ใน 1 ตอน</p>
-          </button>
+              <p className="text-xs text-muted-foreground ml-6">One-shot จบสมบูรณ์ใน 1 ตอน</p>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -475,10 +505,11 @@ function SummaryRow({ label, value, bold, highlight }) {
 // ─── Main Wizard ──────────────────────────────────────────────────────────
 export default function CreateNovelWizard({ open, onOpenChange, activeWriters, onCreated }) {
   const [step, setStep] = useState(1);
-  const [form, setForm] = useState({ title: "", genre: "", synopsis: "", era: "", writer_id: "", novel_type: "นิยายยาว", target_chapters: "10", word_count_target: "1500", ending_type: "จบตามจริง" });
+  const [form, setForm] = useState({ title: "", genre: "", synopsis: "", era: "", writer_id: "", novel_type: "นิยายยาว", target_chapters: "10", word_count_target: "1500", ending_type: "จบตามจริง", parent_novel_id: "", season_number: 1 });
   const [chars, setChars] = useState([emptyChar()]);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
+  const [seasonSelectorOpen, setSeasonSelectorOpen] = useState(false);
 
   const handleClose = (v) => {
     onOpenChange(v);
@@ -505,7 +536,27 @@ export default function CreateNovelWizard({ open, onOpenChange, activeWriters, o
   const handleCreate = async () => {
     if (!validateStep()) return;
     setCreating(true);
-    const novel = await base44.entities.Novel.create(form);
+    
+    // ถ้าเป็น Season ใหม่ ให้คัดลอกข้อมูลจาก Season ก่อนหน้า
+    const novelData = { ...form };
+    if (form.parent_novel_id && form.season_number > 1) {
+      // ดึงข้อมูลจาก Season ก่อนหน้า
+      const parentNovel = await base44.entities.Novel.get(form.parent_novel_id);
+      if (parentNovel) {
+        novelData.writer_id = parentNovel.writer_id || form.writer_id;
+        novelData.genre = parentNovel.genre || form.genre;
+        novelData.era = parentNovel.era || form.era;
+        novelData.novel_type = parentNovel.novel_type || form.novel_type;
+        novelData.ending_type = parentNovel.ending_type || form.ending_type;
+        novelData.target_chapters = parentNovel.target_chapters || form.target_chapters;
+        novelData.word_count_target = parentNovel.word_count_target || form.word_count_target;
+        novelData.main_character_count = parentNovel.main_character_count || form.main_character_count;
+        novelData.season_number = form.season_number;
+        novelData.parent_novel_id = parentNovel.parent_novel_id || form.parent_novel_id;
+      }
+    }
+    
+    const novel = await base44.entities.Novel.create(novelData);
     const namedChars = chars.filter((c) => c.name.trim());
     if (namedChars.length > 0) {
       await Promise.all(namedChars.map((c) =>

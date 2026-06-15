@@ -4,7 +4,7 @@ import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { BookOpen, Layers, ChevronDown, ChevronUp, MoreVertical, ImagePlus, FolderOpen, BookMarked, FolderPlus, ArrowRightLeft, ArrowUp, ArrowDown, BookPlus, Plus } from "lucide-react";
+import { BookOpen, Layers, ChevronDown, ChevronUp, MoreVertical, ImagePlus, FolderOpen, BookMarked, FolderPlus, ArrowRightLeft, ArrowUp, ArrowDown, BookPlus, Plus, Library } from "lucide-react";
 import ImportNovelDialog from "@/components/novel/ImportNovelDialog";
 import SeriesFormDialog from "@/components/series/SeriesFormDialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -94,6 +94,12 @@ function NovelCard({ novel, chapters, uploadingFor, onUploadClick, seriesList, o
               <Badge className="bg-white/20 backdrop-blur-sm text-white text-xs font-normal h-6 px-2 border-0">
                 {novelChapters.length} ตอน
               </Badge>
+              {novel.season_number && (
+                <Badge className="bg-white/30 backdrop-blur-sm text-white text-xs font-bold h-6 px-2 border-0 flex items-center gap-1">
+                  <Library className="w-3 h-3" />
+                  Season {novel.season_number}
+                </Badge>
+              )}
             </div>
           </div>
         </div>
@@ -218,6 +224,11 @@ export default function SeriesDashboard() {
       });
     },
     enabled: !!user,
+  });
+
+  const { data: seasons = [] } = useQuery({
+    queryKey: ["seasons-all"],
+    queryFn: () => base44.entities.Season.list(),
   });
 
   const { data: seriesList = [] } = useQuery({

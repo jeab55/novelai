@@ -20,6 +20,7 @@ import AiDraftDialog from "./AiDraftDialog";
 import ContinuityChecker from "./ContinuityChecker";
 import BulkAutoWriteDialog from "./BulkAutoWriteDialog";
 import NewEpisodeDialog from "./NewEpisodeDialog";
+import SeasonSelectorDialog from "./SeasonSelectorDialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const statusColors = {
@@ -41,6 +42,7 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
   const [bulkAutoWriteOpen, setBulkAutoWriteOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [newEpisodeOpen, setNewEpisodeOpen] = useState(false);
+  const [seasonSelectorOpen, setSeasonSelectorOpen] = useState(false);
   const queryClient = useQueryClient();
 
   // Handle chapter navigation from other tabs (e.g. AiPlotDialog draft)
@@ -254,6 +256,15 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
           <Button
             variant="outline"
             size="sm"
+            className="gap-1.5 text-purple-700 border-purple-300 hover:bg-purple-50 dark:text-purple-400 dark:border-purple-800/40 dark:hover:bg-purple-950/20"
+            onClick={() => setSeasonSelectorOpen(true)}
+          >
+            <Layers className="w-3.5 h-3.5" />
+            Season
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
             className="gap-1.5 text-emerald-700 border-emerald-300 hover:bg-emerald-50 dark:text-emerald-400 dark:border-emerald-800/40 dark:hover:bg-emerald-950/20"
             onClick={() => setNewEpisodeOpen(true)}
           >
@@ -268,6 +279,17 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
                 queryClient.invalidateQueries({ queryKey: ["episodes", novel?.series_id] });
               }}
               novel={novel}
+            />
+          )}
+          {seasonSelectorOpen && (
+            <SeasonSelectorDialog
+              open={true}
+              onClose={() => setSeasonSelectorOpen(false)}
+              novelId={novelId}
+              onSeasonSelected={(season) => {
+                // Navigate to the selected season
+                window.location.href = `/novel/${season.id}`;
+              }}
             />
           )}
           <Dialog open={newChapterOpen} onOpenChange={setNewChapterOpen}>
