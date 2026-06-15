@@ -419,8 +419,7 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
       </div>
 
       {/* Toolbar - AI Tools & Actions */}
-      {chapters.length > 0 && (
-        <div className="bg-gradient-to-r from-secondary/50 to-secondary/30 border border-border rounded-xl p-4 mb-6">
+      <div className="bg-gradient-to-r from-secondary/50 to-secondary/30 border border-border rounded-xl p-4 mb-6">
           <div className="flex items-center gap-3 flex-wrap">
             {/* AI Writing Group */}
             <div className="flex items-center gap-2">
@@ -511,7 +510,6 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
             </Button>
           </div>
         </div>
-      )}
 
       <Dialog open={newChapterOpen} onOpenChange={setNewChapterOpen}>
         <DialogContent className="sm:max-w-md">
