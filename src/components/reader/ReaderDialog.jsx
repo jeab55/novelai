@@ -3,10 +3,9 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
-import { Link } from "react-router-dom";
 import {
   BookMarked, Clock, Settings2, Sun, Moon, Coffee,
-  Minus, Plus, X, ChevronLeft, ChevronRight, Pencil
+  Minus, Plus, X, ChevronLeft, ChevronRight
 } from "lucide-react";
 
 const FONTS = [
@@ -56,7 +55,7 @@ function countWords(text) {
   }
 }
 
-export default function ReaderDialog({ chapters, novelId, initialIndex = 0, onClose }) {
+export default function ReaderDialog({ chapters, initialIndex = 0, onClose }) {
   const [idx, setIdx] = useState(initialIndex);
   const [showSettings, setShowSettings] = useState(false);
   const [fontSize, setFontSize] = useState(18);
@@ -74,13 +73,6 @@ export default function ReaderDialog({ chapters, novelId, initialIndex = 0, onCl
   const goPrev = () => setIdx((i) => Math.max(i - 1, 0));
 
   if (!chapter) return null;
-
-  const handleEdit = () => {
-    onClose?.();
-    setTimeout(() => {
-      window.location.href = `/series/${novelId}/episode/${chapter.id}`;
-    }, 100);
-  };
 
   return (
     <Dialog open onOpenChange={onClose}>
@@ -130,18 +122,7 @@ export default function ReaderDialog({ chapters, novelId, initialIndex = 0, onCl
           </div>
 
           {/* Stats + controls */}
-          <div className="flex items-center gap-2">
-            {novelId && (
-              <button
-                onClick={handleEdit}
-                className="p-1.5 rounded-lg transition-colors flex items-center gap-1 text-xs font-medium"
-                style={{ color: theme.text, backgroundColor: theme.border }}
-                title="แก้ไขตอนนี้"
-              >
-                <Pencil className="w-3.5 h-3.5" />
-                แก้ไข
-              </button>
-            )}
+          <div className="flex items-center gap-3">
             <span className="flex items-center gap-1 text-xs opacity-60" style={{ color: theme.text }}>
               <BookMarked className="w-3 h-3" />
               {words.toLocaleString()} คำ

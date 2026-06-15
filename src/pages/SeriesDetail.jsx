@@ -5,12 +5,11 @@ import { useParams, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, ArrowLeft, BookOpen, FileEdit, Trash2, Eye, EyeOff, Sparkles, Loader2, BookMarked } from "lucide-react";
+import { Plus, ArrowLeft, BookOpen, FileEdit, Trash2, Eye, EyeOff, Sparkles, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import AppLayout from "@/components/AppLayout";
-import ReaderDialog from "@/components/reader/ReaderDialog";
 
 export default function SeriesDetail() {
   const { id: novelId } = useParams();
@@ -19,8 +18,6 @@ export default function SeriesDetail() {
   const [newTitle, setNewTitle] = useState("");
   const [newSynopsis, setNewSynopsis] = useState("");
   const [generatingSynopsis, setGeneratingSynopsis] = useState(false);
-  const [readerOpen, setReaderOpen] = useState(false);
-  const [readingEpisodeIdx, setReadingEpisodeIdx] = useState(0);
   const autoImportedRef = useRef(false);
 
   const { data: novel, isLoading: novelLoading } = useQuery({
@@ -279,16 +276,6 @@ export default function SeriesDetail() {
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Button
-                    size="sm" variant="outline" className="gap-1.5 h-8 px-3 text-xs"
-                    onClick={() => {
-                      setReadingEpisodeIdx(episodes.findIndex(e => e.id === ep.id));
-                      setReaderOpen(true);
-                    }}
-                  >
-                    <BookMarked className="w-3.5 h-3.5" />
-                    อ่าน
-                  </Button>
                   <Link to={`/series/${novelId}/episode/${ep.id}`}>
                     <Button size="sm" variant="outline" className="gap-1.5 h-8 px-3 text-xs">
                       <FileEdit className="w-3.5 h-3.5" />
@@ -322,16 +309,6 @@ export default function SeriesDetail() {
           </div>
         )}
       </div>
-
-      {/* Reader Dialog */}
-      {readerOpen && (
-        <ReaderDialog
-          chapters={episodes}
-          novelId={novelId}
-          initialIndex={readingEpisodeIdx}
-          onClose={() => setReaderOpen(false)}
-        />
-      )}
 
       {/* Add Episode Dialog */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
