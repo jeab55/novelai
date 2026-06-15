@@ -335,10 +335,9 @@ ${charSummary || "(ยังไม่มี)"}
                         </p>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
-                        {String(season.id) === String(novel?.id) && (
+                        {String(season.id) === String(novel?.id) ? (
                           <Badge className="bg-primary text-primary-foreground">ปัจจุบัน</Badge>
-                        )}
-                        {String(season.id) !== String(novel?.id) && (
+                        ) : (
                           <button
                             onClick={(e) => {
                               e.preventDefault();
