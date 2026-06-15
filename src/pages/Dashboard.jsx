@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Plus, BookOpen, Pencil, Trash2, Share2, CheckCircle2, Loader2 } from "lucide-react";
+import { Plus, BookOpen, Pencil, Trash2, Share2, CheckCircle2, Loader2, Filter } from "lucide-react";
 import DeleteNovelDialog from "@/components/novel/DeleteNovelDialog";
 import CreateNovelWizard from "@/components/novel/CreateNovelWizard";
 import ShortStoryCreatorDialog from "@/components/novel/ShortStoryCreatorDialog";
@@ -42,6 +42,7 @@ export default function Dashboard() {
   const [editingId, setEditingId] = useState(null);
   const [deleteDialog, setDeleteDialog] = useState({ open: false, novel: null });
   const [shareDialog, setShareDialog] = useState({ open: false, novel: null });
+  const [showOnlyCompleted, setShowOnlyCompleted] = useState(false);
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
@@ -263,6 +264,10 @@ export default function Dashboard() {
                 <BookOpen className="w-4 h-4" />
                 เรื่องสั้น AI
               </Button>
+              <Button variant="outline" className={`gap-2 font-body ${showOnlyCompleted ? "bg-emerald-50 text-emerald-700 border-emerald-300" : "border-border"}`} onClick={() => setShowOnlyCompleted(!showOnlyCompleted)}>
+                <Filter className="w-4 h-4" />
+                {showOnlyCompleted ? "แสดงทั้งหมด" : "เขียนเสร็จแล้ว"}
+              </Button>
               <Button className="gap-2 font-body" onClick={() => setOpen(true)}>
                 <Plus className="w-4 h-4" />
                 สร้างเรื่องใหม่
@@ -288,7 +293,7 @@ export default function Dashboard() {
             </motion.div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-              {novels.map((novel, i) => (
+              {novels.filter(novel => showOnlyCompleted ? novel.status === "เขียนเสร็จ" : true).map((novel, i) => (
                 <motion.div
                   key={novel.id}
                   initial={{ opacity: 0, y: 20 }}
