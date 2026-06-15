@@ -173,33 +173,39 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
     <ExportDialog open={exportOpen} onOpenChange={setExportOpen} novel={novel} chapters={chapters} />
     <AiChapterGeneratorDialog
       open={aiChapterGeneratorOpen}
-      onClose={() => setAiChapterGeneratorOpen(false)}
+      onClose={() => {
+        setAiChapterGeneratorOpen(false);
+        queryClient.invalidateQueries({ queryKey: ["chapters", selectedSeasonTab] });
+      }}
       novel={novel}
-      novelId={novelId}
+      novelId={selectedSeasonTab}
     />
     <BulkAutoWriteDialog
       open={bulkAutoWriteOpen}
-      onClose={() => setBulkAutoWriteOpen(false)}
+      onClose={() => {
+        setBulkAutoWriteOpen(false);
+        queryClient.invalidateQueries({ queryKey: ["chapters", selectedSeasonTab] });
+      }}
       novel={novel}
-      novelId={novelId}
+      novelId={selectedSeasonTab}
     />
     {draftChapter && (
-      <AiDraftDialog
-        open={aiDraftOpen}
-        onClose={() => { setAiDraftOpen(false); setDraftChapter(null); }}
-        chapter={draftChapter}
-        novel={novel}
-        novelId={novelId}
-        onInsert={(content) => {
-          const chapterToOpen = { ...draftChapter, content };
-          setAiDraftOpen(false);
-          setTimeout(() => {
-            setDraftChapter(null);
-            setSelectedChapter(chapterToOpen);
-          }, 0);
-          toast.success("เปิด editor พร้อมร่างที่ AI สร้างแล้ว");
-        }}
-      />
+    <AiDraftDialog
+      open={aiDraftOpen}
+      onClose={() => { setAiDraftOpen(false); setDraftChapter(null); }}
+      chapter={draftChapter}
+      novel={novel}
+      novelId={selectedSeasonTab}
+      onInsert={(content) => {
+        const chapterToOpen = { ...draftChapter, content };
+        setAiDraftOpen(false);
+        setTimeout(() => {
+          setDraftChapter(null);
+          setSelectedChapter(chapterToOpen);
+        }, 0);
+        toast.success("เปิด editor พร้อมร่างที่ AI สร้างแล้ว");
+      }}
+    />
     )}
     <NewEpisodeDialog
       open={newEpisodeOpen}
