@@ -176,6 +176,8 @@ export default function ImportNovelDialog({ open, onClose, novels = [], seriesLi
     } catch (e) {
       console.error('❌ Import error:', e);
       toast.error("เกิดข้อผิดพลาด: " + (e.message || JSON.stringify(e)));
+      // แสดง step ที่ 2 พร้อมข้อความ error
+      setStep(2);
     } finally {
       setImporting(false);
     }
