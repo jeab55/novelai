@@ -198,6 +198,14 @@ export default function ImportNovelDialog({ open, onClose, novels = [], seriesLi
       return;
     }
 
+    // ตรวจสอบขนาดไฟล์ (สูงสุด 5MB)
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    if (file.size > maxSize) {
+      toast.error(`ไฟล์ใหญ่เกินไป (สูงสุด 5MB) - ไฟล์นี้ ${(file.size / 1024 / 1024).toFixed(2)}MB`);
+      e.target.value = "";
+      return;
+    }
+
     setUploading(true);
     setSelectedFile(file);
     
@@ -287,12 +295,13 @@ export default function ImportNovelDialog({ open, onClose, novels = [], seriesLi
                     {uploading && <Loader2 className="w-4 h-4 animate-spin text-primary" />}
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    รองรับ: TXT, MD, DOCX, PDF
+                    รองรับ: TXT, MD, DOCX, PDF (สูงสุด 5MB)
                   </p>
                   {selectedFile && (
                     <div className="flex items-center gap-1.5 mt-2 text-xs text-primary">
                       <File className="w-3 h-3" />
                       <span>{selectedFile.name}</span>
+                      <span className="text-muted-foreground">({(selectedFile.size / 1024).toFixed(1)} KB)</span>
                     </div>
                   )}
                 </div>
