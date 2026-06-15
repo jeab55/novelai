@@ -374,7 +374,7 @@ ${charSummary || "(ยังไม่มี)"}
               onClick={() => setStep(1)}
             >
               <Plus className="w-4 h-4" />
-              สร้าง Season ใหม่ (ภาคต่อ)
+              เพิ่ม Season
             </Button>
           </div>
         </DialogContent>
