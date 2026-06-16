@@ -189,14 +189,14 @@ ${charSummary || "(ยังไม่มี)"}
       const maxSeasonNumber = seasons.reduce((max, s) => Math.max(max, s.season_number || 1), 0);
       const newSeasonNumber = maxSeasonNumber + 1;
 
-      // สร้าง Season ใหม่
+      // สร้าง Season ใหม่ — lock writer_id จาก parent novel เสมอ
       const newSeason = await base44.entities.Novel.create({
         title: seasonTitle,
         genre: novel.genre,
         synopsis: seasonSynopsis || novel.synopsis,
         era: novel.era,
         status: "กำลังเขียน",
-        writer_id: novel.writer_id || "", // Lock writer จาก Season 1
+        writer_id: novel.writer_id || "", // ★ สำคัญ: lock writer จาก parent novel — ห้ามให้ null
         series_id: novel.series_id || "",
         parent_novel_id: novel.id,
         season_number: newSeasonNumber,

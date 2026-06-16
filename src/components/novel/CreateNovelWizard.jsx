@@ -232,7 +232,19 @@ function Step1({ form, setForm, chars, activeWriters }) {
           variant="outline"
           size="sm"
           className="w-full gap-2 border-dashed"
-          onClick={() => setSeasonSelectorOpen(true)}
+          onClick={async () => {
+            // ดึงข้อมูล parent novel ถ้ามี เพื่อ lock writer_id ล่วงหน้า
+            if (form.parent_novel_id) {
+              try {
+                const parent = await base44.entities.Novel.get(form.parent_novel_id);
+                if (parent?.writer_id) {
+                  setForm({ ...form, writer_id: parent.writer_id });
+                  toast.success(`ล็อค AI Writer: ${parent.writer_id ? "ใช้.writer เดิม" : ""}`);
+                }
+              } catch {}
+            }
+            setSeasonSelectorOpen(true);
+          }}
         >
           <Library className="w-4 h-4" />
           {form.parent_novel_id ? `Season ${form.season_number || 2}: กำลังสร้างภาคต่อ` : "สร้าง Season ใหม่ (ภาคต่อ)"}
@@ -242,15 +254,25 @@ function Step1({ form, setForm, chars, activeWriters }) {
             open={true}
             onClose={() => setSeasonSelectorOpen(false)}
             novelId={form.parent_novel_id || activeWriters?.[0]?.id}
-            onSeasonSelected={(season) => {
+            onSeasonSelected={async (season) => {
+              // ดึง writer_id จาก parent novel เสมอ
+              let inheritedWriterId = form.writer_id;
+              if (season.parent_novel_id || season.id) {
+                try {
+                  const parent = await base44.entities.Novel.get(season.parent_novel_id || season.id);
+                  if (parent?.writer_id) {
+                    inheritedWriterId = parent.writer_id;
+                  }
+                } catch {}
+              }
               setForm({ 
                 ...form, 
                 parent_novel_id: season.parent_novel_id || season.id,
                 season_number: (season.season_number || 1) + 1,
-                writer_id: season.writer_id || form.writer_id
+                writer_id: inheritedWriterId
               });
               setSeasonSelectorOpen(false);
-              toast.success(`สร้างภาคต่อจาก ${season.title}`);
+              toast.success(`สร้างภาคต่อจาก ${season.title} — ใช้ AI Writer เดิม`);
             }}
           />
         )}
@@ -542,11 +564,12 @@ export default function CreateNovelWizard({ open, onOpenChange, activeWriters, o
     const writerSystemPrompt = selectedWriter?.system_prompt || "";
     const writerName = selectedWriter?.name || "";
 
-    // ถ้าเป็น Season ใหม่ ให้คัดลอกข้อมูลจาก Season ก่อนหน้า
+    // ถ้าเป็น Season ใหม่ ให้คัดลอกข้อมูลจาก Season ก่อนหน้า — โดย writer_id ต้องมาจาก parent เท่านั้น
     const novelData = { ...form };
     if (form.parent_novel_id && form.season_number > 1) {
       const parentNovel = await base44.entities.Novel.get(form.parent_novel_id);
       if (parentNovel) {
+        // ★ สำคัญ: lock writer_id จาก parent novel เสมอ — ห้ามให้ null
         novelData.writer_id = parentNovel.writer_id || form.writer_id;
         novelData.genre = parentNovel.genre || form.genre;
         novelData.era = parentNovel.era || form.era;
@@ -558,6 +581,10 @@ export default function CreateNovelWizard({ open, onOpenChange, activeWriters, o
         novelData.season_number = form.season_number;
         novelData.parent_novel_id = parentNovel.parent_novel_id || form.parent_novel_id;
       }
+    }
+    // ★ ตรวจสอบอีกครั้ง — ถ้ายังไม่มี writer_id ให้ใช้จาก form ที่ผู้ใช้เลือก
+    if (!novelData.writer_id && form.writer_id) {
+      novelData.writer_id = form.writer_id;
     }
 
     const namedChars = chars.filter((c) => c.name.trim());
