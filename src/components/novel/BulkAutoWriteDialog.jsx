@@ -11,7 +11,7 @@ import { useBulkWrite } from "@/lib/BulkWriteContext";
 const DEFAULT_WRITER_PROMPT = `คุณคือนักเขียนนิยายภาษาไทยมืออาชีพที่กำลังร่างตอนใหม่ให้ผู้เขียน
 คุณต้องร่างเนื้อหาตอนที่สมบูรณ์ตามโครงที่ได้รับ รักษาสำนวนและโทนของเรื่อง ใช้ภาษาไทยที่อ่านลื่น`;
 
-function buildSystemPrompt(novel, characters, worldEntries, plotEvents, prevChapters, writerPrompt) {
+function buildSystemPrompt(novel, characters, worldEntries, plotEvents, prevChapters, writerPrompt, previousSeasonLastChapter) {
   const isOneShot = novel.novel_type === "เรื่องสั้น";
   let ctx = `[บทบาท]\n${writerPrompt || DEFAULT_WRITER_PROMPT}\n\n`;
 
@@ -72,7 +72,17 @@ function buildSystemPrompt(novel, characters, worldEntries, plotEvents, prevChap
     });
   }
 
-  if (prevChapters.length > 0) {
+  // ★ สำคัญ: ถ้าเป็น Season ใหม่ (มี parent_novel_id) และเป็นตอนที่ 1 — ให้ใส่ตอนท้ายของ Season ก่อนหน้า
+  if (previousSeasonLastChapter && novel.parent_novel_id) {
+    ctx += `\n\n[ตอนสุดท้ายของ Season ก่อนหน้า — เชื่อมต่อเนื้อเรื่อง]\n`;
+    ctx += `— ${previousSeasonLastChapter.title} —\n`;
+    const preview = (previousSeasonLastChapter.content || "").substring(0, 2000);
+    ctx += `${preview}${(previousSeasonLastChapter.content || "").length > 2000 ? "\n…(ต่อ)" : ""}\n\n`;
+    ctx += `[คำสั่ง]\n`;
+    ctx += `- เขียนตอนที่ 1 ของ Season นี้โดยเชื่อมต่อจากตอนท้ายด้านบนทันที — ไม่ต้องเล่าเรื่องใหม่หรือสรุปย่อ\n`;
+    ctx += `- เริ่มจากฉากหรือเหตุการณ์ที่ต่อเนื่องกันเลย ให้ผู้อ่านรู้สึกว่าอ่านต่อจากตอนจบล่าสุด\n`;
+    ctx += `- รักษาโทน สไตล์ และตัวละครให้สอดคล้องกับ Season ก่อนหน้า\n\n`;
+  } else if (prevChapters.length > 0) {
     ctx += `\n[ตอนก่อนหน้า — รักษาความต่อเนื่อง]\n`;
     const recent = prevChapters.slice(-2);
     recent.forEach((ch) => {
@@ -282,8 +292,8 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
   };
 
   // สร้างตอนเดียวพร้อม auto-retry (1-2 ครั้ง)
-  const generateSingleChapter = async ({ i, chapterTitle, linkedEvent, contextChapters, writerPrompt, existingChapter, allCharacters, allWorldEntries, allPlotEvents }) => {
-    const sysPrompt = buildSystemPrompt(novel, allCharacters, allWorldEntries, allPlotEvents, contextChapters, writerPrompt);
+  const generateSingleChapter = async ({ i, chapterTitle, linkedEvent, contextChapters, writerPrompt, existingChapter, allCharacters, allWorldEntries, allPlotEvents, previousSeasonLastChapter }) => {
+    const sysPrompt = buildSystemPrompt(novel, allCharacters, allWorldEntries, allPlotEvents, contextChapters, writerPrompt, previousSeasonLastChapter);
     let taskPrompt = sysPrompt;
     taskPrompt += `\n\n[โจทย์ตอนที่ต้องร่าง — เขียนเนื้อหาเต็มตอน]\n`;
     taskPrompt += `ชื่อตอน: "${chapterTitle}"\n`;
@@ -435,6 +445,20 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
       base44.entities.WorldEntry.filter({ novel_id: novelId }).then((all) => all.filter((w) => !w.is_deleted)),
     ]);
 
+    // ดึงตอนสุดท้ายของ Season ก่อนหน้า — สำหรับ Season 2+ (มี parent_novel_id)
+    let previousSeasonLastChapter = null;
+    if (novel?.parent_novel_id && startFromOrder === 1) {
+      try {
+        const parentChapters = await base44.entities.Chapter.filter({ novel_id: novel.parent_novel_id }, "order");
+        const validChapters = parentChapters.filter((c) => !c.is_deleted && (c.word_count || 0) >= 500);
+        if (validChapters.length > 0) {
+          previousSeasonLastChapter = validChapters[validChapters.length - 1];
+        }
+      } catch (err) {
+        console.error("Failed to load previous season chapters:", err);
+      }
+    }
+
     // ตอนที่มีเนื้อหาแล้ว — นำมาใส่ใน log ทันทีเพื่อแสดงสถานะ
     for (let i = 1; i < startFromOrder; i++) {
       const ch = freshChapters.find((c) => c.order === i);
@@ -485,6 +509,7 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
       const result = await generateSingleChapter({
         i, chapterTitle, linkedEvent, contextChapters, writerPrompt, existingChapter: existing,
         allCharacters: freshCharacters, allWorldEntries: freshWorldEntries, allPlotEvents: freshPlotEvents,
+        previousSeasonLastChapter,
       });
 
       if (cancelledRef.current) break;
@@ -567,6 +592,20 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
       base44.entities.WorldEntry.filter({ novel_id: novelId }).then((all) => all.filter((w) => !w.is_deleted)),
     ]);
 
+    // ดึงตอนสุดท้ายของ Season ก่อนหน้า — สำหรับ retry ด้วย
+    let previousSeasonLastChapter = null;
+    if (novel?.parent_novel_id) {
+      try {
+        const parentChapters = await base44.entities.Chapter.filter({ novel_id: novel.parent_novel_id }, "order");
+        const validChapters = parentChapters.filter((c) => !c.is_deleted && (c.word_count || 0) >= 500);
+        if (validChapters.length > 0) {
+          previousSeasonLastChapter = validChapters[validChapters.length - 1];
+        }
+      } catch (err) {
+        console.error("Failed to load previous season chapters:", err);
+      }
+    }
+
     for (const failed of failedChaptersList) {
       const existing = freshChapters.find((c) => c.order === failed.order);
       const linkedEvent = freshPlotEvents.find((e) => e.order === failed.order);
@@ -585,6 +624,7 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
         allCharacters: freshCharacters,
         allWorldEntries: freshWorldEntries,
         allPlotEvents: freshPlotEvents,
+        previousSeasonLastChapter,
       });
 
       if (result.success) {
