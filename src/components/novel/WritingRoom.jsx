@@ -397,22 +397,22 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
                 size="sm"
                 className="gap-1.5 h-9 text-purple-700 border-purple-300 hover:bg-purple-50 dark:text-purple-400 dark:border-purple-800/40 dark:hover:bg-purple-950/20"
                 onClick={() => setSeasonSelectorOpen(true)}
+                title="เพิ่ม Season ใหม่"
               >
                 <Layers className="w-4 h-4" />
                 เพิ่ม Season
               </Button>
-              {seasons.length > 1 && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5 h-9 text-destructive border-destructive/30 hover:bg-destructive/10"
-                  onClick={() => setDeleteSeasonDialogOpen(true)}
-                  title="ลบ Season นี้"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  ลบ Season
-                </Button>
-              )}
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 h-9 text-destructive border-destructive/30 hover:bg-destructive/10"
+                onClick={() => setDeleteSeasonDialogOpen(true)}
+                disabled={String(selectedSeasonTab) === String(novelId)}
+                title={String(selectedSeasonTab) === String(novelId) ? "ไม่สามารถลบ Season หลักได้" : "ลบ Season นี้"}
+              >
+                <Trash2 className="w-4 h-4" />
+                ลบ Season
+              </Button>
             </div>
           </div>
         </div>
