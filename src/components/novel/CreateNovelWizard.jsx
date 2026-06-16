@@ -14,7 +14,7 @@ import SeasonSelectorDialog from "./SeasonSelectorDialog";
 const GENRES = ["โรแมนติก", "แฟนตาซี", "อิงประวัติศาสตร์", "จีนย้อนยุค", "วาย", "สยองขวัญ", "ลึกลับ", "แอ็คชั่น", "ดราม่า", "อื่นๆ"];
 const CHAR_ROLES = ["ตัวเอก", "ตัวรอง", "ตัวร้าย", "ตัวประกอบ"];
 const DIALECTS = ["กลาง", "อีสาน", "เหนือ", "ใต้", "ตะวันออก", "อื่นๆ"];
-const emptyChar = () => ({ name: "", role: "ตัวเอก", age: "", occupation: "", dialect: "กลาง", personality: "", background: "", wound: "", desire: "" });
+const emptyChar = () => ({ name: "", role: "ตัวเอก", age: "", occupation: "", dialect: "กลาง", dialect_examples: "", personality: "", background: "", wound: "", desire: "" });
 
 const STEPS = [
   { id: 1, label: "ประเภทและข้อมูล", icon: BookOpen },
@@ -79,6 +79,7 @@ function CharacterCard({ c, onUpdate, onRemove, writerSystemPrompt }) {
         </Select>
 
         <Input placeholder="อายุ" value={c.age} onChange={(e) => onUpdate("age", e.target.value)} className="w-14 h-8 text-xs shrink-0" />
+        <Input placeholder="คำแปล" value={c.dialect_examples || ""} onChange={(e) => onUpdate("dialect_examples", e.target.value)} className="w-28 h-8 text-xs shrink-0" />
         <Select value={c.dialect || "กลาง"} onValueChange={(v) => onUpdate("dialect", v)}>
           <SelectTrigger className="w-20 h-8 text-xs shrink-0"><SelectValue /></SelectTrigger>
           <SelectContent>{DIALECTS.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
@@ -651,6 +652,7 @@ export default function CreateNovelWizard({ open, onOpenChange, activeWriters, o
           age: c.age || undefined,
           occupation: c.occupation || undefined,
           dialect: c.dialect || "กลาง",
+          dialect_examples: c.dialect_examples || undefined,
           personality: c.personality || undefined,
           background: c.background || undefined,
           wound: c.wound || undefined,

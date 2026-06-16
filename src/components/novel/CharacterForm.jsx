@@ -92,6 +92,7 @@ ${charDesc}
     { key: "role", label: "บทบาท", type: "select", options: ROLES },
     { key: "age", label: "อายุ", type: "input", placeholder: "เช่น 28" },
     { key: "dialect", label: "ภาษาถิ่น", type: "select", options: ["กลาง", "อีสาน", "เหนือ", "ใต้", "ตะวันออก", "อื่นๆ"] },
+    { key: "dialect_examples", label: "ตัวอย่างคำภาษาถิ่นและคำแปล", type: "textarea", placeholder: "เช่น 'อี่หยัง = อะไร, บ่ = ไม่, แซบ = อร่อย' (ใช้สำหรับแปลอัตโนมัติ)" },
     { key: "appearance", label: "ลักษณะภายนอก", type: "textarea", placeholder: "รูปร่าง หน้าตา การแต่งกาย..." },
     { key: "personality", label: "นิสัยและบุคลิก", type: "textarea", placeholder: "นิสัย อุปนิสัย พฤติกรรม..." },
     { key: "background", label: "ปูมหลัง", type: "textarea", placeholder: "ที่มา ครอบครัว ประวัติ..." },

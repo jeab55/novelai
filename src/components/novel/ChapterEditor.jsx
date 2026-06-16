@@ -16,6 +16,7 @@ import HistoricalFactCheckPanel from "./HistoricalFactCheckPanel";
 import ChapterIllustrationPanel from "./ChapterIllustrationPanel";
 import ThaiProofreaderPanel from "./ThaiProofreaderPanel";
 import ThaiSpellCheckerDialog from "./ThaiSpellCheckerDialog";
+import DialectTranslationPanel from "./DialectTranslationPanel";
 import { saveVersion } from "@/lib/saveVersion";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -351,6 +352,17 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
           <Sparkles className="w-3.5 h-3.5" />
           ตรวจคำผิด
         </Button>
+
+        {/* Dialect Translation button */}
+        <DialectTranslationPanel
+          content={content}
+          novel={novel}
+          onApplyTranslation={(translatedContent) => {
+            setContent(translatedContent);
+            setAutoSaveStatus("saving");
+            debouncedAutoSave(translatedContent);
+          }}
+        />
 
         {/* AI Draft button */}
         <Button
