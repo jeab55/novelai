@@ -388,6 +388,7 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
       return;
     }
 
+    // นับเฉพาะตอนที่ยังไม่มีเนื้อหาจริง (>= 500 คำ) — ข้ามตอนที่ทำเสร็จแล้ว
     const chaptersToCreate = [];
     const shortChapters = [];
     for (let i = 1; i <= target; i++) {
@@ -617,11 +618,11 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
           <p className="text-xs text-muted-foreground mt-0.5">
             {isOneShot
               ? "สร้างเรื่องสั้นจบในตอนเดียวแบบเต็มรูปแบบ"
-              : `สร้างทีละตอนตามลำดับจนครบ ${target} ตอน อิงโครงเรื่อง ไทม์ไลน์ และตัวละคร`
+              : `สร้างทีละตอนตามลำดับจนครบ {target} ตอน อิงโครงเรื่อง ไทม์ไลน์ และตัวละคร`
             }
             <br />
-            <span className="text-amber-600 font-medium">
-              ใช้ Claude Sonnet — integration credits สูงมาก ({isOneShot ? "1" : target} ครั้ง)
+            <span className="text-emerald-600 font-medium">
+              ✓ หักเครดิตทีละตอน — เสียเฉพาะตอนที่สร้างสำเร็จ
             </span>
           </p>
         </DialogHeader>
@@ -740,41 +741,47 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
         {/* Confirmation */}
         {step === "confirm" && confirmData && (
           <div className="overflow-y-auto flex-1 px-6 py-5 space-y-4">
-            <div className="rounded-xl border border-primary/20 bg-primary/5 p-5 space-y-3">
+            <div className="rounded-xl border border-emerald-200 dark:border-emerald-800/50 bg-emerald-50/50 dark:bg-emerald-950/20 p-5 space-y-3">
               <div className="flex items-start gap-3">
-                <Sparkles className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
                 <div>
-                  <h3 className="font-heading font-semibold text-foreground">ยืนยันการสร้างตอน</h3>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    ระบบจะสร้าง {confirmData.chaptersToCreate.length} ตอนที่ยังไม่มีเนื้อหา
-                    และบันทึกทันทีหลังสร้างแต่ละตอน
+                  <h3 className="font-heading font-semibold text-emerald-800 dark:text-emerald-200">หักเครดิตทีละตอน</h3>
+                  <p className="text-sm text-emerald-700 dark:text-emerald-300 mt-1">
+                    ระบบจะหักเครดิต<strong>เฉพาะตอนที่สร้างสำเร็จ</strong> — ถ้ามีปัญหาหลุดกลางคัน จะไม่เสียเครดิตตอนที่ล้มเหลว
+                  </p>
+                  <p className="text-xs text-emerald-700 dark:text-emerald-300 mt-2">
+                    ✓ กดสร้างใหม่ได้ — จะสร้าง<strong>เฉพาะตอนที่ยังไม่มีเนื้อหา</strong> ไม่ต้องเสียเครดิตซ้ำ
                   </p>
                 </div>
               </div>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">จำนวนตอนที่จะสร้าง</span>
+              <div className="space-y-2 text-sm border-t border-emerald-200 dark:border-emerald-800/50 pt-3">
+                <div className="flex justify-between text-emerald-700 dark:text-emerald-300">
+                  <span>ตอนที่ต้องสร้าง</span>
                   <span className="font-semibold">{confirmData.chaptersToCreate.length} ตอน</span>
                 </div>
-                <div className="flex justify-between text-primary font-semibold border-t border-primary/20 pt-2">
-                  <span>เครดิตทั้งหมดที่ใช้</span>
+                <div className="flex justify-between text-emerald-700 dark:text-emerald-300">
+                  <span>เครดิตต่อตอน</span>
+                  <span className="font-semibold">{confirmData.creditPerChapter} เครดิต</span>
+                </div>
+                <div className="flex justify-between text-emerald-800 dark:text-emerald-200 font-bold border-t border-emerald-200 dark:border-emerald-800/50 pt-2">
+                  <span>รวมสูงสุด</span>
                   <span>{confirmData.totalCredits} เครดิต</span>
                 </div>
               </div>
-              {confirmData.shortChapters?.length > 0 && (
-                <div className="bg-muted/40 rounded-lg p-3 text-xs text-muted-foreground">
-                  <p className="font-medium text-amber-700 dark:text-amber-300 mb-1 flex items-center gap-1">
-                    <AlertTriangle className="w-3 h-3" />
-                    ตอนที่มีอยู่แต่สั้น (&lt;500 คำ) — จะเขียนทับ:
-                  </p>
-                  <div className="space-y-1 pl-2 border-l-2 border-amber-300">
-                    {confirmData.shortChapters.map((ch) => (
-                      <div key={ch.order}>ตอนที่ {ch.order}: {ch.title}</div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
+            {confirmData.shortChapters?.length > 0 && (
+              <div className="rounded-xl border border-amber-200 dark:border-amber-800/50 bg-amber-50/50 dark:bg-amber-950/20 p-4 space-y-2 text-xs">
+                <div className="flex items-center gap-2 text-amber-800 dark:text-amber-200">
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                  <span className="font-medium">ตอนสั้นเกินไป (จะเขียนเพิ่ม)</span>
+                </div>
+                <div className="space-y-1 pl-2 border-l-2 border-amber-300">
+                  {confirmData.shortChapters.map((ch) => (
+                    <div key={ch.order} className="text-amber-700 dark:text-amber-300">ตอนที่ {ch.order}: {ch.title}</div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
