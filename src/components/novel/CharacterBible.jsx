@@ -173,11 +173,26 @@ export default function CharacterBible({ novelId, novel }) {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-medium">{char.name}</p>
-                    <p className="text-xs text-muted-foreground">{char.age ? `${char.age} ปี` : ""}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {char.age ? `${char.age} ปี` : ""}
+                      {char.dialect && char.dialect !== "กลาง" && (
+                        <span className="mx-1">•</span>
+                      )}
+                      {char.dialect && char.dialect !== "กลาง" && (
+                        <span className="text-primary/70">{char.dialect}</span>
+                      )}
+                    </p>
                   </div>
-                  <Badge className={`${roleColors[char.role] || roleColors["ตัวประกอบ"]} text-xs`}>
-                    {char.role || "ตัวประกอบ"}
-                  </Badge>
+                  <div className="flex items-center gap-1.5">
+                    {char.dialect && char.dialect !== "กลาง" && (
+                      <Badge variant="outline" className="text-[10px] border-primary/30 text-primary">
+                        {char.dialect}
+                      </Badge>
+                    )}
+                    <Badge className={`${roleColors[char.role] || roleColors["ตัวประกอบ"]} text-xs`}>
+                      {char.role || "ตัวประกอบ"}
+                    </Badge>
+                  </div>
                   <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" title="ประวัติเวอร์ชัน" onClick={(e) => { e.stopPropagation(); setVersionChar(char); }}>
                     <History className="w-3.5 h-3.5" />
                   </Button>
@@ -195,6 +210,14 @@ export default function CharacterBible({ novelId, novel }) {
                     exit={{ height: 0, opacity: 0 }}
                     className="border-t border-border/40 px-4 py-4 space-y-3 text-sm"
                   >
+                    {char.dialect && (
+                      <div>
+                        <span className="text-muted-foreground font-medium">ภาษาถิ่น: </span>
+                        <Badge variant="outline" className="text-xs border-primary/30 text-primary ml-1.5">
+                          {char.dialect}
+                        </Badge>
+                      </div>
+                    )}
                     {char.appearance && <div><span className="text-muted-foreground font-medium">ลักษณะ:</span> {char.appearance}</div>}
                     {char.personality && <div><span className="text-muted-foreground font-medium">นิสัย:</span> {char.personality}</div>}
                     {char.background && <div><span className="text-muted-foreground font-medium">ปูมหลัง:</span> {char.background}</div>}

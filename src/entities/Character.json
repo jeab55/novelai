@@ -1,0 +1,67 @@
+{
+  "name": "Character",
+  "type": "object",
+  "properties": {
+    "novel_id": {
+      "type": "string",
+      "description": "ID ของนิยายที่ตัวละครสังกัด"
+    },
+    "name": {
+      "type": "string",
+      "description": "ชื่อตัวละคร"
+    },
+    "role": {
+      "type": "string",
+      "enum": ["ตัวเอก", "ตัวรอง", "ตัวร้าย", "ตัวประกอบ"],
+      "description": "บทบาท"
+    },
+    "age": {
+      "type": "string",
+      "description": "อายุ"
+    },
+    "occupation": {
+      "type": "string",
+      "description": "อาชีพ"
+    },
+    "appearance": {
+      "type": "string",
+      "description": "ลักษณะภายนอก"
+    },
+    "personality": {
+      "type": "string",
+      "description": "นิสัยและบุคลิก"
+    },
+    "background": {
+      "type": "string",
+      "description": "ปูมหลัง"
+    },
+    "desire": {
+      "type": "string",
+      "description": "สิ่งที่ต้องการ"
+    },
+    "wound": {
+      "type": "string",
+      "description": "สิ่งที่ต้องการจริง (need) กับปมในใจ (wound)"
+    },
+    "relationships": {
+      "type": "string",
+      "description": "ความสัมพันธ์กับตัวละครอื่น"
+    },
+    "ai_analysis": {
+      "type": "string",
+      "description": "ผลวิเคราะห์ตัวละครจาก AI"
+    },
+    "is_deleted": {
+      "type": "boolean",
+      "default": false,
+      "description": "soft delete flag"
+    },
+    "dialect": {
+      "type": "string",
+      "enum": ["กลาง", "อีสาน", "เหนือ", "ใต้", "ตะวันออก", "อื่นๆ"],
+      "default": "กลาง",
+      "description": "ภาษาถิ่นที่ตัวละครใช้"
+    }
+  },
+  "required": ["novel_id", "name"]
+}

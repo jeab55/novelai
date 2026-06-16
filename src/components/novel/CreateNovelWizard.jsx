@@ -13,7 +13,8 @@ import SeasonSelectorDialog from "./SeasonSelectorDialog";
 
 const GENRES = ["โรแมนติก", "แฟนตาซี", "อิงประวัติศาสตร์", "จีนย้อนยุค", "วาย", "สยองขวัญ", "ลึกลับ", "แอ็คชั่น", "ดราม่า", "อื่นๆ"];
 const CHAR_ROLES = ["ตัวเอก", "ตัวรอง", "ตัวร้าย", "ตัวประกอบ"];
-const emptyChar = () => ({ name: "", role: "ตัวเอก", age: "", occupation: "", personality: "", background: "", wound: "", desire: "" });
+const DIALECTS = ["กลาง", "อีสาน", "เหนือ", "ใต้", "ตะวันออก", "อื่นๆ"];
+const emptyChar = () => ({ name: "", role: "ตัวเอก", age: "", occupation: "", dialect: "กลาง", personality: "", background: "", wound: "", desire: "" });
 
 const STEPS = [
   { id: 1, label: "ประเภทและข้อมูล", icon: BookOpen },
@@ -78,7 +79,10 @@ function CharacterCard({ c, onUpdate, onRemove, writerSystemPrompt }) {
         </Select>
 
         <Input placeholder="อายุ" value={c.age} onChange={(e) => onUpdate("age", e.target.value)} className="w-14 h-8 text-xs shrink-0" />
-        <Input placeholder="อาชีพ" value={c.occupation} onChange={(e) => onUpdate("occupation", e.target.value)} className="w-20 h-8 text-xs shrink-0" />
+        <Select value={c.dialect || "กลาง"} onValueChange={(v) => onUpdate("dialect", v)}>
+          <SelectTrigger className="w-20 h-8 text-xs shrink-0"><SelectValue /></SelectTrigger>
+          <SelectContent>{DIALECTS.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
+        </Select>
         <button type="button" onClick={() => setExpanded((v) => !v)} className="h-8 w-8 shrink-0 rounded-md flex items-center justify-center text-muted-foreground hover:bg-accent transition-colors text-xs" title={expanded ? "ย่อ" : "กรอกรายละเอียด"}>
           {expanded ? "▲" : "▼"}
         </button>
@@ -646,6 +650,7 @@ export default function CreateNovelWizard({ open, onOpenChange, activeWriters, o
           role: c.role,
           age: c.age || undefined,
           occupation: c.occupation || undefined,
+          dialect: c.dialect || "กลาง",
           personality: c.personality || undefined,
           background: c.background || undefined,
           wound: c.wound || undefined,

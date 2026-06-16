@@ -22,6 +22,7 @@ export default function CharacterForm({ novelId, character, onDone, novelIdForVe
     desire: character?.desire || "",
     wound: character?.wound || "",
     relationships: character?.relationships || "",
+    dialect: character?.dialect || "กลาง",
   });
   const [analyzing, setAnalyzing] = useState(false);
   const [analysis, setAnalysis] = useState(null);
@@ -90,6 +91,7 @@ ${charDesc}
     { key: "name", label: "ชื่อตัวละคร", type: "input", placeholder: "เช่น เจ้าพระยาวิชาเยนทร์" },
     { key: "role", label: "บทบาท", type: "select", options: ROLES },
     { key: "age", label: "อายุ", type: "input", placeholder: "เช่น 28" },
+    { key: "dialect", label: "ภาษาถิ่น", type: "select", options: ["กลาง", "อีสาน", "เหนือ", "ใต้", "ตะวันออก", "อื่นๆ"] },
     { key: "appearance", label: "ลักษณะภายนอก", type: "textarea", placeholder: "รูปร่าง หน้าตา การแต่งกาย..." },
     { key: "personality", label: "นิสัยและบุคลิก", type: "textarea", placeholder: "นิสัย อุปนิสัย พฤติกรรม..." },
     { key: "background", label: "ปูมหลัง", type: "textarea", placeholder: "ที่มา ครอบครัว ประวัติ..." },

@@ -216,6 +216,7 @@ ${charSummary || "(ยังไม่มี)"}
             role: c.role,
             age: c.age || "",
             occupation: c.occupation || "",
+            dialect: c.dialect || "กลาง",
             appearance: c.appearance || "",
             personality: c.personality || "",
             background: c.background || "",
