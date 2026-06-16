@@ -536,11 +536,15 @@ export default function CreateNovelWizard({ open, onOpenChange, activeWriters, o
   const handleCreate = async () => {
     if (!validateStep()) return;
     setCreating(true);
-    
+
+    // หา writer ที่เลือก เพื่อดึง system_prompt มาใช้เป็นหัวใจ
+    const selectedWriter = activeWriters.find((w) => w.id === form.writer_id);
+    const writerSystemPrompt = selectedWriter?.system_prompt || "";
+    const writerName = selectedWriter?.name || "";
+
     // ถ้าเป็น Season ใหม่ ให้คัดลอกข้อมูลจาก Season ก่อนหน้า
     const novelData = { ...form };
     if (form.parent_novel_id && form.season_number > 1) {
-      // ดึงข้อมูลจาก Season ก่อนหน้า
       const parentNovel = await base44.entities.Novel.get(form.parent_novel_id);
       if (parentNovel) {
         novelData.writer_id = parentNovel.writer_id || form.writer_id;
@@ -555,9 +559,58 @@ export default function CreateNovelWizard({ open, onOpenChange, activeWriters, o
         novelData.parent_novel_id = parentNovel.parent_novel_id || form.parent_novel_id;
       }
     }
-    
-    const novel = await base44.entities.Novel.create(novelData);
+
     const namedChars = chars.filter((c) => c.name.trim());
+    const isOneShot = novelData.novel_type === "เรื่องสั้น";
+
+    // ── สร้าง plot_outline โดยใช้ system_prompt ของนักเขียน AI เป็นหัวใจ ──
+    if (writerSystemPrompt && form.title.trim()) {
+      const charSummary = namedChars.length > 0
+        ? namedChars.map((c) => {
+            const parts = [
+              `${c.name} (${c.role})`,
+              c.age && `อายุ ${c.age}`,
+              c.occupation && `อาชีพ: ${c.occupation}`,
+              c.personality && `นิสัย: ${c.personality}`,
+              c.background && `ปูมหลัง: ${c.background}`,
+              c.desire && `want: ${c.desire}`,
+              c.wound && `wound: ${c.wound}`,
+            ].filter(Boolean).join(", ");
+            return `• ${parts}`;
+          }).join("\n")
+        : "ยังไม่ระบุตัวละคร";
+
+      const contextBlock = [
+        `ชื่อเรื่อง: ${form.title}`,
+        form.genre && `แนว: ${form.genre}`,
+        form.era && `ยุคสมัย/ฉากหลัง: ${form.era}`,
+        form.synopsis && `เรื่องย่อที่ผู้เขียนให้มา: ${form.synopsis}`,
+        isOneShot
+          ? `ประเภท: เรื่องสั้นจบในตอนเดียว — ความยาว ${novelData.word_count_target || 3000} คำ — ตอนจบ: ${novelData.ending_type || "ตามจริง"}`
+          : `ประเภท: นิยายหลายตอน — ${novelData.target_chapters || 10} ตอน — จำนวนคำต่อตอน: ${novelData.word_count_target || 1500} คำ`,
+        `ตัวละครหลัก:\n${charSummary}`,
+      ].filter(Boolean).join("\n");
+
+      const plotPrompt = `[สกิลและสไตล์การเขียนของ${writerName ? ` ${writerName}` : "นักเขียน AI"} — ใช้เป็นหัวใจในการสร้างเรื่องนี้]\n${writerSystemPrompt}\n\n[ข้อมูลนิยายจากผู้เขียน]\n${contextBlock}\n\n[งานที่ต้องทำ]\nอ่านข้อมูลข้างต้นทั้งหมด แล้วสร้าง "โครงเรื่องหลัก" สำหรับนิยายเรื่องนี้โดยใช้สกิลและสไตล์การเขียนของ${writerName ? `${writerName}` : "นักเขียน AI"} เป็นหัวใจ\n\nโครงเรื่องต้องครอบคลุม:\n1. แก่น/ธีมหลักของเรื่อง\n2. โครงสามองก์ (ต้นเรื่อง / กลางเรื่อง / จุดสูงสุดและบทสรุป)\n3. อารมณ์และโทนที่ต้องการสื่อ สอดคล้องกับสไตล์นักเขียน\n4. ปมหลักและจุดหักเหสำคัญ\n5. ความสัมพันธ์ระหว่างตัวละครหลัก\n\nตอบเป็นภาษาไทย กระชับ ชัดเจน ไม่เกิน 600 คำ ตอบเฉพาะโครงเรื่อง ไม่ต้องมีคำอธิบายเพิ่มเติม`;
+
+      try {
+        const result = await base44.integrations.Core.InvokeLLM({
+          prompt: plotPrompt,
+          model: "claude_sonnet_4_6",
+        });
+        const plotOutline = typeof result === "string"
+          ? result.replace(/^```[\w]*\n?/m, "").replace(/```$/m, "").trim()
+          : (result?.text || "").trim();
+        if (plotOutline) {
+          novelData.plot_outline = plotOutline;
+        }
+      } catch {
+        // ถ้า AI ล้มเหลว ก็สร้างเรื่องได้เลยโดยไม่มี plot_outline
+      }
+    }
+
+    const novel = await base44.entities.Novel.create(novelData);
+
     if (namedChars.length > 0) {
       await Promise.all(namedChars.map((c) =>
         base44.entities.Character.create({
@@ -574,6 +627,7 @@ export default function CreateNovelWizard({ open, onOpenChange, activeWriters, o
         })
       ));
     }
+
     setCreating(false);
     handleClose(false);
     onCreated?.();
@@ -610,7 +664,7 @@ export default function CreateNovelWizard({ open, onOpenChange, activeWriters, o
               </Button>
             ) : (
               <Button className="flex-1" onClick={handleCreate} disabled={creating || !form.title.trim() || !form.writer_id} title={!form.title.trim() ? "กรุณากรอกชื่อเรื่อง" : !form.writer_id ? "กรุณาเลือกนักเขียน AI" : ""}>
-                {creating ? <><Loader2 className="w-4 h-4 animate-spin mr-1.5" />กำลังสร้าง...</> : "สร้างนิยาย"}
+                {creating ? <><Loader2 className="w-4 h-4 animate-spin mr-1.5" />AI กำลังสร้างโครงเรื่อง...</> : "สร้างนิยาย"}
               </Button>
             )}
           </div>
