@@ -801,7 +801,7 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
                 <div>
                   <h3 className="font-heading font-semibold text-emerald-800 dark:text-emerald-200">หักเครดิตทีละตอน</h3>
                   <p className="text-sm text-emerald-700 dark:text-emerald-300 mt-1">
-                    ระบบจะหักเครดิต<strong>เฉพาะตอนที่สร้างสำเร็จ</strong> — ถ้ามีปัญหาหลุดกลางคัน จะไม่เสียเครดิตตอนที่ล้มเหลว
+                    ระบบจะหักเครดิต<strong>เฉพาะตอนที่สร้างสำเร็จ</strong>ทีละตอน — ถ้ามีปัญหาหลุดกลางคัน จะไม่เสียเครดิตตอนที่ล้มเหลว
                   </p>
                   <p className="text-xs text-emerald-700 dark:text-emerald-300 mt-2">
                     ✓ กดสร้างใหม่ได้ — จะสร้าง<strong>เฉพาะตอนที่ยังไม่มีเนื้อหา</strong> ไม่ต้องเสียเครดิตซ้ำ
@@ -815,12 +815,11 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
                 </div>
                 <div className="flex justify-between text-emerald-700 dark:text-emerald-300">
                   <span>เครดิตต่อตอน</span>
-                  <span className="font-semibold">{confirmData.creditPerChapter} เครดิต</span>
+                  <span className="font-semibold">{confirmData.creditPerChapter} เครดิต / ตอน</span>
                 </div>
-                <div className="flex justify-between text-emerald-800 dark:text-emerald-200 font-bold border-t border-emerald-200 dark:border-emerald-800/50 pt-2">
-                  <span>รวมสูงสุด</span>
-                  <span>{confirmData.totalCredits} เครดิต</span>
-                </div>
+                <p className="text-xs text-emerald-600 dark:text-emerald-400 pt-1">
+                  ⚡ เครดิตจะถูกหักทันทีเมื่อแต่ละตอนสร้างสำเร็จ ไม่หักล่วงหน้าทั้งหมด
+                </p>
               </div>
             </div>
             {confirmData.shortChapters?.length > 0 && (
@@ -879,7 +878,7 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
                     {isOneShot ? "สร้างเรื่องสั้นเสร็จแล้ว!" : "สร้างนิยายครบทุกตอนแล้ว!"}
                   </p>
                   <p className="text-xs text-emerald-700 dark:text-emerald-300">
-                    {doneCount} ตอน · {log.filter(e => e.status === "done").reduce((s, e) => s + (e.wordCount || 0), 0).toLocaleString()} คำ · <span className="text-amber-600 dark:text-amber-400 font-medium">หักรวม {doneCount * creditPerChapter} เครดิต</span>
+                    {doneCount} ตอน · {log.filter(e => e.status === "done").reduce((s, e) => s + (e.wordCount || 0), 0).toLocaleString()} คำ
                   </p>
                 </div>
               </div>
@@ -968,7 +967,7 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
               <Button variant="ghost" onClick={() => setStep("settings")} size="sm">กลับ</Button>
               <Button onClick={handleConfirmStart} className="gap-2 bg-primary hover:bg-primary/90">
                 <Sparkles className="w-4 h-4" />
-                ยืนยันสร้าง ({confirmData?.totalCredits} เครดิต)
+                ยืนยันสร้าง ({confirmData?.chaptersToCreate?.length} ตอน · {confirmData?.creditPerChapter} เครดิต/ตอน)
               </Button>
             </>
           )}
