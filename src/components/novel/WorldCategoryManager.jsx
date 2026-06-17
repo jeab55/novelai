@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, Pencil, Trash2, X, Check, GripVertical } from "lucide-react";
+import { toast } from "sonner";
 
 const PRESET_COLORS = [
   { label: "เขียว", bg: "bg-emerald-100", text: "text-emerald-700", ring: "ring-emerald-400" },
@@ -41,17 +42,22 @@ export default function WorldCategoryManager({ novelId, categories, onClose }) {
         color: newColor,
         order: categories.length,
       }),
-    onSuccess: () => { invalidate(); setNewName(""); setNewColor("เขียว"); },
+    onSuccess: () => { invalidate(); setNewName(""); setNewColor("เขียว"); toast.success("บันทึกแล้ว"); },
+    onError: (err) => toast.error(`บันทึกไม่สำเร็จ: ${err?.message || "กรุณาลองใหม่"}`, {
+      action: { label: "ลองใหม่", onClick: () => addMutation.mutate() },
+    }),
   });
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }) => base44.entities.WorldCategory.update(id, data),
-    onSuccess: () => { invalidate(); setEditingId(null); },
+    onSuccess: () => { invalidate(); setEditingId(null); toast.success("บันทึกแล้ว"); },
+    onError: (err) => toast.error(`บันทึกไม่สำเร็จ: ${err?.message || "กรุณาลองใหม่"}`),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id) => base44.entities.WorldCategory.delete(id),
-    onSuccess: invalidate,
+    onSuccess: () => { invalidate(); toast.success("ลบแล้ว"); },
+    onError: (err) => toast.error(`ลบไม่สำเร็จ: ${err?.message || "กรุณาลองใหม่"}`),
   });
 
   const startEdit = (cat) => {

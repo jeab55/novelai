@@ -8,7 +8,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Loader2, Sparkles, Globe, RefreshCw, ChevronDown, ChevronUp, AlertCircle } from "lucide-react";
+import { Loader2, Sparkles, Globe, RefreshCw, ChevronDown, ChevronUp, AlertCircle, CheckCircle2 } from "lucide-react";
+import { toast } from "sonner";
 
 const CATEGORIES = ["สถานที่", "ขนบธรรมเนียม", "ยุคสมัย", "สิ่งของ", "ระบบ", "อื่นๆ"];
 
@@ -69,9 +70,10 @@ ${locations.length > 0 ? locations.map((l) => `- ${l}`).join("\n") : "(ไม่
 
 export default function AiWorldBuilderDialog({ open, onClose, novel, novelId }) {
   const queryClient = useQueryClient();
-  const [step, setStep] = useState("idle"); // idle | generating | review | error
+  const [step, setStep] = useState("idle"); // idle | generating | saving | done | review | error
   const [entries, setEntries] = useState([]);
   const [error, setError] = useState("");
+  const [savedCount, setSavedCount] = useState(0);
 
   const { data: writer } = useQuery({
     queryKey: ["writer", novel?.writer_id],
@@ -109,6 +111,7 @@ export default function AiWorldBuilderDialog({ open, onClose, novel, novelId }) 
 
   const saveMutation = useMutation({
     mutationFn: async (toSave) => {
+      setStep("saving");
       // Create selected entries
       const created = await Promise.all(
         toSave.map((e) =>
@@ -139,11 +142,22 @@ export default function AiWorldBuilderDialog({ open, onClose, novel, novelId }) 
           }).filter(Boolean)
         );
       }
+      return created.length;
     },
-    onSuccess: () => {
+    onSuccess: (count) => {
       queryClient.invalidateQueries({ queryKey: ["worldEntries", novelId] });
       queryClient.invalidateQueries({ queryKey: ["plotEvents", novelId] });
-      handleClose();
+      setSavedCount(count);
+      setStep("done");
+      toast.success(`บันทึกแล้ว ${count} รายการ`);
+      setTimeout(() => handleClose(), 1500);
+    },
+    onError: (err) => {
+      setStep("review");
+      setError("");
+      toast.error(`บันทึกไม่สำเร็จ: ${err?.message || "กรุณาลองใหม่"}`, {
+        action: { label: "ลองใหม่", onClick: handleSave },
+      });
     },
   });
 
@@ -195,7 +209,15 @@ export default function AiWorldBuilderDialog({ open, onClose, novel, novelId }) 
     });
 
     setEntries(mapped);
-    setStep("review");
+
+    // บันทึกอัตโนมัติทันที — เฉพาะรายการใหม่ที่ไม่ซ้ำ
+    const toSave = mapped.filter((e) => e.checked && e.title && !e.alreadyExists);
+    if (toSave.length > 0) {
+      saveMutation.mutate(toSave);
+    } else {
+      setStep("review");
+      toast.info("ไม่มีรายการใหม่ให้บันทึก (ทั้งหมดมีอยู่แล้ว)");
+    }
   };
 
   const updateEntry = (idx, field, value) => {
@@ -213,6 +235,7 @@ export default function AiWorldBuilderDialog({ open, onClose, novel, novelId }) 
     setStep("idle");
     setEntries([]);
     setError("");
+    setSavedCount(0);
   };
 
   const selectedCount = entries.filter((e) => e.checked).length;
@@ -257,6 +280,21 @@ export default function AiWorldBuilderDialog({ open, onClose, novel, novelId }) 
               <Loader2 className="w-8 h-8 animate-spin text-primary" />
               <p className="text-sm text-muted-foreground">กำลังสร้างโลก/ฉาก...</p>
               <p className="text-xs text-muted-foreground/60">อาจใช้เวลา 15-30 วินาที</p>
+            </div>
+          )}
+
+          {step === "saving" && (
+            <div className="py-12 flex flex-col items-center gap-4">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              <p className="text-sm text-muted-foreground">กำลังบันทึกลงฐานข้อมูล...</p>
+            </div>
+          )}
+
+          {step === "done" && (
+            <div className="py-12 flex flex-col items-center gap-4">
+              <CheckCircle2 className="w-10 h-10 text-emerald-500" />
+              <p className="text-sm font-medium">บันทึกแล้ว {savedCount} รายการ</p>
+              <p className="text-xs text-muted-foreground/60">แก้ไขเพิ่มเติมได้ในรายการโลก/ฉาก</p>
             </div>
           )}
 

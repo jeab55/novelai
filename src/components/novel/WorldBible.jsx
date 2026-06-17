@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import VersionHistoryDialog from "./VersionHistoryDialog";
 import { saveVersion } from "@/lib/saveVersion";
+import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { ERA_TEMPLATES } from "./EraTemplates";
 import WorldCategoryManager, { getColorClasses } from "./WorldCategoryManager";
@@ -98,15 +99,25 @@ export default function WorldBible({ novelId, onNavigateToTimeline, novel }) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["worldEntries", novelId] });
+      toast.success("บันทึกแล้ว");
       setDialogOpen(false);
       setEditing(null);
       setForm({ title: "", category: "", description: "" });
+    },
+    onError: (err) => {
+      toast.error(`บันทึกไม่สำเร็จ: ${err?.message || "กรุณาลองใหม่"}`, {
+        action: { label: "ลองใหม่", onClick: () => saveMutation.mutate(form) },
+      });
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id) => base44.entities.WorldEntry.update(id, { is_deleted: true }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["worldEntries", novelId] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["worldEntries", novelId] });
+      toast.success("ลบแล้ว");
+    },
+    onError: (err) => toast.error(`ลบไม่สำเร็จ: ${err?.message || "กรุณาลองใหม่"}`),
   });
 
   const openEdit = (entry) => {
@@ -127,19 +138,27 @@ export default function WorldBible({ novelId, onNavigateToTimeline, novel }) {
     if (!selectedEra) return;
     setImportingEra(true);
     const era = ERA_TEMPLATES.find((t) => t.label === selectedEra);
-    if (era) {
-      await Promise.all(era.entries.map((entry) =>
-        base44.entities.WorldEntry.create({ ...entry, novel_id: novelId })
-      ));
-      queryClient.invalidateQueries({ queryKey: ["worldEntries", novelId] });
+    try {
+      if (era) {
+        await Promise.all(era.entries.map((entry) =>
+          base44.entities.WorldEntry.create({ ...entry, novel_id: novelId })
+        ));
+        queryClient.invalidateQueries({ queryKey: ["worldEntries", novelId] });
+        toast.success(`บันทึกแล้ว ${era.entries.length} รายการ`);
+      }
+      setImportingEra(false);
+      setImportDone(true);
+      setTimeout(() => {
+        setImportDone(false);
+        setTemplatePickerOpen(false);
+        setSelectedEra(null);
+      }, 1500);
+    } catch (err) {
+      setImportingEra(false);
+      toast.error(`บันทึกไม่สำเร็จ: ${err?.message || "กรุณาลองใหม่"}`, {
+        action: { label: "ลองใหม่", onClick: handleImportEra },
+      });
     }
-    setImportingEra(false);
-    setImportDone(true);
-    setTimeout(() => {
-      setImportDone(false);
-      setTemplatePickerOpen(false);
-      setSelectedEra(null);
-    }, 1500);
   };
 
   // Group by category for grouped view
