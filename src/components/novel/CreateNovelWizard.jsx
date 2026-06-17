@@ -281,42 +281,6 @@ function Step1({ form, setForm, chars, activeWriters }) {
             }}
           />
         )}
-        <div>
-          <label className="text-sm font-medium mb-2 block">ประเภทงาน <span className="text-destructive">*</span></label>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => setForm({ ...form, novel_type: "นิยายยาว", target_chapters: "10" })}
-              className={`flex flex-col items-start gap-1.5 rounded-xl border px-4 py-3 text-left transition-all ${
-                !isOneShot ? "border-primary bg-primary/5 ring-1 ring-primary/20" : "border-border/60 hover:border-primary/30 hover:bg-muted/30"
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${!isOneShot ? "border-primary bg-primary" : "border-muted-foreground/30"}`}>
-                  {!isOneShot && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
-                </div>
-                <span className={`text-sm font-medium ${!isOneShot ? "text-primary" : ""}`}>นิยายหลายตอน</span>
-              </div>
-              <p className="text-xs text-muted-foreground ml-6">10-40 ตอน แบ่งเป็นตอนย่อย</p>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setForm({ ...form, novel_type: "เรื่องสั้น", target_chapters: "1" })}
-              className={`flex flex-col items-start gap-1.5 rounded-xl border px-4 py-3 text-left transition-all ${
-                isOneShot ? "border-primary bg-primary/5 ring-1 ring-primary/20" : "border-border/60 hover:border-primary/30 hover:bg-muted/30"
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${isOneShot ? "border-primary bg-primary" : "border-muted-foreground/30"}`}>
-                  {isOneShot && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
-                </div>
-                <span className={`text-sm font-medium ${isOneShot ? "text-primary" : ""}`}>เรื่องสั้น</span>
-              </div>
-              <p className="text-xs text-muted-foreground ml-6">One-shot จบสมบูรณ์ใน 1 ตอน</p>
-            </button>
-          </div>
-        </div>
       </div>
 
       <div>
@@ -334,39 +298,21 @@ function Step1({ form, setForm, chars, activeWriters }) {
         <label className="text-sm font-medium mb-1.5 block">ยุคสมัยและฉากหลัง</label>
         <Input placeholder="เช่น กรุงศรีอยุธยาตอนปลาย พ.ศ. 2310" value={form.era} onChange={(e) => setForm({ ...form, era: e.target.value })} />
       </div>
-      {!isOneShot && (
-        <div>
-          <label className="text-sm font-medium mb-1.5 block">จำนวนตอนที่ต้องการ</label>
-          <Select value={form.target_chapters.toString()} onValueChange={(v) => setForm({ ...form, target_chapters: v })}>
-            <SelectTrigger><SelectValue placeholder="เลือกจำนวนตอน" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="10">10 ตอน</SelectItem>
-              <SelectItem value="20">20 ตอน</SelectItem>
-              <SelectItem value="30">30 ตอน</SelectItem>
-              <SelectItem value="40">40 ตอน</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      )}
-
-      {isOneShot && (
-        <div>
-          <label className="text-sm font-medium mb-1.5 block">รูปแบบตอนจบ</label>
-          <Select value={form.ending_type || "จบตามจริง"} onValueChange={(v) => setForm({ ...form, ending_type: v })}>
-            <SelectTrigger><SelectValue placeholder="เลือกตอนจบ" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="จบสุข (HEA)">จบสุข (HEA)</SelectItem>
-              <SelectItem value="จบเศร้า (HFE)">จบเศร้า (HFE)</SelectItem>
-              <SelectItem value="จบเปิด (Open Ending)">จบเปิด (Open Ending)</SelectItem>
-              <SelectItem value="จบหักมุม (Twist)">จบหักมุม (Twist)</SelectItem>
-              <SelectItem value="จบตามจริง">จบตามจริง</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      )}
+      <div>
+        <label className="text-sm font-medium mb-1.5 block">จำนวนตอนที่ต้องการ</label>
+        <Select value={form.target_chapters.toString()} onValueChange={(v) => setForm({ ...form, target_chapters: v })}>
+          <SelectTrigger><SelectValue placeholder="เลือกจำนวนตอน" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="10">10 ตอน</SelectItem>
+            <SelectItem value="20">20 ตอน</SelectItem>
+            <SelectItem value="30">30 ตอน</SelectItem>
+            <SelectItem value="40">40 ตอน</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
 
       <div>
-        <label className="text-sm font-medium mb-1.5 block">จำนวนคำเป้าหมาย{!isOneShot ? "ต่อตอน" : ""}</label>
+        <label className="text-sm font-medium mb-1.5 block">จำนวนคำเป้าหมายต่อตอน</label>
         <Select value={form.word_count_target.toString()} onValueChange={(v) => setForm({ ...form, word_count_target: v })}>
           <SelectTrigger><SelectValue placeholder="เลือกจำนวนคำ" /></SelectTrigger>
           <SelectContent>
