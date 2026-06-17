@@ -286,7 +286,7 @@ function Step1({ form, setForm, chars, activeWriters }) {
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
-              onClick={() => setForm({ ...form, novel_type: "นิยายยาว", target_chapters: "10", word_count_target: "1500" })}
+              onClick={() => setForm({ ...form, novel_type: "นิยายยาว", target_chapters: "10" })}
               className={`flex flex-col items-start gap-1.5 rounded-xl border px-4 py-3 text-left transition-all ${
                 !isOneShot ? "border-primary bg-primary/5 ring-1 ring-primary/20" : "border-border/60 hover:border-primary/30 hover:bg-muted/30"
               }`}
@@ -302,7 +302,7 @@ function Step1({ form, setForm, chars, activeWriters }) {
 
             <button
               type="button"
-              onClick={() => setForm({ ...form, novel_type: "เรื่องสั้น", target_chapters: "1", word_count_target: "3000" })}
+              onClick={() => setForm({ ...form, novel_type: "เรื่องสั้น", target_chapters: "1" })}
               className={`flex flex-col items-start gap-1.5 rounded-xl border px-4 py-3 text-left transition-all ${
                 isOneShot ? "border-primary bg-primary/5 ring-1 ring-primary/20" : "border-border/60 hover:border-primary/30 hover:bg-muted/30"
               }`}
@@ -351,20 +351,6 @@ function Step1({ form, setForm, chars, activeWriters }) {
 
       {isOneShot && (
         <div>
-          <label className="text-sm font-medium mb-1.5 block">ความยาวเป้าหมาย (จำนวนคำ)</label>
-          <Select value={form.word_count_target.toString()} onValueChange={(v) => setForm({ ...form, word_count_target: v })}>
-            <SelectTrigger><SelectValue placeholder="เลือกความยาว" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="3000">~3,000 คำ</SelectItem>
-              <SelectItem value="5000">~5,000 คำ</SelectItem>
-              <SelectItem value="8000">~8,000 คำ</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      )}
-
-      {isOneShot && (
-        <div>
           <label className="text-sm font-medium mb-1.5 block">รูปแบบตอนจบ</label>
           <Select value={form.ending_type || "จบตามจริง"} onValueChange={(v) => setForm({ ...form, ending_type: v })}>
             <SelectTrigger><SelectValue placeholder="เลือกตอนจบ" /></SelectTrigger>
@@ -379,20 +365,19 @@ function Step1({ form, setForm, chars, activeWriters }) {
         </div>
       )}
 
-      {!isOneShot && (
-        <div>
-          <label className="text-sm font-medium mb-1.5 block">จำนวนคำเป้าหมายต่อตอน</label>
-          <Select value={form.word_count_target.toString()} onValueChange={(v) => setForm({ ...form, word_count_target: v })}>
-            <SelectTrigger><SelectValue placeholder="เลือกจำนวนคำ" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="1000">~1,000 คำ</SelectItem>
-              <SelectItem value="1500">~1,500 คำ</SelectItem>
-              <SelectItem value="2000">~2,000 คำ</SelectItem>
-              <SelectItem value="3000">~3,000 คำ</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      )}
+      <div>
+        <label className="text-sm font-medium mb-1.5 block">จำนวนคำเป้าหมาย{!isOneShot ? "ต่อตอน" : ""}</label>
+        <Select value={form.word_count_target.toString()} onValueChange={(v) => setForm({ ...form, word_count_target: v })}>
+          <SelectTrigger><SelectValue placeholder="เลือกจำนวนคำ" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="1000">~1,000 คำ</SelectItem>
+            <SelectItem value="1500">~1,500 คำ</SelectItem>
+            <SelectItem value="2000">~2,000 คำ</SelectItem>
+            <SelectItem value="3000">~3,000 คำ</SelectItem>
+            <SelectItem value="5000">~5,000 คำ</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
       <div>
         <div className="flex items-center justify-between mb-1.5">
           <label className="text-sm font-medium">เรื่องย่อ</label>
