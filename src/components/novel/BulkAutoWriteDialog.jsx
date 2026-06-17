@@ -879,7 +879,7 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
                     {isOneShot ? "สร้างเรื่องสั้นเสร็จแล้ว!" : "สร้างนิยายครบทุกตอนแล้ว!"}
                   </p>
                   <p className="text-xs text-emerald-700 dark:text-emerald-300">
-                    {doneCount} ตอน · {log.filter(e => e.status === "done").reduce((s, e) => s + (e.wordCount || 0), 0).toLocaleString()} คำ
+                    {doneCount} ตอน · {log.filter(e => e.status === "done").reduce((s, e) => s + (e.wordCount || 0), 0).toLocaleString()} คำ · <span className="text-amber-600 dark:text-amber-400 font-medium">หักรวม {doneCount * creditPerChapter} เครดิต</span>
                   </p>
                 </div>
               </div>
@@ -914,10 +914,13 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
                     }>
                       ตอนที่ {entry.order}: {entry.title}
                     </span>
-                    <span className="ml-auto text-xs text-muted-foreground shrink-0">
-                      {entry.status === "done" && entry.wordCount
-                        ? `${entry.wordCount.toLocaleString()} คำ`
-                        : entry.status === "skip" ? "มีแล้ว"
+                    <span className="ml-auto text-xs text-muted-foreground shrink-0 flex items-center gap-2">
+                      {entry.status === "done" && entry.wordCount ? (
+                        <>
+                          <span>{entry.wordCount.toLocaleString()} คำ</span>
+                          <span className="text-amber-600 dark:text-amber-400 font-medium">-{creditPerChapter} เครดิต</span>
+                        </>
+                      ) : entry.status === "skip" ? "มีแล้ว"
                         : entry.status === "generating" ? "กำลังสร้าง..."
                         : entry.status === "error" ? (
                           <span className="text-destructive">{entry.errorMsg || "ล้มเหลว"}</span>
