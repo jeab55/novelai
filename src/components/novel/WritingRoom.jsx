@@ -470,28 +470,15 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
             {/* Divider */}
             <div className="w-px h-6 bg-border" />
 
-            {/* AI Tools Dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5 h-9 text-blue-700 border-blue-300 hover:bg-blue-50"
-                >
-                  <Wand2 className="w-4 h-4" />
-                  เครื่องมือ AI
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-56">
-                <DropdownMenuItem
-                  onClick={() => setSpellCheckSummaryOpen(true)}
-                  className="gap-2"
-                >
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  ตรวจคำผิด
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5 h-9 text-blue-700 border-blue-300 hover:bg-blue-50"
+              onClick={() => setSpellCheckSummaryOpen(true)}
+            >
+              <CheckCircle2 className="w-4 h-4" />
+              ตรวจคำผิด
+            </Button>
 
             {/* Quick Export */}
             <Button
