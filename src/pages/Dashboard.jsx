@@ -11,7 +11,6 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, BookOpen, Pencil, Trash2, Share2, CheckCircle2, Loader2 } from "lucide-react";
 import DeleteNovelDialog from "@/components/novel/DeleteNovelDialog";
 import CreateNovelWizard from "@/components/novel/CreateNovelWizard";
-import ShortStoryCreatorDialog from "@/components/novel/ShortStoryCreatorDialog";
 import ShareNovelDialog from "@/components/novel/ShareNovelDialog";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
@@ -36,7 +35,6 @@ const genreColors = {
 
 export default function Dashboard() {
   const [open, setOpen] = useState(false);
-  const [shortStoryOpen, setShortStoryOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [editForm, setEditForm] = useState({});
   const [editingId, setEditingId] = useState(null);
@@ -157,7 +155,6 @@ export default function Dashboard() {
         onClose={() => setShareDialog({ open: false, novel: null })}
         novel={shareDialog.novel}
       />
-      <ShortStoryCreatorDialog open={shortStoryOpen} onOpenChange={setShortStoryOpen} />
       <CreateNovelWizard
         open={open}
         onOpenChange={setOpen}
@@ -275,15 +272,6 @@ export default function Dashboard() {
                 )}
               </div>
               <div className="flex items-center gap-2">
-                <Button 
-                  variant="outline" 
-                  className="gap-2 font-body border-sky-300 text-sky-700 hover:bg-sky-50 dark:text-sky-400 dark:border-sky-800/40 dark:hover:bg-sky-950/20" 
-                  onClick={() => setShortStoryOpen(true)}
-                >
-                  <BookOpen className="w-4 h-4" />
-                  เรื่องสั้น AI
-                </Button>
-
                 <Button className="gap-2 font-body shadow-sm" onClick={() => setOpen(true)}>
                   <Plus className="w-4 h-4" />
                   สร้างเรื่องใหม่
