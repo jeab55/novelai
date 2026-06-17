@@ -10,6 +10,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Loader2, Sparkles, RefreshCw, CheckCheck, Wand2, ChevronRight, Bot, Clock, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { saveChapterContent } from "@/lib/saveChapterContent";
+import { saveVersion } from "@/lib/saveVersion";
 import { invokeAIStable } from "@/lib/aiInvoke";
 
 const WORD_TARGETS = [
@@ -174,6 +175,7 @@ export default function AiDraftDialog({ open, onClose, chapter, novel, novelId, 
   const [loadingType, setLoadingType] = useState(""); // "draft" | "polish" | "saving"
   const [draft, setDraft] = useState("");
   const [saveError, setSaveError] = useState("");
+  const [saved, setSaved] = useState(false);
   const queryClient = useQueryClient();
   const [linkedPlotEventId, setLinkedPlotEventId] = useState(chapter?.plot_event_id || "");
   const [form, setForm] = useState({
@@ -260,6 +262,50 @@ export default function AiDraftDialog({ open, onClose, chapter, novel, novelId, 
   const getSystemPrompt = () =>
     buildDraftSystemPrompt(novel, characters, worldEntries, plotEvents, chapters, chapter, selectedWriter?.system_prompt, linkedEvent);
 
+  // บันทึกร่างเข้าตอนโดยอัตโนมัติ — เก็บ snapshot เวอร์ชันเดิมไว้ก่อนทับ
+  const autoSaveDraft = async (content) => {
+    setSaveError("");
+    setSaved(false);
+    // 1) snapshot เวอร์ชันเดิม (กู้คืนได้) — ทำเฉพาะตอนที่มีอยู่แล้วและมีเนื้อหาเดิม
+    if (chapter?.id && chapter?.content) {
+      try {
+        await saveVersion({
+          entityType: "chapter",
+          entityId: chapter.id,
+          novelId,
+          data: {
+            title: chapter.title,
+            content: chapter.content,
+            order: chapter.order,
+            status: chapter.status,
+          },
+          label: "ก่อน AI ร่างทับ",
+        });
+      } catch {
+        // ถ้า snapshot ล้มเหลว ไม่บล็อกการบันทึก แต่แจ้งเตือนเบาๆ
+        toast.warning("บันทึกเวอร์ชันสำรองไม่สำเร็จ แต่จะบันทึกร่างต่อ");
+      }
+    }
+    // 2) บันทึกเนื้อหาร่าง
+    const result = await saveChapterContent({
+      novelId,
+      chapterId: chapter?.id,
+      title: form.chapterTitle || chapter?.title,
+      order: chapter?.order,
+      content,
+      status: "ร่าง",
+    });
+    if (result.success) {
+      queryClient.invalidateQueries({ queryKey: ["chapters", novelId] });
+      setSaved(true);
+      toast.success("บันทึกร่างแล้ว");
+    } else {
+      setSaveError(result.error || "บันทึกไม่สำเร็จ กรุณาลองใหม่");
+      toast.error(`บันทึกร่างไม่สำเร็จ: ${result.error || "กรุณาลองใหม่"}`);
+    }
+    return result;
+  };
+
   const handleDraft = async () => {
     if (!selectedWriter) {
       toast.error("กรุณาตั้งค่านักเขียน AI ให้กับนิยายนี้ก่อน (ไปที่หน้าแก้ไขนิยาย)");
@@ -304,6 +350,9 @@ export default function AiDraftDialog({ open, onClose, chapter, novel, novelId, 
       setDraft(text);
       setStep(2);
       toast.success("ร่างตอนสำเร็จแล้ว");
+      // บันทึกร่างเข้าตอนทันทีโดยอัตโนมัติ
+      setLoadingType("saving");
+      await autoSaveDraft(text);
     } catch (err) {
       setSaveError(err.message || "ร่างไม่สำเร็จ กรุณาลองใหม่");
       toast.error(`ร่างไม่สำเร็จ: ${err.message || "กรุณาลองใหม่"}`);
@@ -325,6 +374,9 @@ export default function AiDraftDialog({ open, onClose, chapter, novel, novelId, 
       );
       setDraft(text);
       toast.success("ขัดเกลาสำนวนเสร็จแล้ว");
+      // บันทึกร่างที่ขัดเกลาแล้วโดยอัตโนมัติ
+      setLoadingType("saving");
+      await autoSaveDraft(text);
     } catch (err) {
       toast.error(`ขัดเกลาไม่สำเร็จ: ${err.message || "กรุณาลองใหม่"}`);
     } finally {
@@ -333,61 +385,33 @@ export default function AiDraftDialog({ open, onClose, chapter, novel, novelId, 
     }
   };
 
-  const handleInsert = async () => {
-    setSaveError("");
-    setLoading(true);
-    setLoadingType("saving");
-
-    // Save to DB first
-    const result = await saveChapterContent({
-      novelId,
-      chapterId: chapter?.id,
-      title: form.chapterTitle || chapter?.title,
-      order: chapter?.order,
-      content: draft,
-      status: "ร่าง",
-    });
-
-    setLoading(false);
-    setLoadingType("");
-
-    if (result.success) {
-      queryClient.invalidateQueries({ queryKey: ["chapters", novelId] });
-      toast.success("บันทึกสำเร็จ เปิด editor แล้ว");
-      // Navigate to chapter editor — onInsert handles closing the dialog + navigation
-      onInsert(draft);
-    } else {
-      setSaveError(result.error || "บันทึกไม่สำเร็จ กรุณากดบันทึกอีกครั้ง");
-      toast.error("บันทึกไม่สำเร็จ กรุณาลองใหม่");
+  // เปิด editor เพื่อแก้ไขต่อ (ร่างถูกบันทึกไปแล้วโดยอัตโนมัติ)
+  const handleOpenEditor = async () => {
+    // เผื่อกรณีบันทึกอัตโนมัติยังไม่สำเร็จ ให้บันทึกอีกครั้งก่อนเปิด
+    if (!saved) {
+      setLoading(true);
+      setLoadingType("saving");
+      const result = await autoSaveDraft(draft);
+      setLoading(false);
+      setLoadingType("");
+      if (!result.success) return;
     }
+    onInsert(draft);
   };
 
   const handleRetrySave = async () => {
-    setSaveError("");
     setLoading(true);
     setLoadingType("saving");
-    const result = await saveChapterContent({
-      novelId,
-      chapterId: chapter?.id,
-      title: form.chapterTitle || chapter?.title,
-      order: chapter?.order,
-      content: draft,
-      status: "ร่าง",
-    });
+    await autoSaveDraft(draft);
     setLoading(false);
     setLoadingType("");
-    if (result.success) {
-      queryClient.invalidateQueries({ queryKey: ["chapters", novelId] });
-      toast.success("บันทึกสำเร็จแล้ว");
-      handleClose();
-    } else {
-      setSaveError(result.error || "บันทึกไม่สำเร็จ กรุณาลองอีกครั้ง");
-    }
   };
 
   const handleClose = () => {
     setStep(1);
     setDraft("");
+    setSaved(false);
+    setSaveError("");
     setLinkedPlotEventId("");
     setForm({ chapterTitle: chapter?.title || "", summary: "", characters: "", tone: "", wordTarget: 1200 });
     onClose();
@@ -564,9 +588,13 @@ export default function AiDraftDialog({ open, onClose, chapter, novel, novelId, 
         ) : (
           /* Step 2: Review */
           <div className="flex-1 overflow-hidden flex flex-col">
-            <div className="px-6 py-3 bg-amber-50/50 border-b border-amber-200/60 shrink-0">
-              <p className="text-xs text-amber-700 font-medium">
-                ร่างโดย AI — อ่านทบทวนและแก้ไขก่อนใส่ลง editor
+            <div className={`px-6 py-3 border-b shrink-0 ${saved ? "bg-emerald-50/60 border-emerald-200/60" : "bg-amber-50/50 border-amber-200/60"}`}>
+              <p className={`text-xs font-medium flex items-center gap-1.5 ${saved ? "text-emerald-700" : "text-amber-700"}`}>
+                {saved ? (
+                  <><CheckCheck className="w-3.5 h-3.5" /> บันทึกร่างเข้าตอนแล้วโดยอัตโนมัติ — แก้ไขต่อได้ทันที</>
+                ) : (
+                  "ร่างโดย AI"
+                )}
               </p>
             </div>
             <ScrollArea className="flex-1 px-6 py-5">
@@ -659,7 +687,7 @@ export default function AiDraftDialog({ open, onClose, chapter, novel, novelId, 
                   <Button
                     size="sm"
                     className="gap-1.5"
-                    onClick={handleInsert}
+                    onClick={handleOpenEditor}
                     disabled={loading || !draft}
                   >
                     {loading && loadingType === "saving" ? (
@@ -667,7 +695,7 @@ export default function AiDraftDialog({ open, onClose, chapter, novel, novelId, 
                     ) : (
                       <CheckCheck className="w-3.5 h-3.5" />
                     )}
-                    {loading && loadingType === "saving" ? "กำลังบันทึก..." : "ใส่ลง editor"}
+                    {loading && loadingType === "saving" ? "กำลังบันทึก..." : "แก้ไขต่อใน editor"}
                   </Button>
                 </div>
               </div>

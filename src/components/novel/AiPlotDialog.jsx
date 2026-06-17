@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { saveChapterContent } from "@/lib/saveChapterContent";
+import { saveVersion } from "@/lib/saveVersion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -458,6 +459,24 @@ export default function AiPlotDialog({ open, onClose, novel, novelId, onOpenChap
       (ch) => ch.novel_id === novelId && ch.order === ev.order
     );
 
+    // snapshot เวอร์ชันเดิมก่อนทับ (กู้คืนได้)
+    if (existingChapter?.id && existingChapter?.content) {
+      try {
+        await saveVersion({
+          entityType: "chapter",
+          entityId: existingChapter.id,
+          novelId,
+          data: {
+            title: existingChapter.title,
+            content: existingChapter.content,
+            order: existingChapter.order,
+            status: existingChapter.status,
+          },
+          label: "ก่อน AI ร่างทับ",
+        });
+      } catch { /* ไม่บล็อกการบันทึกถ้า snapshot ล้มเหลว */ }
+    }
+
     const result = await saveChapterContent({
       novelId,
       chapterId: existingChapter?.id || null,
@@ -476,7 +495,7 @@ export default function AiPlotDialog({ open, onClose, novel, novelId, onOpenChap
         ? { ...savedChapter, content: draftContent }
         : { novel_id: novelId, title: ev.title, order: ev.order, content: draftContent, status: "ร่าง" };
       setDraftStatus((prev) => ({ ...prev, [idx]: { state: "done", chapter: chapterToOpen } }));
-      toast.success(`ร่างตอน "${ev.title}" สำเร็จ และบันทึกแล้ว`);
+      toast.success(`บันทึกร่างแล้ว — ตอน "${ev.title}"`);
     } else {
       setDraftStatus((prev) => ({ ...prev, [idx]: `error:${result.error}` }));
       toast.error(`บันทึกร่างไม่สำเร็จ: ${result.error}`);
