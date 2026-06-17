@@ -439,108 +439,143 @@ export default function CreateNovelWizard({ open, onOpenChange, activeWriters, o
   const handleCreate = async () => {
     if (!validateStep()) return;
     setCreating(true);
+    setError("");
 
-    // หา writer ที่เลือก เพื่อดึง system_prompt มาใช้เป็นหัวใจ
-    const selectedWriter = activeWriters.find((w) => w.id === form.writer_id);
-    const writerSystemPrompt = selectedWriter?.system_prompt || "";
-    const writerName = selectedWriter?.name || "";
+    try {
+      // หา writer ที่เลือก
+      const selectedWriter = activeWriters.find((w) => w.id === form.writer_id);
+      const writerSystemPrompt = selectedWriter?.system_prompt || "";
+      const writerName = selectedWriter?.name || "";
 
-    // ถ้าเป็น Season ใหม่ ให้คัดลอกข้อมูลจาก Season ก่อนหน้า — โดย writer_id ต้องมาจาก parent เท่านั้น
-    const novelData = { ...form };
-    if (form.parent_novel_id && form.season_number > 1) {
-      const parentNovel = await base44.entities.Novel.get(form.parent_novel_id);
-      if (parentNovel) {
-        // ★ สำคัญ: lock writer_id จาก parent novel เสมอ — ห้ามให้ null
-        novelData.writer_id = parentNovel.writer_id || form.writer_id;
-        novelData.genre = parentNovel.genre || form.genre;
-        novelData.era = parentNovel.era || form.era;
-        novelData.novel_type = parentNovel.novel_type || form.novel_type;
-        novelData.ending_type = parentNovel.ending_type || form.ending_type;
-        novelData.target_chapters = parentNovel.target_chapters || form.target_chapters;
-        novelData.word_count_target = parentNovel.word_count_target || form.word_count_target;
-        novelData.main_character_count = parentNovel.main_character_count || form.main_character_count;
-        novelData.season_number = form.season_number;
-        novelData.parent_novel_id = parentNovel.parent_novel_id || form.parent_novel_id;
-      }
-    }
-    // ★ ตรวจสอบอีกครั้ง — ถ้ายังไม่มี writer_id ให้ใช้จาก form ที่ผู้ใช้เลือก
-    if (!novelData.writer_id && form.writer_id) {
-      novelData.writer_id = form.writer_id;
-    }
+      // ── ขั้น 1: เตรียม novelData ──
+      const novelData = { ...form };
 
-    const namedChars = chars.filter((c) => c.name.trim());
-    const isOneShot = novelData.novel_type === "เรื่องสั้น";
-
-    // ── สร้าง plot_outline โดยใช้ system_prompt ของนักเขียน AI เป็นหัวใจ ──
-    if (writerSystemPrompt && form.title.trim()) {
-      const charSummary = namedChars.length > 0
-        ? namedChars.map((c) => {
-            const parts = [
-              `${c.name} (${c.role})`,
-              c.age && `อายุ ${c.age}`,
-              c.occupation && `อาชีพ: ${c.occupation}`,
-              c.personality && `นิสัย: ${c.personality}`,
-              c.background && `ปูมหลัง: ${c.background}`,
-              c.desire && `want: ${c.desire}`,
-              c.wound && `wound: ${c.wound}`,
-            ].filter(Boolean).join(", ");
-            return `• ${parts}`;
-          }).join("\n")
-        : "ยังไม่ระบุตัวละคร";
-
-      const contextBlock = [
-        `ชื่อเรื่อง: ${form.title}`,
-        form.genre && `แนว: ${form.genre}`,
-        form.era && `ยุคสมัย/ฉากหลัง: ${form.era}`,
-        form.synopsis && `เรื่องย่อที่ผู้เขียนให้มา: ${form.synopsis}`,
-        isOneShot
-          ? `ประเภท: เรื่องสั้นจบในตอนเดียว — ความยาว ${novelData.word_count_target || 3000} คำ — ตอนจบ: ${novelData.ending_type || "ตามจริง"}`
-          : `ประเภท: นิยายหลายตอน — ${novelData.target_chapters || 10} ตอน — จำนวนคำต่อตอน: ${novelData.word_count_target || 1500} คำ`,
-        `ตัวละครหลัก:\n${charSummary}`,
-      ].filter(Boolean).join("\n");
-
-      const plotPrompt = `[สกิลและสไตล์การเขียนของ${writerName ? ` ${writerName}` : "นักเขียน AI"} — ใช้เป็นหัวใจในการสร้างเรื่องนี้]\n${writerSystemPrompt}\n\n[ข้อมูลนิยายจากผู้เขียน]\n${contextBlock}\n\n[งานที่ต้องทำ]\nอ่านข้อมูลข้างต้นทั้งหมด แล้วสร้าง "โครงเรื่องหลัก" สำหรับนิยายเรื่องนี้โดยใช้สกิลและสไตล์การเขียนของ${writerName ? `${writerName}` : "นักเขียน AI"} เป็นหัวใจ\n\nโครงเรื่องต้องครอบคลุม:\n1. แก่น/ธีมหลักของเรื่อง\n2. โครงสามองก์ (ต้นเรื่อง / กลางเรื่อง / จุดสูงสุดและบทสรุป)\n3. อารมณ์และโทนที่ต้องการสื่อ สอดคล้องกับสไตล์นักเขียน\n4. ปมหลักและจุดหักเหสำคัญ\n5. ความสัมพันธ์ระหว่างตัวละครหลัก\n\nตอบเป็นภาษาไทย กระชับ ชัดเจน ไม่เกิน 600 คำ ตอบเฉพาะโครงเรื่อง ไม่ต้องมีคำอธิบายเพิ่มเติม`;
-
-      try {
-        const result = await base44.integrations.Core.InvokeLLM({
-          prompt: plotPrompt,
-          model: "claude_sonnet_4_6",
-        });
-        const plotOutline = typeof result === "string"
-          ? result.replace(/^```[\w]*\n?/m, "").replace(/```$/m, "").trim()
-          : (result?.text || "").trim();
-        if (plotOutline) {
-          novelData.plot_outline = plotOutline;
+      // ถ้าเป็น Season ใหม่ ให้คัดลอกข้อมูลจาก parent
+      if (form.parent_novel_id && form.season_number > 1) {
+        try {
+          const parentNovel = await base44.entities.Novel.get(form.parent_novel_id);
+          if (parentNovel) {
+            novelData.writer_id = parentNovel.writer_id || form.writer_id;
+            novelData.genre = parentNovel.genre || form.genre;
+            novelData.era = parentNovel.era || form.era;
+            novelData.novel_type = parentNovel.novel_type || form.novel_type;
+            novelData.ending_type = parentNovel.ending_type || form.ending_type;
+            novelData.target_chapters = parentNovel.target_chapters || form.target_chapters;
+            novelData.word_count_target = parentNovel.word_count_target || form.word_count_target;
+            novelData.main_character_count = parentNovel.main_character_count || form.main_character_count;
+            novelData.season_number = form.season_number;
+            novelData.parent_novel_id = parentNovel.parent_novel_id || form.parent_novel_id;
+          }
+        } catch {
+          // ถ้าดึง parent ไม่ได้ ใช้ข้อมูลจาก form ต่อ
         }
-      } catch {
-        // ถ้า AI ล้มเหลว ก็สร้างเรื่องได้เลยโดยไม่มี plot_outline
       }
+      if (!novelData.writer_id && form.writer_id) {
+        novelData.writer_id = form.writer_id;
+      }
+
+      const namedChars = chars.filter((c) => c.name.trim());
+      const isOneShot = novelData.novel_type === "เรื่องสั้น";
+
+      // ── ขั้น 2: บันทึก Novel ลงฐานข้อมูลก่อนเสมอ ──
+      const novel = await base44.entities.Novel.create(novelData);
+
+      // ── ขั้น 3: บันทึกตัวละคร ──
+      if (namedChars.length > 0) {
+        await Promise.all(namedChars.map((c) =>
+          base44.entities.Character.create({
+            novel_id: novel.id,
+            name: c.name.trim(),
+            role: c.role,
+            age: c.age || undefined,
+            occupation: c.occupation || undefined,
+            dialect: c.dialect || "กลาง",
+            dialect_examples: c.dialect_examples || undefined,
+            personality: c.personality || undefined,
+            background: c.background || undefined,
+            wound: c.wound || undefined,
+            desire: c.desire || undefined,
+            ai_analysis: c.ai_analysis || undefined,
+          })
+        ));
+      }
+
+      // ── ขั้น 4: สร้าง plot_outline หลังจากบันทึกสำเร็จแล้ว ──
+      // ถ้า AI ล้มเหลวหรือ timeout เรื่องถูกสร้างไปแล้ว ไม่บล็อก
+      setCreating(false);
+      handleClose(false);
+      onCreated?.();
+      toast.success(`สร้างนิยาย "${form.title}" สำเร็จแล้ว!`);
+
+      if (writerSystemPrompt && form.title.trim()) {
+        const charSummary = namedChars.length > 0
+          ? namedChars.map((c) => {
+              const parts = [
+                `${c.name} (${c.role})`,
+                c.age && `อายุ ${c.age}`,
+                c.occupation && `อาชีพ: ${c.occupation}`,
+                c.personality && `นิสัย: ${c.personality}`,
+                c.background && `ปูมหลัง: ${c.background}`,
+                c.desire && `want: ${c.desire}`,
+                c.wound && `wound: ${c.wound}`,
+              ].filter(Boolean).join(", ");
+              return `• ${parts}`;
+            }).join("\n")
+          : "ยังไม่ระบุตัวละคร";
+
+        const contextBlock = [
+          `ชื่อเรื่อง: ${form.title}`,
+          form.genre && `แนว: ${form.genre}`,
+          form.era && `ยุคสมัย/ฉากหลัง: ${form.era}`,
+          form.synopsis && `เรื่องย่อที่ผู้เขียนให้มา: ${form.synopsis}`,
+          isOneShot
+            ? `ประเภท: เรื่องสั้นจบในตอนเดียว — ความยาว ${novelData.word_count_target || 3000} คำ — ตอนจบ: ${novelData.ending_type || "ตามจริง"}`
+            : `ประเภท: นิยายหลายตอน — ${novelData.target_chapters || 10} ตอน — จำนวนคำต่อตอน: ${novelData.word_count_target || 1500} คำ`,
+          `ตัวละครหลัก:\n${charSummary}`,
+        ].filter(Boolean).join("\n");
+
+        const plotPrompt = `[สกิลและสไตล์การเขียนของ${writerName ? ` ${writerName}` : "นักเขียน AI"} — ใช้เป็นหัวใจในการสร้างเรื่องนี้]\n${writerSystemPrompt}\n\n[ข้อมูลนิยายจากผู้เขียน]\n${contextBlock}\n\n[งานที่ต้องทำ]\nอ่านข้อมูลข้างต้นทั้งหมด แล้วสร้าง "โครงเรื่องหลัก" สำหรับนิยายเรื่องนี้โดยใช้สกิลและสไตล์การเขียนของ${writerName ? `${writerName}` : "นักเขียน AI"} เป็นหัวใจ\n\nโครงเรื่องต้องครอบคลุม:\n1. แก่น/ธีมหลักของเรื่อง\n2. โครงสามองก์ (ต้นเรื่อง / กลางเรื่อง / จุดสูงสุดและบทสรุป)\n3. อารมณ์และโทนที่ต้องการสื่อ สอดคล้องกับสไตล์นักเขียน\n4. ปมหลักและจุดหักเหสำคัญ\n5. ความสัมพันธ์ระหว่างตัวละครหลัก\n\nตอบเป็นภาษาไทย กระชับ ชัดเจน ไม่เกิน 600 คำ ตอบเฉพาะโครงเรื่อง ไม่ต้องมีคำอธิบายเพิ่มเติม`;
+
+        // helper: race กับ timeout 60s + retry 1 ครั้ง
+        const invokePlot = () => Promise.race([
+          base44.integrations.Core.InvokeLLM({ prompt: plotPrompt, model: "claude_sonnet_4_6" }),
+          new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 60000)),
+        ]);
+
+        let plotOutline = "";
+        try {
+          const result = await invokePlot();
+          plotOutline = typeof result === "string"
+            ? result.replace(/^```[\w]*\n?/m, "").replace(/```$/m, "").trim()
+            : (result?.text || "").trim();
+        } catch {
+          // retry 1 ครั้ง
+          try {
+            const result2 = await invokePlot();
+            plotOutline = typeof result2 === "string"
+              ? result2.replace(/^```[\w]*\n?/m, "").replace(/```$/m, "").trim()
+              : (result2?.text || "").trim();
+          } catch {
+            // ล้มเหลวทั้ง 2 ครั้ง — แจ้งผู้ใช้แต่เรื่องถูกสร้างไปแล้ว
+            toast.warning("สร้างเรื่องสำเร็จแล้ว แต่วางโครงพล็อตอัตโนมัติไม่สำเร็จ — กดวางพล็อตใหม่ได้ภายหลังในหน้าแก้ไขนิยาย");
+          }
+        }
+
+        if (plotOutline) {
+          try {
+            await base44.entities.Novel.update(novel.id, { plot_outline: plotOutline });
+          } catch {
+            // ล้มเหลว silent — plot_outline ไม่ใช่ข้อมูลสำคัญ
+          }
+        }
+      }
+
+    } catch (err) {
+      setCreating(false);
+      const msg = err?.message || "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง";
+      setError(msg);
+      toast.error(`สร้างนิยายไม่สำเร็จ: ${msg}`);
     }
-
-    const novel = await base44.entities.Novel.create(novelData);
-
-    if (namedChars.length > 0) {
-      await Promise.all(namedChars.map((c) =>
-        base44.entities.Character.create({
-          novel_id: novel.id,
-          name: c.name.trim(),
-          role: c.role,
-          age: c.age || undefined,
-          occupation: c.occupation || undefined,
-          dialect: c.dialect || "กลาง",
-          dialect_examples: c.dialect_examples || undefined,
-          personality: c.personality || undefined,
-          background: c.background || undefined,
-          wound: c.wound || undefined,
-          desire: c.desire || undefined,
-          ai_analysis: c.ai_analysis || undefined,
-        })
-      ));
-    }
-
-    setCreating(false);
-    handleClose(false);
-    onCreated?.();
   };
 
   return (
@@ -574,7 +609,7 @@ export default function CreateNovelWizard({ open, onOpenChange, activeWriters, o
               </Button>
             ) : (
               <Button className="flex-1" onClick={handleCreate} disabled={creating || !form.title.trim() || !form.writer_id} title={!form.title.trim() ? "กรุณากรอกชื่อเรื่อง" : !form.writer_id ? "กรุณาเลือกนักเขียน AI" : ""}>
-                {creating ? <><Loader2 className="w-4 h-4 animate-spin mr-1.5" />AI กำลังสร้างโครงเรื่อง...</> : "สร้างนิยาย"}
+                {creating ? <><Loader2 className="w-4 h-4 animate-spin mr-1.5" />กำลังสร้างนิยาย...</> : "สร้างนิยาย"}
               </Button>
             )}
           </div>
