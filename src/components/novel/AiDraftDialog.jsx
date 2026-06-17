@@ -264,6 +264,10 @@ export default function AiDraftDialog({ open, onClose, chapter, novel, novelId, 
     buildDraftSystemPrompt(novel, characters, worldEntries, plotEvents, chapters, chapter, selectedWriter?.system_prompt, linkedEvent);
 
   const handleDraft = async () => {
+    if (!selectedWriter) {
+      toast.error("กรุณาตั้งค่านักเขียน AI ให้กับนิยายนี้ก่อน (ไปที่หน้าแก้ไขนิยาย)");
+      return;
+    }
     setLoading(true);
     setLoadingType("draft");
     setSaveError("");
@@ -403,7 +407,10 @@ export default function AiDraftDialog({ open, onClose, chapter, novel, novelId, 
                     {selectedWriter.style && <span className="text-xs text-muted-foreground">{selectedWriter.style}</span>}
                   </div>
                 ) : (
-                  <span className="text-sm text-muted-foreground italic block">ยังไม่ได้ตั้งนักเขียนประจำเรื่อง</span>
+                  <div>
+                    <span className="text-sm text-destructive font-medium block">ยังไม่ได้ตั้งนักเขียนประจำเรื่อง</span>
+                    <span className="text-xs text-destructive/70">กรุณาแก้ไขนิยายและเลือกนักเขียน AI ก่อนร่างตอน</span>
+                  </div>
                 )}
               </div>
               <span className="text-[10px] text-primary/50 bg-primary/8 border border-primary/15 px-2 py-0.5 rounded-full shrink-0">ประจำเรื่อง</span>
@@ -564,7 +571,8 @@ export default function AiDraftDialog({ open, onClose, chapter, novel, novelId, 
               </Button>
               <Button
                 onClick={handleDraft}
-                disabled={!form.summary.trim() || loading}
+                disabled={!form.summary.trim() || loading || !selectedWriter}
+                title={!selectedWriter ? "กรุณาตั้งค่านักเขียน AI ให้กับนิยายนี้ก่อน" : ""}
                 className="gap-2"
               >
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}

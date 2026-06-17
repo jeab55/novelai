@@ -295,6 +295,11 @@ export default function AiPlotDialog({ open, onClose, novel, novelId, onOpenChap
 
   const generate = async () => {
     if (!novel || step === "generating") return;
+    if (!writer) {
+      setParseError("นิยายนี้ยังไม่มีนักเขียน AI ที่ล็อกไว้ กรุณาแก้ไขนิยายและเลือกนักเขียน AI ก่อน");
+      setStep("review");
+      return;
+    }
     setStep("generating");
     setParseError("");
 
@@ -400,6 +405,10 @@ export default function AiPlotDialog({ open, onClose, novel, novelId, onOpenChap
   const handleDraftChapter = async (idx) => {
     const ev = events[idx];
     if (!ev?.title) return;
+    if (!writer) {
+      setDraftStatus((prev) => ({ ...prev, [idx]: "error:นิยายนี้ยังไม่มีนักเขียน AI กรุณาแก้ไขนิยายและเลือกนักเขียนก่อน" }));
+      return;
+    }
 
     setDraftStatus((prev) => ({ ...prev, [idx]: "drafting" }));
 

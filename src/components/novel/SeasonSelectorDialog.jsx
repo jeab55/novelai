@@ -457,7 +457,7 @@ ${charSummary || "(ยังไม่มี)"}
                     </div>
                     <Button
                       onClick={handleGenerateSeason}
-                      disabled={generatingSeason}
+                      disabled={generatingSeason || !writer}
                       size="lg"
                       className="gap-2 px-8 mt-2"
                     >
@@ -465,10 +465,10 @@ ${charSummary || "(ยังไม่มี)"}
                         ? <><Loader2 className="w-4 h-4 animate-spin" />กำลังสร้าง Season...</>
                         : <><Sparkles className="w-4 h-4" />สร้าง Season ใหม่</>}
                     </Button>
-                    {!writer && (
-                      <p className="text-xs text-muted-foreground/70">
-                        💡 เลือก AI Writer ให้นิยายนี้เพื่อให้ผลลัพธ์ดียิ่งขึ้น
-                      </p>
+                    {!novel?.writer_id && (
+                      <div className="text-xs text-destructive bg-destructive/5 border border-destructive/20 rounded-lg px-3 py-2">
+                        ⚠️ นิยายนี้ยังไม่มีนักเขียน AI กรุณาแก้ไขนิยายและเลือกนักเขียนก่อนสร้าง Season ใหม่
+                      </div>
                     )}
                   </div>
                   <div className="text-center">

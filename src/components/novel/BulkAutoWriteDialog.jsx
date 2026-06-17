@@ -382,6 +382,10 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
   };
 
   const handleStart = async () => {
+    if (!novelWriter) {
+      toast.error("นิยายนี้ยังไม่มีนักเขียน AI ที่ล็อกไว้ กรุณาแก้ไขนิยายและเลือกนักเขียน AI ก่อน");
+      return;
+    }
     if (isOneShot) {
       const existing = chapters[0];
       if (existing && (existing.word_count || 0) >= 500) {
@@ -670,6 +674,15 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
         {/* Settings */}
         {step === "settings" && (
           <div className="overflow-y-auto flex-1 px-6 py-5 space-y-4">
+            {!novelWriter && (
+              <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-4 flex items-start gap-3">
+                <AlertTriangle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-destructive">ไม่มีนักเขียน AI ประจำเรื่อง</p>
+                  <p className="text-xs text-destructive/80 mt-0.5">กรุณาแก้ไขข้อมูลนิยายและเลือกนักเขียน AI ก่อนใช้งานฟีเจอร์นี้</p>
+                </div>
+              </div>
+            )}
             <div className="rounded-xl border border-border/50 bg-muted/20 p-4 space-y-2 text-sm">
               {isOneShot ? (
                 <>
@@ -939,7 +952,7 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
                     สร้างตอนที่เหลือต่อ ({chaptersToCreateCount} ตอน)
                   </Button>
                 )}
-                <Button onClick={handleStart} className="gap-2" disabled={chaptersToCreateCount === 0 && !isPartiallyDone}>
+                <Button onClick={handleStart} className="gap-2" disabled={(chaptersToCreateCount === 0 && !isPartiallyDone) || !novelWriter}>
                   <Sparkles className="w-4 h-4" />
                   {chaptersToCreateCount === 0 ? "ครบแล้ว" : "เริ่มสร้างใหม่"}
                 </Button>

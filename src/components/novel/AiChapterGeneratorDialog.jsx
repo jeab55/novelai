@@ -50,6 +50,10 @@ export default function AiChapterGeneratorDialog({ open, onClose, novel, novelId
 
   const generateChapters = async () => {
     if (!novel) return;
+    if (!writer) {
+      setStep("error");
+      return;
+    }
     setStep("generating");
 
     const targetChapters = novel.target_chapters || 10;
@@ -197,20 +201,37 @@ ${eventsContext}
 
           {step === "idle" && (
             <div className="py-6 text-center space-y-4">
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                AI จะสร้างโครงตอนย่อย {novel?.target_chapters || 10} ตอน จากโครงเรื่อง 3 องก์และไทม์ไลน์ที่มี
-                <br />แต่ละตอนจะมีชื่อตอน โครงย่อ และผูกกับเหตุการณ์ไทม์ไลน์ (ถ้ามี)
-              </p>
-              {novel?.plot_outline && (
-                <div className="text-xs text-left bg-muted/50 border border-border/60 rounded-lg p-3 max-h-32 overflow-y-auto">
-                  <p className="font-semibold mb-1">โครงเรื่อง:</p>
-                  <p className="text-muted-foreground whitespace-pre-wrap">{novel.plot_outline}</p>
+              {!writer && novel?.writer_id ? (
+                <div className="text-sm text-destructive bg-destructive/5 border border-destructive/20 rounded-lg p-3">
+                  กำลังโหลดข้อมูลนักเขียน...
                 </div>
+              ) : !novel?.writer_id ? (
+                <div className="text-sm text-destructive bg-destructive/5 border border-destructive/20 rounded-lg p-3">
+                  ⚠️ นิยายนี้ยังไม่มีนักเขียน AI กรุณาแก้ไขนิยายและเลือกนักเขียนก่อน
+                </div>
+              ) : (
+                <>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    AI จะสร้างโครงตอนย่อย {novel?.target_chapters || 10} ตอน จากโครงเรื่อง 3 องก์และไทม์ไลน์ที่มี
+                    <br />แต่ละตอนจะมีชื่อตอน โครงย่อ และผูกกับเหตุการณ์ไทม์ไลน์ (ถ้ามี)
+                  </p>
+                  {writer && (
+                    <div className="text-xs text-primary/70 bg-primary/5 border border-primary/15 rounded-lg px-3 py-2">
+                      นักเขียน AI: <strong>{writer.name}</strong>
+                    </div>
+                  )}
+                  {novel?.plot_outline && (
+                    <div className="text-xs text-left bg-muted/50 border border-border/60 rounded-lg p-3 max-h-32 overflow-y-auto">
+                      <p className="font-semibold mb-1">โครงเรื่อง:</p>
+                      <p className="text-muted-foreground whitespace-pre-wrap">{novel.plot_outline}</p>
+                    </div>
+                  )}
+                  <Button onClick={generateChapters} className="gap-2 mt-2">
+                    <Sparkles className="w-4 h-4" />
+                    สร้างโครงตอน
+                  </Button>
+                </>
               )}
-              <Button onClick={generateChapters} className="gap-2 mt-2">
-                <Sparkles className="w-4 h-4" />
-                สร้างโครงตอน
-              </Button>
             </div>
           )}
 
@@ -224,11 +245,17 @@ ${eventsContext}
 
           {step === "error" && (
             <div className="py-12 text-center space-y-4">
-              <p className="text-sm text-destructive">เกิดข้อผิดพลาดในการสร้างโครงตอน</p>
-              <Button onClick={generateChapters} variant="outline" className="gap-2">
-                <RefreshCw className="w-3.5 h-3.5" />
-                ลองใหม่
-              </Button>
+              {!novel?.writer_id ? (
+                <p className="text-sm text-destructive">⚠️ นิยายนี้ยังไม่มีนักเขียน AI กรุณาแก้ไขนิยายและเลือกนักเขียนก่อน</p>
+              ) : (
+                <>
+                  <p className="text-sm text-destructive">เกิดข้อผิดพลาดในการสร้างโครงตอน</p>
+                  <Button onClick={generateChapters} variant="outline" className="gap-2">
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    ลองใหม่
+                  </Button>
+                </>
+              )}
             </div>
           )}
 
