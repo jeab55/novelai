@@ -505,10 +505,11 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
       setLog((l) => [...l, { order: i, title: chapterTitle, status: "generating" }]);
       setCurrentMsg(`✍️ กำลังร่างตอนที่ ${i}/${target}: "${chapterTitle}"...`);
 
-      const contextChapters = [
-        ...freshChapters.filter((c) => c.order < i && c.content && !c.is_deleted),
-        ...writtenSoFar.filter((c) => c.order < i),
-      ].sort((a, b) => a.order - b.order);
+      // รวม freshChapters + writtenSoFar (ที่เพิ่งสร้างในรอบนี้) โดย de-duplicate ด้วย order
+      const contextMap = new Map();
+      freshChapters.filter((c) => c.order < i && c.content && !c.is_deleted).forEach((c) => contextMap.set(c.order, c));
+      writtenSoFar.filter((c) => c.order < i && c.content).forEach((c) => contextMap.set(c.order, c));
+      const contextChapters = Array.from(contextMap.values()).sort((a, b) => a.order - b.order);
 
       const result = await generateSingleChapter({
         i, chapterTitle, linkedEvent, contextChapters, writerPrompt, existingChapter: existing,
@@ -662,7 +663,7 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
           <p className="text-xs text-muted-foreground mt-0.5">
             {isOneShot
               ? "สร้างเรื่องสั้นจบในตอนเดียวแบบเต็มรูปแบบ"
-              : `สร้างทีละตอนตามลำดับจนครบ {target} ตอน อิงโครงเรื่อง ไทม์ไลน์ และตัวละคร`
+              : `สร้างทีละตอนตามลำดับจนครบ ${target} ตอน อิงโครงเรื่อง ไทม์ไลน์ และตัวละคร`
             }
             <br />
             <span className="text-emerald-600 font-medium">
