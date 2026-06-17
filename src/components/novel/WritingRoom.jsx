@@ -490,45 +490,6 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
                   <CheckCircle2 className="w-3.5 h-3.5" />
                   ตรวจคำผิด
                 </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => setAiChapterGeneratorOpen(true)}
-                  className="gap-2"
-                >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  สร้างตอนด้วย AI
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => setBulkAutoWriteOpen(true)}
-                  disabled={isBulkWriting}
-                  className="gap-2"
-                >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  สร้างตอนทั้งหมด
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={() => {
-                    const last = chapters[chapters.length - 1];
-                    if (last) {
-                      setDraftChapter(last);
-                      setAiDraftOpen(true);
-                    } else {
-                      setAiChapterGeneratorOpen(true);
-                    }
-                  }}
-                  className="gap-2"
-                >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  สร้างร่าง
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={() => setExportOpen(true)}
-                  className="gap-2"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  ส่งออกไฟล์
-                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
 
