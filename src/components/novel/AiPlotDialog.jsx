@@ -18,6 +18,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Loader2, Sparkles, Plus, Trash2, RefreshCw, FileText, CheckCircle2, AlertCircle, ChevronDown, ChevronUp, Users, Globe } from "lucide-react";
 import AiWorldBuilderDialog from "./AiWorldBuilderDialog";
+import { invokeAIStable } from "@/lib/aiInvoke";
+import { toast } from "sonner";
 
 function stripCodeFence(text) {
   if (typeof text !== "string") return text;
@@ -169,20 +171,31 @@ async function generateChapterDraft({ novel, writer, characters, worldEntries, p
     sysPrompt += `→ ตอนนี้ต้องเล่าเหตุการณ์นี้ให้ครบ ใช้เป็นแกนกลางของพล็อต\n`;
   }
 
-  sysPrompt += `\n[คำสั่งสำคัญ]\n- ร่างเนื้อหาตอนนี้ให้ครบประมาณ 1,200 คำ อย่าตัดจบกลางคัน\n`;
+  const targetWords = novel.word_count_target || 1200;
+  const splitLong = targetWords >= 3000;
+
+  sysPrompt += `\n[คำสั่งสำคัญ]\n- ร่างเนื้อหาตอนนี้ให้ครบประมาณ ${targetWords.toLocaleString()} คำ อย่าตัดจบกลางคัน\n`;
   sysPrompt += `- ใช้ "Show don't tell" แสดงผ่านการกระทำและบทสนทนา\n`;
   sysPrompt += `- จบตอนด้วย chapter hook ที่ดึงให้อยากอ่านต่อ\n`;
   sysPrompt += `- ใช้ภาษาไทยที่อ่านลื่น เหมาะกับยุคสมัยของเรื่อง\n`;
   if (charList) sysPrompt += `- ใช้ชื่อตัวละครตรงตามคลังตัวละครเสมอ: ${charList}\n`;
   sysPrompt += `- ผลลัพธ์: เฉพาะเนื้อหาตอน ไม่ต้องมีคำนำหรืออธิบาย\n`;
 
-  const prompt = `${sysPrompt}\n\n[โจทย์ตอนที่ต้องร่าง]\nชื่อตอน: ${event.title}\nสิ่งที่ต้องเกิดในตอนนี้:\n${event.description || ""}\n\nร่างตอนนี้ให้ครบ 1,200 คำ:`;
+  // ── กรณีคำเยอะ (3000+) แบ่งสร้าง 2 ช่วงต่อเนื่องเพื่อลด timeout ──
+  if (splitLong) {
+    const half = Math.round(targetWords / 2);
+    const firstPrompt = `${sysPrompt}\n\n[โจทย์ตอนที่ต้องร่าง — ครึ่งแรก]\nชื่อตอน: ${event.title}\nสิ่งที่ต้องเกิดในตอนนี้:\n${event.description || ""}\n\nเขียน "ครึ่งแรก" ของตอนนี้ ความยาวประมาณ ${half.toLocaleString()} คำ เปิดเรื่องและดำเนินเรื่องไปจนถึงกลางตอน อย่าเพิ่งจบ:`;
+    const firstHalf = await invokeAIStable({ prompt: firstPrompt, model: "claude_sonnet_4_6" });
 
-  const result = await base44.integrations.Core.InvokeLLM({ prompt, model: "claude_sonnet_4_6" });
-  let text = typeof result === "string" ? result : (result?.text || "");
-  // Strip code fences
-  text = text.replace(/^```[\w]*\n?/m, "").replace(/\n?```$/m, "").trim();
-  return text;
+    const secondPrompt = `${sysPrompt}\n\n[โจทย์ตอนที่ต้องร่าง — ครึ่งหลัง]\nชื่อตอน: ${event.title}\nสิ่งที่ต้องเกิดในตอนนี้:\n${event.description || ""}\n\n[ครึ่งแรกที่เขียนไปแล้ว — เขียนต่อจากนี้ทันที]\n${firstHalf.substring(0, 3000)}${firstHalf.length > 3000 ? "\n…(ต่อ)" : ""}\n\nเขียน "ครึ่งหลัง" ต่อจากครึ่งแรกให้ลื่นไหล ความยาวประมาณ ${half.toLocaleString()} คำ พาเรื่องไปสู่จุดพีคและจบตอนด้วย chapter hook อย่าเขียนซ้ำครึ่งแรก:`;
+    const secondHalf = await invokeAIStable({ prompt: secondPrompt, model: "claude_sonnet_4_6" });
+
+    return `${firstHalf}\n\n${secondHalf}`.trim();
+  }
+
+  const prompt = `${sysPrompt}\n\n[โจทย์ตอนที่ต้องร่าง]\nชื่อตอน: ${event.title}\nสิ่งที่ต้องเกิดในตอนนี้:\n${event.description || ""}\n\nร่างตอนนี้ให้ครบ ${targetWords.toLocaleString()} คำ:`;
+
+  return await invokeAIStable({ prompt, model: "claude_sonnet_4_6" });
 }
 
 export default function AiPlotDialog({ open, onClose, novel, novelId, onOpenChapter }) {
@@ -307,13 +320,14 @@ export default function AiPlotDialog({ open, onClose, novel, novelId, onOpenChap
 
     let raw;
     try {
-      raw = await base44.integrations.Core.InvokeLLM({
-        prompt: userPrompt,
-        model: "claude_sonnet_4_6",
-      });
+      raw = await invokeAIStable(
+        { prompt: userPrompt, model: "claude_sonnet_4_6" },
+        { onRetry: ({ attempt, maxAttempts }) => toast.info(`AI ไม่ตอบสนอง กำลังลองใหม่ (${attempt}/${maxAttempts - 1})...`) }
+      );
     } catch (err) {
-      setParseError(`เรียก AI ไม่สำเร็จ: ${err.message}`);
+      setParseError(`เรียก AI ไม่สำเร็จ: ${err.message} — กรุณากด "เขียนใหม่"`);
       setStep("review");
+      toast.error("วางพล็อตไม่สำเร็จหลังลองใหม่หลายครั้ง");
       return;
     }
 
@@ -429,11 +443,13 @@ export default function AiPlotDialog({ open, onClose, novel, novelId, onOpenChap
       });
     } catch (err) {
       setDraftStatus((prev) => ({ ...prev, [idx]: `error:ร่างไม่สำเร็จ: ${err.message}` }));
+      toast.error(`ร่างตอน "${ev.title}" ไม่สำเร็จ — กดลองใหม่ได้`);
       return;
     }
 
     if (!draftContent) {
       setDraftStatus((prev) => ({ ...prev, [idx]: "error:AI ไม่ส่งเนื้อหากลับมา กรุณาลองใหม่" }));
+      toast.error("AI ไม่ส่งเนื้อหากลับมา กรุณาลองใหม่");
       return;
     }
 
@@ -460,8 +476,10 @@ export default function AiPlotDialog({ open, onClose, novel, novelId, onOpenChap
         ? { ...savedChapter, content: draftContent }
         : { novel_id: novelId, title: ev.title, order: ev.order, content: draftContent, status: "ร่าง" };
       setDraftStatus((prev) => ({ ...prev, [idx]: { state: "done", chapter: chapterToOpen } }));
+      toast.success(`ร่างตอน "${ev.title}" สำเร็จ และบันทึกแล้ว`);
     } else {
       setDraftStatus((prev) => ({ ...prev, [idx]: `error:${result.error}` }));
+      toast.error(`บันทึกร่างไม่สำเร็จ: ${result.error}`);
     }
   };
 

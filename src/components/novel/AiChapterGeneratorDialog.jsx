@@ -15,6 +15,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Loader2, Sparkles, Plus, Trash2, FileText, RefreshCw } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { invokeAIStable } from "@/lib/aiInvoke";
+import { toast } from "sonner";
 
 export default function AiChapterGeneratorDialog({ open, onClose, novel, novelId }) {
   const queryClient = useQueryClient();
@@ -90,18 +92,11 @@ ${eventsContext}
 ตอบเป็นภาษาไทย JSON ล้วนเท่านั้น`;
 
     try {
-      const raw = await base44.integrations.Core.InvokeLLM({
-        prompt,
-        model: "claude_sonnet_4_6",
-      });
-
-      let parsed;
-      if (typeof raw === "string") {
-        const cleaned = raw.replace(/^```[\w]*\n?/m, "").replace(/\n?```$/m, "").trim();
-        parsed = JSON.parse(cleaned);
-      } else {
-        parsed = raw;
-      }
+      const raw = await invokeAIStable(
+        { prompt, model: "claude_sonnet_4_6" },
+        { onRetry: ({ attempt, maxAttempts }) => toast.info(`AI ไม่ตอบสนอง กำลังลองใหม่ (${attempt}/${maxAttempts - 1})...`) }
+      );
+      const parsed = JSON.parse(raw);
 
       const chaptersRaw = parsed.chapters || parsed.items || [];
       setChapters(chaptersRaw.map((c, i) => ({
@@ -113,9 +108,11 @@ ${eventsContext}
         plot_event_title: c.plot_event_title || null,
       })));
       setStep("review");
+      toast.success("สร้างโครงตอนสำเร็จแล้ว");
     } catch (err) {
       console.error("Generate chapters error:", err);
       setStep("error");
+      toast.error(`สร้างโครงตอนไม่สำเร็จ: ${err.message}`);
     }
   };
 

@@ -10,6 +10,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Loader2, Sparkles, RefreshCw, CheckCheck, Wand2, ChevronRight, Bot, Clock, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { saveChapterContent } from "@/lib/saveChapterContent";
+import { invokeAIStable } from "@/lib/aiInvoke";
 
 const WORD_TARGETS = [
   { label: "สั้น ~800 คำ", value: 800 },
@@ -63,14 +64,10 @@ async function expandContentAutomatically(currentContent, targetWords, chapterTi
     expandPrompt += `[เขียนต่อจากนี้ — อย่างน้อย ${remainingWords} คำ]:\n`;
 
     try {
-      const result = await base44.integrations.Core.InvokeLLM({ prompt: expandPrompt, model: "claude_sonnet_4_6" });
-      let expansion = typeof result === "string" ? result : (result?.text || "");
-      expansion = expansion.replace(/^```[\w]*\n?/m, "").replace(/\n?```$/m, "").trim();
-      
+      const expansion = await invokeAIStable({ prompt: expandPrompt, model: "claude_sonnet_4_6" });
       if (!expansion || expansion.length < 50) {
         break;
       }
-      
       content = content + "\n\n" + expansion;
     } catch {
       break;
@@ -272,25 +269,48 @@ export default function AiDraftDialog({ open, onClose, chapter, novel, novelId, 
     setLoadingType("draft");
     setSaveError("");
     const sysPrompt = getSystemPrompt();
-    const prompt = buildDraftPrompt(form, sysPrompt, form.wordTarget);
-    const result = await base44.integrations.Core.InvokeLLM({ prompt, model: "claude_sonnet_4_6" });
-    let text = typeof result === "string" ? result : (result?.text || "");
-    text = text.replace(/^```[\w]*\n?/m, "").replace(/\n?```$/m, "").trim();
-    
-    // นับคำและขยายอัตโนมัติถ้าสั้นเกินไป
-    const initialWordCount = countThaiWords(text);
-    const minWords = Math.floor(form.wordTarget * 0.9);
-    
-    if (initialWordCount < minWords || initialWordCount < 1000) {
-      setLoadingType("expanding");
-      const expanded = await expandContentAutomatically(text, form.wordTarget, form.chapterTitle, form, sysPrompt, selectedWriter?.system_prompt || "");
-      text = expanded.content;
+
+    try {
+      let text;
+      // กรณีคำเยอะ (3000+) แบ่งสร้าง 2 ช่วงต่อเนื่องเพื่อลด timeout
+      if (form.wordTarget >= 3000) {
+        const half = Math.round(form.wordTarget / 2);
+        const firstPrompt = `${buildDraftPrompt(form, sysPrompt, half)}\n\n[หมายเหตุ] เขียน "ครึ่งแรก" ของตอนนี้ ประมาณ ${half} คำ — เปิดเรื่องและดำเนินไปจนถึงกลางตอน อย่าเพิ่งจบ`;
+        const firstHalf = await invokeAIStable(
+          { prompt: firstPrompt, model: "claude_sonnet_4_6" },
+          { onRetry: ({ attempt, maxAttempts }) => toast.info(`AI ไม่ตอบสนอง กำลังลองใหม่ (${attempt}/${maxAttempts - 1})...`) }
+        );
+        const secondPrompt = `${sysPrompt}\n\n[โจทย์ — เขียนครึ่งหลังต่อจากครึ่งแรก]\nชื่อตอน: "${form.chapterTitle}"\n\n[ครึ่งแรกที่เขียนไปแล้ว]\n${firstHalf.substring(0, 3000)}${firstHalf.length > 3000 ? "\n…(ต่อ)" : ""}\n\nเขียน "ครึ่งหลัง" ต่อจากครึ่งแรกให้ลื่นไหล ประมาณ ${half} คำ พาเรื่องไปสู่จุดพีคและจบตอน อย่าเขียนซ้ำครึ่งแรก:`;
+        const secondHalf = await invokeAIStable({ prompt: secondPrompt, model: "claude_sonnet_4_6" });
+        text = `${firstHalf}\n\n${secondHalf}`.trim();
+      } else {
+        const prompt = buildDraftPrompt(form, sysPrompt, form.wordTarget);
+        text = await invokeAIStable(
+          { prompt, model: "claude_sonnet_4_6" },
+          { onRetry: ({ attempt, maxAttempts }) => toast.info(`AI ไม่ตอบสนอง กำลังลองใหม่ (${attempt}/${maxAttempts - 1})...`) }
+        );
+      }
+
+      // นับคำและขยายอัตโนมัติถ้าสั้นเกินไป
+      const initialWordCount = countThaiWords(text);
+      const minWords = Math.floor(form.wordTarget * 0.9);
+
+      if (initialWordCount < minWords || initialWordCount < 1000) {
+        setLoadingType("expanding");
+        const expanded = await expandContentAutomatically(text, form.wordTarget, form.chapterTitle, form, sysPrompt, selectedWriter?.system_prompt || "");
+        text = expanded.content;
+      }
+
+      setDraft(text);
+      setStep(2);
+      toast.success("ร่างตอนสำเร็จแล้ว");
+    } catch (err) {
+      setSaveError(err.message || "ร่างไม่สำเร็จ กรุณาลองใหม่");
+      toast.error(`ร่างไม่สำเร็จ: ${err.message || "กรุณาลองใหม่"}`);
+    } finally {
+      setLoading(false);
+      setLoadingType("");
     }
-    
-    setDraft(text);
-    setStep(2);
-    setLoading(false);
-    setLoadingType("");
   };
 
   const handlePolish = async () => {
@@ -298,12 +318,19 @@ export default function AiDraftDialog({ open, onClose, chapter, novel, novelId, 
     setLoadingType("polish");
     const sysPrompt = getSystemPrompt();
     const prompt = buildPolishPrompt(draft, sysPrompt);
-    const result = await base44.integrations.Core.InvokeLLM({ prompt, model: "claude_sonnet_4_6" });
-    let text = typeof result === "string" ? result : (result?.text || "");
-    text = text.replace(/^```[\w]*\n?/m, "").replace(/\n?```$/m, "").trim();
-    setDraft(text);
-    setLoading(false);
-    setLoadingType("");
+    try {
+      const text = await invokeAIStable(
+        { prompt, model: "claude_sonnet_4_6" },
+        { onRetry: ({ attempt, maxAttempts }) => toast.info(`AI ไม่ตอบสนอง กำลังลองใหม่ (${attempt}/${maxAttempts - 1})...`) }
+      );
+      setDraft(text);
+      toast.success("ขัดเกลาสำนวนเสร็จแล้ว");
+    } catch (err) {
+      toast.error(`ขัดเกลาไม่สำเร็จ: ${err.message || "กรุณาลองใหม่"}`);
+    } finally {
+      setLoading(false);
+      setLoadingType("");
+    }
   };
 
   const handleInsert = async () => {

@@ -7,6 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Loader2, Sparkles, X, CheckCircle2, SkipForward, AlertTriangle, Bot, RefreshCw, PlayCircle, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { useBulkWrite } from "@/lib/BulkWriteContext";
+import { invokeAIStable } from "@/lib/aiInvoke";
 
 const DEFAULT_WRITER_PROMPT = `คุณคือนักเขียนนิยายภาษาไทยมืออาชีพที่กำลังร่างตอนใหม่ให้ผู้เขียน
 คุณต้องร่างเนื้อหาตอนที่สมบูรณ์ตามโครงที่ได้รับ รักษาสำนวนและโทนของเรื่อง ใช้ภาษาไทยที่อ่านลื่น`;
@@ -204,23 +205,12 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
     return count;
   };
 
-  // เรียก LLM พร้อม timeout 90 วินาที
-  const invokeLLMWithTimeout = async (prompt, timeoutMs = 180000) => {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-    try {
-      const result = await Promise.race([
-        base44.integrations.Core.InvokeLLM({ prompt, model: "claude_sonnet_4_6" }),
-        new Promise((_, reject) => {
-          controller.signal.addEventListener('abort', () => reject(new Error('LLM timeout')));
-        })
-      ]);
-      clearTimeout(timeoutId);
-      return result;
-    } catch (err) {
-      clearTimeout(timeoutId);
-      throw err;
-    }
+  // เรียก LLM แบบเสถียร: timeout 180 วิ + retry อัตโนมัติ 2 ครั้ง (exponential backoff)
+  const invokeLLMWithTimeout = async (prompt) => {
+    return await invokeAIStable(
+      { prompt, model: "claude_sonnet_4_6" },
+      { onRetry: ({ attempt, maxAttempts }) => setCurrentMsg(`🔄 AI ไม่ตอบสนอง กำลังลองใหม่ (${attempt}/${maxAttempts - 1})...`) }
+    );
   };
 
   const expandContent = async (currentContent, targetWords, chapterTitle, order, linkedEvent, onProgress, writerPrompt = "") => {
@@ -252,9 +242,7 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
       expandPrompt += `[เขียนต่อจากนี้ — อย่างน้อย ${remainingWords} คำ]:\n`;
 
       try {
-        const result = await invokeLLMWithTimeout(expandPrompt, 180000);
-        let expansion = typeof result === "string" ? result : (result?.text || "");
-        expansion = expansion.replace(/^```[\w]*\n?/m, "").replace(/\n?```$/m, "").trim();
+        const expansion = await invokeLLMWithTimeout(expandPrompt);
         if (!expansion || expansion.length < 50) break;
         content = content + "\n\n" + expansion;
       } catch {
@@ -281,9 +269,7 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
     titlePrompt += `\nตั้งชื่อตอนที่${order} ภาษาไทยสละสลวย น่าอ่าน ความยาว 3-8 คำ ไม่ต้องมีคำว่า "ตอนที่"\n`;
     titlePrompt += `ตอบกลับด้วยชื่อตอนเพียงชื่อเดียว:`;
     try {
-      const result = await base44.integrations.Core.InvokeLLM({ prompt: titlePrompt, model: "claude_sonnet_4_6" });
-      let title = typeof result === "string" ? result : (result?.text || "");
-      title = title.replace(/^```[\w]*\n?/m, "").replace(/\n?```$/m, "").trim();
+      let title = await invokeLLMWithTimeout(titlePrompt);
       title = title.replace(/^["']|["']$/g, "").trim();
       return title && title.length >= 3 ? title : `ตอนที่ ${order}`;
     } catch {
@@ -312,6 +298,7 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
     }
     taskPrompt += `[เริ่มเขียนตอนนี้เลย — ความยาวอย่างน้อย ${wordTarget} คำ]:\n`;
 
+    // invokeAIStable retry 2 ครั้งเองแล้ว — ที่นี่ลองเพิ่มอีก 1 รอบใหญ่ถ้าเนื้อหาสั้นผิดปกติ
     const MAX_RETRIES = 2;
     let lastError = null;
 
@@ -322,9 +309,19 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
       }
 
       try {
-        const result = await invokeLLMWithTimeout(taskPrompt, 180000);
-        let text = typeof result === "string" ? result : (result?.text || "");
-        text = text.replace(/^```[\w]*\n?/m, "").replace(/\n?```$/m, "").trim();
+        let text;
+        // กรณีคำเยอะ (3000+) แบ่งสร้าง 2 ช่วงต่อเนื่องเพื่อลด timeout
+        if (wordTarget >= 3000) {
+          const half = Math.round(wordTarget / 2);
+          setCurrentMsg(`✍️ ร่างครึ่งแรกของตอนที่ ${i} (~${half} คำ)...`);
+          const firstHalf = await invokeLLMWithTimeout(`${taskPrompt}\n\n[หมายเหตุ] เขียน "ครึ่งแรก" ประมาณ ${half} คำ เปิดเรื่องและดำเนินไปจนถึงกลางตอน อย่าเพิ่งจบ`);
+          setCurrentMsg(`✍️ ร่างครึ่งหลังของตอนที่ ${i} (~${half} คำ)...`);
+          const secondPrompt = `${sysPrompt}\n\n[โจทย์ — เขียนครึ่งหลังต่อจากครึ่งแรก]\nชื่อตอน: "${chapterTitle}"\n\n[ครึ่งแรกที่เขียนไปแล้ว]\n${(firstHalf || "").substring(0, 3000)}${(firstHalf || "").length > 3000 ? "\n…(ต่อ)" : ""}\n\nเขียน "ครึ่งหลัง" ต่อจากครึ่งแรกให้ลื่นไหล ประมาณ ${half} คำ พาเรื่องไปสู่จุดพีคและจบตอน อย่าเขียนซ้ำครึ่งแรก:`;
+          const secondHalf = await invokeLLMWithTimeout(secondPrompt);
+          text = `${firstHalf || ""}\n\n${secondHalf || ""}`.trim();
+        } else {
+          text = await invokeLLMWithTimeout(taskPrompt);
+        }
 
         if (!text || text.length < 100) throw new Error("เนื้อหาสั้นเกินไป");
 
