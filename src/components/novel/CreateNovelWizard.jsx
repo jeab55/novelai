@@ -311,7 +311,7 @@ function Step1({ form, setForm, chars, activeWriters }) {
                 <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${isOneShot ? "border-primary bg-primary" : "border-muted-foreground/30"}`}>
                   {isOneShot && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
                 </div>
-                <span className={`text-sm font-medium ${isOneShot ? "text-primary" : ""}`}>เรื่องสั้นจบในตอนเดียว</span>
+                <span className={`text-sm font-medium ${isOneShot ? "text-primary" : ""}`}>เรื่องสั้น</span>
               </div>
               <p className="text-xs text-muted-foreground ml-6">One-shot จบสมบูรณ์ใน 1 ตอน</p>
             </button>
