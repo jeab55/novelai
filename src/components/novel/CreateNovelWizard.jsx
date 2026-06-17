@@ -6,10 +6,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Plus, X, Sparkles, Loader2, ChevronDown, ChevronUp, Check, Users, BookOpen, Feather, Library } from "lucide-react";
+import { Plus, X, Sparkles, Loader2, ChevronDown, ChevronUp, Check, Users, BookOpen, Feather } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { toast } from "sonner";
-import SeasonSelectorDialog from "./SeasonSelectorDialog";
 
 const GENRES = ["โรแมนติก", "แฟนตาซี", "อิงประวัติศาสตร์", "จีนย้อนยุค", "วาย", "สยองขวัญ", "ลึกลับ", "แอ็คชั่น", "ดราม่า", "อื่นๆ"];
 const CHAR_ROLES = ["ตัวเอก", "ตัวรอง", "ตัวร้าย", "ตัวประกอบ"];
@@ -170,8 +169,6 @@ function Step1({ form, setForm, chars, activeWriters }) {
   const [drafting, setDrafting] = useState(false);
   const [draftError, setDraftError] = useState("");
   const [confirmMode, setConfirmMode] = useState(false);
-  const [seasonSelectorOpen, setSeasonSelectorOpen] = useState(false);
-
   const handleDraftSynopsis = async (append = false) => {
     setConfirmMode(false);
     setDraftError("");
@@ -231,58 +228,6 @@ function Step1({ form, setForm, chars, activeWriters }) {
 
   return (
     <div className="space-y-4">
-      {/* ประเภทงาน */}
-      <div className="space-y-3">
-        <Button
-          variant="outline"
-          size="sm"
-          className="w-full gap-2 border-dashed"
-          onClick={async () => {
-            // ดึงข้อมูล parent novel ถ้ามี เพื่อ lock writer_id ล่วงหน้า
-            if (form.parent_novel_id) {
-              try {
-                const parent = await base44.entities.Novel.get(form.parent_novel_id);
-                if (parent?.writer_id) {
-                  setForm({ ...form, writer_id: parent.writer_id });
-                  toast.success(`ล็อค AI Writer: ${parent.writer_id ? "ใช้.writer เดิม" : ""}`);
-                }
-              } catch {}
-            }
-            setSeasonSelectorOpen(true);
-          }}
-        >
-          <Library className="w-4 h-4" />
-          {form.parent_novel_id ? `Season ${form.season_number || 2}: กำลังสร้างภาคต่อ` : "สร้าง Season ใหม่ (ภาคต่อ)"}
-        </Button>
-        {seasonSelectorOpen && (
-          <SeasonSelectorDialog
-            open={true}
-            onClose={() => setSeasonSelectorOpen(false)}
-            novelId={form.parent_novel_id || activeWriters?.[0]?.id}
-            onSeasonSelected={async (season) => {
-              // ดึง writer_id จาก parent novel เสมอ
-              let inheritedWriterId = form.writer_id;
-              if (season.parent_novel_id || season.id) {
-                try {
-                  const parent = await base44.entities.Novel.get(season.parent_novel_id || season.id);
-                  if (parent?.writer_id) {
-                    inheritedWriterId = parent.writer_id;
-                  }
-                } catch {}
-              }
-              setForm({ 
-                ...form, 
-                parent_novel_id: season.parent_novel_id || season.id,
-                season_number: (season.season_number || 1) + 1,
-                writer_id: inheritedWriterId
-              });
-              setSeasonSelectorOpen(false);
-              toast.success(`สร้างภาคต่อจาก ${season.title} — ใช้ AI Writer เดิม`);
-            }}
-          />
-        )}
-      </div>
-
       <div>
         <label className="text-sm font-medium mb-1.5 block">ชื่อเรื่อง <span className="text-destructive">*</span></label>
         <Input placeholder="เช่น ลับแลลายเมฆ" value={form.title} onChange={(e) => { setForm({ ...form, title: e.target.value }); setDraftError(""); }} autoFocus />
