@@ -187,6 +187,34 @@ function Step1({ form, setForm, chars, activeWriters }) {
   const [confirmMode, setConfirmMode] = useState(false);
   const [marketDrafting, setMarketDrafting] = useState(false);
   const [titleSuggesting, setTitleSuggesting] = useState(false);
+  const [eraSuggesting, setEraSuggesting] = useState(false);
+
+  // ให้ AI สร้างยุคสมัยและฉากหลังจากพล็อต/แนว
+  const handleSuggestEra = async () => {
+    setDraftError("");
+    if (!form.synopsis.trim() && !form.genre) {
+      setDraftError("กรุณากรอกเรื่องย่อหรือเลือกแนวก่อน ให้ AI สร้างยุคสมัยได้ตรงพล็อต");
+      return;
+    }
+    setEraSuggesting(true);
+    const contextParts = [
+      form.title && `ชื่อเรื่อง: ${form.title}`,
+      form.genre && `แนวนิยาย: ${form.genre}`,
+      form.synopsis.trim() && `เรื่องย่อ/พล็อต: ${form.synopsis.trim()}`,
+    ].filter(Boolean).join("\n");
+
+    const result = await base44.integrations.Core.InvokeLLM({
+      prompt: `คุณคือนักเขียนนิยายไทยมืออาชีพ ช่วยกำหนด "ยุคสมัยและฉากหลัง" ที่เหมาะกับนิยายเรื่องนี้ ให้สอดคล้องกับแนวและพล็อต น่าสนใจและมีบรรยากาศชัดเจน\n\n${contextParts}\n\nระบุยุคสมัยและฉากหลังแบบกระชับในบรรทัดเดียว (เช่น "กรุงศรีอยุธยาตอนปลาย พ.ศ. 2310" หรือ "กรุงเทพฯ ยุคปัจจุบัน ย่านธุรกิจใจกลางเมือง") ตอบเฉพาะข้อความยุคสมัยและฉากหลังเดียว ไม่ต้องมีเครื่องหมายคำพูด หัวข้อ หรือคำอธิบาย`,
+    });
+    const cleaned = (typeof result === "string" ? result : "").replace(/^["'「」]+|["'「」]+$/g, "").replace(/^ยุคสมัย[^:：]*[:：]\s*/i, "").trim().split("\n")[0];
+    if (cleaned) {
+      setForm((f) => ({ ...f, era: cleaned }));
+      toast.success("สร้างยุคสมัยด้วย AI สำเร็จ! ✨");
+    } else {
+      setDraftError("AI ไม่สามารถสร้างยุคสมัยได้ กรุณาลองใหม่");
+    }
+    setEraSuggesting(false);
+  };
 
   // ให้ AI คิดชื่อเรื่องจากพล็อต/เรื่องย่อ
   const handleSuggestTitle = async () => {
@@ -338,7 +366,21 @@ function Step1({ form, setForm, chars, activeWriters }) {
         </Select>
       </div>
       <div>
-        <label className="text-sm font-medium mb-1.5 block">ยุคสมัยและฉากหลัง</label>
+        <div className="flex items-center justify-between mb-1.5">
+          <label className="text-sm font-medium">ยุคสมัยและฉากหลัง</label>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-7 text-xs gap-1 text-primary/70 hover:text-primary hover:bg-primary/8 px-2"
+            onClick={handleSuggestEra}
+            disabled={eraSuggesting}
+            title="ให้ AI สร้างยุคสมัยและฉากหลังจากพล็อต"
+          >
+            {eraSuggesting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+            {eraSuggesting ? "กำลังสร้าง..." : "✨ ให้ AI สร้างยุคสมัย"}
+          </Button>
+        </div>
         <Input placeholder="เช่น กรุงศรีอยุธยาตอนปลาย พ.ศ. 2310" value={form.era} onChange={(e) => setForm({ ...form, era: e.target.value })} />
       </div>
       <div>
