@@ -194,19 +194,8 @@ ${charSummary || "(ยังไม่มี)"}
     setGeneratingChars(false);
   }
 
-  // รวมชื่อภาคที่มีอยู่แล้วในเรื่องนี้ (นิยายหลัก + ทุกภาคต่อ) เพื่อตรวจชื่อซ้ำ
-  const existingSeasonTitles = [novel?.title, ...seasons.map((s) => s.title)]
-    .filter(Boolean)
-    .map((t) => t.trim().toLowerCase());
-  const isDuplicateTitle = existingSeasonTitles.includes(seasonTitle.trim().toLowerCase());
-
   async function handleCreate() {
     if (!seasonTitle.trim()) { toast.error("กรุณากรอกชื่อ Season"); return; }
-    // ★ ห้ามตั้งชื่อภาคซ้ำกันภายในเรื่องเดียวกัน
-    if (isDuplicateTitle) {
-      toast.error("ชื่อภาคนี้มีอยู่แล้วในเรื่องนี้ กรุณาใช้ชื่ออื่น");
-      return;
-    }
     setCreating(true);
 
     try {
@@ -534,13 +523,7 @@ ${charSummary || "(ยังไม่มี)"}
                       placeholder="ตั้งชื่อภาคนี้ (ชื่อล้วน ๆ ไม่ต้องใส่ 'Season X:' หรือชื่อเรื่องหลัก)"
                       value={seasonTitle}
                       onChange={(e) => setSeasonTitle(e.target.value)}
-                      className={isDuplicateTitle ? "border-destructive focus-visible:ring-destructive" : ""}
                     />
-                    {isDuplicateTitle && (
-                      <p className="text-xs text-destructive mt-1.5">
-                        ⚠️ ชื่อภาคนี้มีอยู่แล้วในเรื่องนี้ กรุณาใช้ชื่ออื่น
-                      </p>
-                    )}
                   </div>
                   <div>
                     <label className="text-sm font-medium mb-1.5 block">เนื้อเรื่องย่อ Season ใหม่</label>
@@ -705,15 +688,14 @@ ${charSummary || "(ยังไม่มี)"}
                   variant="outline"
                   className="gap-1.5"
                   onClick={handleCreate}
-                  disabled={!seasonTitle.trim() || creating || isDuplicateTitle}
+                  disabled={!seasonTitle.trim() || creating}
                 >
                   {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                   บันทึก
                 </Button>
                 <Button
                   onClick={() => setStep(2)}
-                  disabled={!seasonTitle.trim() || isDuplicateTitle}
-                  title={isDuplicateTitle ? "ชื่อภาคนี้มีอยู่แล้ว กรุณาใช้ชื่ออื่น" : ""}
+                  disabled={!seasonTitle.trim()}
                 >
                   ถัดไป <ChevronRight className="w-4 h-4 ml-1" />
                 </Button>
@@ -743,7 +725,7 @@ ${charSummary || "(ยังไม่มี)"}
               </Button>
             )}
             {step === 3 && (
-              <Button onClick={handleCreate} disabled={creating || isDuplicateTitle} title={isDuplicateTitle ? "ชื่อภาคนี้มีอยู่แล้ว กรุณาใช้ชื่ออื่น" : ""} className="gap-2">
+              <Button onClick={handleCreate} disabled={creating} className="gap-2">
                 {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
                 ตกลง สร้าง Season
               </Button>
