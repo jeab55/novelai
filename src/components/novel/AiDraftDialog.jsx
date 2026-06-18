@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { saveChapterContent } from "@/lib/saveChapterContent";
 import { saveVersion } from "@/lib/saveVersion";
 import { invokeAIStable } from "@/lib/aiInvoke";
+import { enforceWordRange, buildWordCountInstruction, getWordRange } from "@/lib/wordCountControl";
 import AiProgressBar from "@/components/novel/AiProgressBar";
 
 const LOADING_LABELS = {
@@ -154,20 +155,20 @@ function buildDraftSystemPrompt(novel, characters, worldEntries, plotEvents, cha
 }
 
 function buildDraftPrompt(form, systemPrompt, wordTarget) {
+  const { min, max } = getWordRange(wordTarget);
   let prompt = systemPrompt;
   prompt += `\n\n[โจทย์ตอนที่ต้องร่าง — เขียนเนื้อหาเต็มตอน]\n`;
   prompt += `ชื่อตอน: "${form.chapterTitle}"\n`;
-  prompt += `ความยาวที่ต้องการ: อย่างน้อย ${wordTarget} คำ (ขั้นต่ำ 1000 คำ)\n\n`;
+  prompt += buildWordCountInstruction(wordTarget) + `\n`;
   prompt += `[คำสั่งสำคัญ — ต้องปฏิบัติตาม]\n`;
-  prompt += `1. เขียนเนื้อหาเต็มตอนเป็นร้อยแก้วนิยายภาษาไทย ความยาวอย่างน้อย ${wordTarget} คำ\n`;
+  prompt += `1. เขียนเนื้อหาเต็มตอนเป็นร้อยแก้วนิยายภาษาไทย ความยาว ${min.toLocaleString()}-${max.toLocaleString()} คำ\n`;
   prompt += `2. ต้องประกอบด้วยหลายฉาก มีทั้งบทบรรยายและบทสนทนาที่ยาวพอสมควร\n`;
   prompt += `3. เขียนเป็นเนื้อเรื่องต่อเนื่อง ไม่ใช่เค้าโครง ไม่ใช่สรุปย่อ ไม่ใช้ bullet points\n`;
-  prompt += `4. ใช้ภาษาไทยที่สละสลวย อ่านลื่น เห็นภาพ มีอารมณ์และจังหวะการเล่าเรื่อง\n`;
-  prompt += `5. ห้ามเขียนสั้นกว่า 1000 คำ — ถ้าสั้นกว่านี้ระบบจะขยายอัตโนมัติแต่จะเสียเครดิตเพิ่ม\n\n`;
+  prompt += `4. ใช้ภาษาไทยที่สละสลวย อ่านลื่น เห็นภาพ มีอารมณ์และจังหวะการเล่าเรื่อง\n\n`;
   if (form.summary) prompt += `[สิ่งที่ต้องเกิดในตอนนี้]:\n${form.summary}\n\n`;
   if (form.characters) prompt += `[ตัวละครในตอน]: ${form.characters}\n\n`;
   if (form.tone) prompt += `[โทน/มุมมอง]: ${form.tone}\n\n`;
-  prompt += `[เริ่มเขียนเนื้อหาตอนนี้เลย — ความยาวอย่างน้อย ${wordTarget} คำ]:\n`;
+  prompt += `[เริ่มเขียนเนื้อหาตอนนี้เลย — ความยาว ${min.toLocaleString()}-${max.toLocaleString()} คำ]:\n`;
   return prompt;
 }
 
@@ -345,14 +346,17 @@ export default function AiDraftDialog({ open, onClose, chapter, novel, novelId, 
         );
       }
 
-      // นับคำและขยายอัตโนมัติถ้าสั้นเกินไป
+      // ตรวจนับจำนวนคำ แล้วขยาย/ย่อให้อยู่ในช่วงเป้าหมาย ±500 คำ
+      const { min: rangeMin, max: rangeMax } = getWordRange(form.wordTarget);
       const initialWordCount = countThaiWords(text);
-      const minWords = Math.floor(form.wordTarget * 0.9);
-
-      if (initialWordCount < minWords || initialWordCount < 1000) {
+      if (initialWordCount < rangeMin || initialWordCount > rangeMax) {
         setLoadingType("expanding");
-        const expanded = await expandContentAutomatically(text, form.wordTarget, form.chapterTitle, form, sysPrompt, selectedWriter?.system_prompt || "");
-        text = expanded.content;
+        const ctx = `[ตอน: "${form.chapterTitle}"]${form.summary ? `\nสิ่งที่ต้องเกิด: ${form.summary}` : ""}`;
+        const adjusted = await enforceWordRange(text, form.wordTarget, {
+          context: ctx,
+          writerPrompt: selectedWriter?.system_prompt || "",
+        });
+        text = adjusted.content;
       }
 
       setDraft(text);

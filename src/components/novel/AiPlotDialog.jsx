@@ -20,6 +20,7 @@ import {
 import { Loader2, Sparkles, Plus, Trash2, RefreshCw, FileText, CheckCircle2, AlertCircle, ChevronDown, ChevronUp, Users, Globe } from "lucide-react";
 import AiWorldBuilderDialog from "./AiWorldBuilderDialog";
 import { invokeAIStable } from "@/lib/aiInvoke";
+import { enforceWordRange, buildWordCountInstruction, getWordRange } from "@/lib/wordCountControl";
 import AiProgressBar from "@/components/novel/AiProgressBar";
 import { toast } from "sonner";
 
@@ -176,7 +177,7 @@ async function generateChapterDraft({ novel, writer, characters, worldEntries, p
   const targetWords = novel.word_count_target || 1200;
   const splitLong = targetWords >= 3000;
 
-  sysPrompt += `\n[คำสั่งสำคัญ]\n- ร่างเนื้อหาตอนนี้ให้ครบประมาณ ${targetWords.toLocaleString()} คำ อย่าตัดจบกลางคัน\n`;
+  sysPrompt += `\n[คำสั่งสำคัญ]\n${buildWordCountInstruction(targetWords)}- อย่าตัดจบกลางคัน\n`;
   sysPrompt += `- ใช้ "Show don't tell" แสดงผ่านการกระทำและบทสนทนา\n`;
   sysPrompt += `- จบตอนด้วย chapter hook ที่ดึงให้อยากอ่านต่อ\n`;
   sysPrompt += `- ใช้ภาษาไทยที่อ่านลื่น เหมาะกับยุคสมัยของเรื่อง\n`;
@@ -192,12 +193,19 @@ async function generateChapterDraft({ novel, writer, characters, worldEntries, p
     const secondPrompt = `${sysPrompt}\n\n[โจทย์ตอนที่ต้องร่าง — ครึ่งหลัง]\nชื่อตอน: ${event.title}\nสิ่งที่ต้องเกิดในตอนนี้:\n${event.description || ""}\n\n[ครึ่งแรกที่เขียนไปแล้ว — เขียนต่อจากนี้ทันที]\n${firstHalf.substring(0, 3000)}${firstHalf.length > 3000 ? "\n…(ต่อ)" : ""}\n\nเขียน "ครึ่งหลัง" ต่อจากครึ่งแรกให้ลื่นไหล ความยาวประมาณ ${half.toLocaleString()} คำ พาเรื่องไปสู่จุดพีคและจบตอนด้วย chapter hook อย่าเขียนซ้ำครึ่งแรก:`;
     const secondHalf = await invokeAIStable({ prompt: secondPrompt, model: "claude_sonnet_4_6" });
 
-    return `${firstHalf}\n\n${secondHalf}`.trim();
+    const combined = `${firstHalf}\n\n${secondHalf}`.trim();
+    const ctx = `[ตอน: "${event.title}"]${event.description ? `\nสิ่งที่ต้องเกิด: ${event.description}` : ""}`;
+    const adjusted = await enforceWordRange(combined, targetWords, { context: ctx, writerPrompt });
+    return adjusted.content;
   }
 
-  const prompt = `${sysPrompt}\n\n[โจทย์ตอนที่ต้องร่าง]\nชื่อตอน: ${event.title}\nสิ่งที่ต้องเกิดในตอนนี้:\n${event.description || ""}\n\nร่างตอนนี้ให้ครบ ${targetWords.toLocaleString()} คำ:`;
+  const { min, max } = getWordRange(targetWords);
+  const prompt = `${sysPrompt}\n\n[โจทย์ตอนที่ต้องร่าง]\nชื่อตอน: ${event.title}\nสิ่งที่ต้องเกิดในตอนนี้:\n${event.description || ""}\n\nร่างตอนนี้ให้อยู่ในช่วง ${min.toLocaleString()}-${max.toLocaleString()} คำ:`;
 
-  return await invokeAIStable({ prompt, model: "claude_sonnet_4_6" });
+  const raw = await invokeAIStable({ prompt, model: "claude_sonnet_4_6" });
+  const ctx = `[ตอน: "${event.title}"]${event.description ? `\nสิ่งที่ต้องเกิด: ${event.description}` : ""}`;
+  const adjusted = await enforceWordRange(raw, targetWords, { context: ctx, writerPrompt });
+  return adjusted.content;
 }
 
 export default function AiPlotDialog({ open, onClose, novel, novelId, onOpenChapter }) {

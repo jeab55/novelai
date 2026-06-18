@@ -8,6 +8,7 @@ import { Loader2, Sparkles, X, CheckCircle2, SkipForward, AlertTriangle, Bot, Re
 import { toast } from "sonner";
 import { useBulkWrite } from "@/lib/BulkWriteContext";
 import { invokeAIStable } from "@/lib/aiInvoke";
+import { enforceWordRange, buildWordCountInstruction, getWordRange, countThaiWords as countWords } from "@/lib/wordCountControl";
 import AiProgressBar from "@/components/novel/AiProgressBar";
 
 const DEFAULT_WRITER_PROMPT = `คุณคือนักเขียนนิยายภาษาไทยมืออาชีพที่กำลังร่างตอนใหม่ให้ผู้เขียน
@@ -95,7 +96,8 @@ function buildSystemPrompt(novel, characters, worldEntries, plotEvents, prevChap
 
   if (isOneShot) {
     ctx += `\n[คำสั่งสำคัญ]\n`;
-    ctx += `- เขียนเรื่องสั้นสมบูรณ์จบในตอนเดียว ความยาวประมาณ ${novel.word_count_target || 3000} คำ\n`;
+    ctx += buildWordCountInstruction(novel.word_count_target || 3000);
+    ctx += `- เขียนเรื่องสั้นสมบูรณ์จบในตอนเดียว\n`;
     ctx += `- ต้องมีจุดพีคและตอนจบที่สมบูรณ์ในตัวเอง\n`;
     ctx += `- ผลลัพธ์: เฉพาะเนื้อหาเรื่องสั้น ไม่ต้องมีคำนำหรืออธิบาย\n`;
   } else {
@@ -285,9 +287,9 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
     taskPrompt += `\n\n[โจทย์ตอนที่ต้องร่าง — เขียนเนื้อหาเต็มตอน]\n`;
     taskPrompt += `ชื่อตอน: "${chapterTitle}"\n`;
     taskPrompt += `ลำดับตอน: ${i} จาก ${target} ตอน\n`;
-    taskPrompt += `ความยาวที่ต้องการ: อย่างน้อย ${wordTarget} คำ\n\n`;
+    taskPrompt += buildWordCountInstruction(wordTarget) + `\n`;
     taskPrompt += `[คำสั่งสำคัญ]\n`;
-    taskPrompt += `1. เขียนเนื้อหาเต็มตอนเป็นร้อยแก้วนิยายภาษาไทย ความยาวอย่างน้อย ${wordTarget} คำ\n`;
+    taskPrompt += `1. เขียนเนื้อหาเต็มตอนเป็นร้อยแก้วนิยายภาษาไทยให้อยู่ในช่วงจำนวนคำที่กำหนด\n`;
     taskPrompt += `2. ประกอบด้วยหลายฉาก มีทั้งบทบรรยายและบทสนทนาที่ลื่นไหล\n`;
     taskPrompt += `3. ห้ามเขียนเป็นเค้าโครง สรุปย่อ หรือรายการสั้นๆ\n`;
     taskPrompt += `4. รักษาความต่อเนื่องกับตอนก่อนหน้า\n\n`;
@@ -297,7 +299,7 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
       if (linkedEvent.time_period) taskPrompt += `\n  ช่วงเวลา: ${linkedEvent.time_period}`;
       taskPrompt += `\n\n`;
     }
-    taskPrompt += `[เริ่มเขียนตอนนี้เลย — ความยาวอย่างน้อย ${wordTarget} คำ]:\n`;
+    taskPrompt += `[เริ่มเขียนตอนนี้เลย — ${getWordRange(wordTarget).min.toLocaleString()}-${getWordRange(wordTarget).max.toLocaleString()} คำ]:\n`;
 
     // invokeAIStable retry 2 ครั้งเองแล้ว — ที่นี่ลองเพิ่มอีก 1 รอบใหญ่ถ้าเนื้อหาสั้นผิดปกติ
     const MAX_RETRIES = 2;
@@ -326,26 +328,24 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
 
         if (!text || text.length < 100) throw new Error("เนื้อหาสั้นเกินไป");
 
-        // ขยายถ้าจำนวนคำยังไม่ถึงเป้า
-        const minWords = Math.floor(wordTarget * 0.9);
+        // ตรวจนับจำนวนคำ แล้วขยาย/ย่อให้อยู่ในช่วงเป้าหมาย ±500 คำ
+        const { min: rangeMin, max: rangeMax } = getWordRange(wordTarget);
         const initialWordCount = countThaiWords(text);
         let finalContent = text;
         let finalWordCount = initialWordCount;
 
-        if (initialWordCount < minWords) {
-          const expanded = await expandContent(
-            text,
-            wordTarget,
-            chapterTitle,
-            i,
-            linkedEvent,
-            ({ attempt: exp, maxAttempts, currentWordCount }) => {
-              setCurrentMsg(`📝 ขยายรอบที่ ${exp}/${maxAttempts} — ${currentWordCount}/${wordTarget} คำ...`);
-            },
-            writerPrompt
-          );
-          finalContent = expanded.content;
-          finalWordCount = expanded.wordCount;
+        if (initialWordCount < rangeMin || initialWordCount > rangeMax) {
+          const ctx = linkedEvent
+            ? `[ตอน: "${chapterTitle}" ลำดับที่ ${i}]\nเหตุการณ์หลัก: ${linkedEvent.title}${linkedEvent.description ? `\n${linkedEvent.description}` : ""}`
+            : `[ตอน: "${chapterTitle}" ลำดับที่ ${i}]`;
+          const adjusted = await enforceWordRange(text, wordTarget, {
+            context: ctx,
+            writerPrompt,
+            onProgress: ({ phase, wordCount }) =>
+              setCurrentMsg(`📝 ${phase === "shrink" ? "ย่อ" : "ขยาย"}ตอนที่ ${i} — ${wordCount}/${wordTarget} คำ...`),
+          });
+          finalContent = adjusted.content;
+          finalWordCount = adjusted.wordCount;
         }
 
         // บันทึกทันทีหลัง generate เสร็จแต่ละตอน

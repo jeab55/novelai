@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Loader2, Sparkles, BookOpen, CheckCircle2, AlertTriangle, Bot } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
+import { enforceWordRange, buildWordCountInstruction, getWordRange } from "@/lib/wordCountControl";
 
 const GENRES = ["โรแมนติก", "แฟนตาซี", "อิงประวัติศาสตร์", "จีนย้อนยุค", "วาย", "สยองขวัญ", "ลึกลับ", "แอ็คชั่น", "ดราม่า", "อื่นๆ"];
 const ENDING_TYPES = ["จบสุข (HEA)", "จบเศร้า (HFE)", "จบเปิด (Open Ending)", "จบตามจริง"];
@@ -182,7 +183,7 @@ ${charDesc}
 รูปแบบตอนจบ: ${endingInstruction}
 
 [คำสั่งสำคัญ]
-- เขียนเรื่องสั้นสมบูรณ์จบในตัวเอง ความยาวอย่างน้อย ${form.word_count_target} คำ
+${buildWordCountInstruction(form.word_count_target)}- เขียนเรื่องสั้นสมบูรณ์จบในตัวเอง
 - โครง 3 องก์บีบอัด: เปิดปม 20% / บีบให้ตึง 60% / จุดพีคและตอนจบ 20%
 - เปิดเรื่องกลางสถานการณ์ทันที (in media res) ไม่เกริ่นนำยาว
 - มีทั้งบทบรรยายและบทสนทนาที่เป็นธรรมชาติ ไม่เขียนเป็นโครงหรือสรุป
@@ -197,24 +198,18 @@ ${charDesc}
     let content = typeof contentRes === "string" ? contentRes : (contentRes?.text || "");
     content = content.replace(/^```[\w]*\n?/m, "").replace(/\n?```$/m, "").trim();
 
-    // ขยายถ้าสั้นเกินไป
+    // ตรวจนับจำนวนคำ แล้วขยาย/ย่อให้อยู่ในช่วงเป้าหมาย ±500 คำ
     let wordCount = countThaiWords(content);
-    const minWords = Math.floor(form.word_count_target * 0.9);
+    const { min: rangeMin, max: rangeMax } = getWordRange(form.word_count_target);
 
-    if (wordCount < minWords) {
-      setStatusMsg(`📝 ขยายเนื้อหา (${wordCount} → ${form.word_count_target} คำ)...`);
-      const expandPrompt = `เนื้อหาปัจจุบันมี ${wordCount} คำ ต้องการอย่างน้อย ${form.word_count_target} คำ
-เขียนต่อจากเนื้อหาด้านล่างอีกอย่างน้อย ${form.word_count_target - wordCount} คำ โดยเพิ่มฉากรายละเอียด บทสนทนา และพัฒนาอารมณ์ตัวละคร:
-
-${content.substring(0, 3000)}
-
-[เขียนต่อจากนี้]:`;
-      const expandRes = await base44.integrations.Core.InvokeLLM({ prompt: expandPrompt, model: "claude_sonnet_4_6" });
-      const expansion = typeof expandRes === "string" ? expandRes : "";
-      if (expansion.trim().length > 50) {
-        content = content + "\n\n" + expansion.trim();
-        wordCount = countThaiWords(content);
-      }
+    if (wordCount < rangeMin || wordCount > rangeMax) {
+      setStatusMsg(`📝 ปรับจำนวนคำให้อยู่ในช่วง ${rangeMin.toLocaleString()}-${rangeMax.toLocaleString()} คำ (ตอนนี้ ${wordCount} คำ)...`);
+      const adjusted = await enforceWordRange(content, form.word_count_target, {
+        context: `เรื่องสั้น: ${novelData.title || form.idea}`,
+        writerPrompt: writerStyle,
+      });
+      content = adjusted.content;
+      wordCount = adjusted.wordCount;
     }
 
     // ─── Step 4: บันทึก Chapter ───
