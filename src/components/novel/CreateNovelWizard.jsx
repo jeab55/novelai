@@ -186,6 +186,34 @@ function Step1({ form, setForm, chars, activeWriters }) {
   const [draftError, setDraftError] = useState("");
   const [confirmMode, setConfirmMode] = useState(false);
   const [marketDrafting, setMarketDrafting] = useState(false);
+  const [titleSuggesting, setTitleSuggesting] = useState(false);
+
+  // ให้ AI คิดชื่อเรื่องจากพล็อต/เรื่องย่อ
+  const handleSuggestTitle = async () => {
+    setDraftError("");
+    if (!form.synopsis.trim() && !form.genre) {
+      setDraftError("กรุณากรอกเรื่องย่อหรือเลือกแนวก่อน ให้ AI ตั้งชื่อเรื่องได้ตรงพล็อต");
+      return;
+    }
+    setTitleSuggesting(true);
+    const contextParts = [
+      form.genre && `แนวนิยาย: ${form.genre}`,
+      form.era && `ยุคสมัยและฉากหลัง: ${form.era}`,
+      form.synopsis.trim() && `เรื่องย่อ/พล็อต: ${form.synopsis.trim()}`,
+    ].filter(Boolean).join("\n");
+
+    const result = await base44.integrations.Core.InvokeLLM({
+      prompt: `คุณคือนักเขียนนิยายไทยมือทอง ช่วยตั้งชื่อเรื่องให้น่าสนใจ ติดหู ดึงดูดให้อยากอ่าน และขายได้ในตลาดนิยายไทย${form.genre ? ` เหมาะกับแนว${form.genre}` : ""} โดยอิงจากข้อมูลด้านล่าง\n\n${contextParts}\n\nตั้งชื่อเรื่องที่กระชับ (ไม่เกิน 8 คำ) สื่อถึงแก่นเรื่อง ตอบเฉพาะชื่อเรื่องเดียว ไม่ต้องมีเครื่องหมายคำพูด หัวข้อ หรือคำอธิบาย`,
+    });
+    const cleaned = (typeof result === "string" ? result : "").replace(/^["'「」]+|["'「」]+$/g, "").replace(/^ชื่อเรื่อง[:：]\s*/i, "").trim().split("\n")[0];
+    if (cleaned) {
+      setForm((f) => ({ ...f, title: cleaned }));
+      toast.success("ตั้งชื่อเรื่องด้วย AI สำเร็จ! ✨");
+    } else {
+      setDraftError("AI ไม่สามารถตั้งชื่อเรื่องได้ กรุณาลองใหม่");
+    }
+    setTitleSuggesting(false);
+  };
 
   // ร่างเรื่องย่อแนวขายได้ในตลาด อิงแนว + โทรปยอดนิยม
   const handleDraftMarketSynopsis = async () => {
@@ -285,7 +313,21 @@ function Step1({ form, setForm, chars, activeWriters }) {
   return (
     <div className="space-y-4">
       <div>
-        <label className="text-sm font-medium mb-1.5 block">ชื่อเรื่อง <span className="text-destructive">*</span></label>
+        <div className="flex items-center justify-between mb-1.5">
+          <label className="text-sm font-medium">ชื่อเรื่อง <span className="text-destructive">*</span></label>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-7 text-xs gap-1 text-primary/70 hover:text-primary hover:bg-primary/8 px-2"
+            onClick={handleSuggestTitle}
+            disabled={titleSuggesting}
+            title="ให้ AI คิดชื่อเรื่องจากพล็อต/เรื่องย่อ"
+          >
+            {titleSuggesting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+            {titleSuggesting ? "กำลังคิด..." : "✨ ให้ AI คิดชื่อเรื่องจากพล็อต"}
+          </Button>
+        </div>
         <Input placeholder="เช่น ลับแลลายเมฆ" value={form.title} onChange={(e) => { setForm({ ...form, title: e.target.value }); setDraftError(""); }} autoFocus />
       </div>
       <div>

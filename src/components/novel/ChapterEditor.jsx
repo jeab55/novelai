@@ -88,7 +88,34 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
   const [illustrationOpen, setIllustrationOpen] = useState(false);
   const [proofreaderOpen, setProofreaderOpen] = useState(false);
   const [spellCheckerOpen, setSpellCheckerOpen] = useState(false);
+  const [titleSuggesting, setTitleSuggesting] = useState(false);
   const queryClient = useQueryClient();
+
+  // ให้ AI คิดชื่อตอนจากเนื้อเรื่อง
+  const handleSuggestTitle = async () => {
+    const text = (content || "").replace(/<[^>]*>/g, " ").trim();
+    if (text.length < 30) {
+      toast.error("เนื้อเรื่องสั้นเกินไป กรุณาเขียนเนื้อหาก่อนให้ AI ตั้งชื่อตอน");
+      return;
+    }
+    setTitleSuggesting(true);
+    try {
+      const result = await base44.integrations.Core.InvokeLLM({
+        prompt: `คุณคือนักเขียนนิยายไทยมืออาชีพ ช่วยตั้งชื่อตอนจากเนื้อเรื่องด้านล่างนี้ ให้น่าสนใจ ดึงดูดให้อยากอ่าน กระชับ (ไม่เกิน 8 คำ) สื่อถึงแก่นหรือจุดสำคัญของตอน${novel?.genre ? ` เหมาะกับแนว${novel.genre}` : ""} โดยไม่สปอยล์ปมสำคัญ\n\n[เนื้อเรื่อง]\n${text.substring(0, 4000)}\n\nตอบเฉพาะชื่อตอนเดียว ไม่ต้องมีเครื่องหมายคำพูด หัวข้อ หรือคำอธิบายใดๆ`,
+      });
+      const cleaned = (typeof result === "string" ? result : "").replace(/^["'「」]+|["'「」]+$/g, "").replace(/^ชื่อตอน[:：]\s*/i, "").trim().split("\n")[0];
+      if (cleaned) {
+        setTitle(cleaned);
+        triggerAutoSave();
+        toast.success("ตั้งชื่อตอนด้วย AI สำเร็จ! ✨");
+      } else {
+        toast.error("AI ไม่สามารถตั้งชื่อตอนได้ กรุณาลองใหม่");
+      }
+    } catch {
+      toast.error("เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง");
+    }
+    setTitleSuggesting(false);
+  };
 
   const { data: plotEvents = [] } = useQuery({
     queryKey: ["plotEvents", novelId],
@@ -267,8 +294,19 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
       <Input
         value={title}
         onChange={(e) => { setTitle(e.target.value); triggerAutoSave(); }}
-        className="max-w-sm font-heading font-semibold border-none bg-transparent shadow-none focus-visible:ring-0 px-0 text-base"
+        className="max-w-xs font-heading font-semibold border-none bg-transparent shadow-none focus-visible:ring-0 px-0 text-base"
       />
+      <Button
+        variant="ghost"
+        size="sm"
+        className="gap-1 h-8 text-xs text-primary/70 hover:text-primary hover:bg-primary/8 shrink-0 px-2"
+        onClick={handleSuggestTitle}
+        disabled={titleSuggesting}
+        title="ให้ AI คิดชื่อตอนจากเนื้อเรื่อง"
+      >
+        {titleSuggesting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+        <span className="hidden lg:inline">{titleSuggesting ? "กำลังคิด..." : "AI ตั้งชื่อตอน"}</span>
+      </Button>
       <div className="flex items-center gap-2 ml-auto">
         {/* Autosave indicator */}
         <span className={`text-xs flex items-center gap-1 tabular-nums transition-colors ${autoSaveStatus === "saving" ? "text-amber-500" : "text-emerald-600"}`}>
