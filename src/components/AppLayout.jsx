@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Cat, BookOpen, Layers, Moon, Sun, Settings, Trash2, LogOut } from "lucide-react";
+import { Cat, BookOpen, Layers, Moon, Sun, Settings, Trash2, LogOut, HelpCircle } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
+import UserGuideDialog from "@/components/UserGuideDialog";
 
 function useDarkMode() {
   const [dark, setDark] = useState(() => localStorage.getItem("novelai-dark") === "true");
@@ -15,6 +16,7 @@ function useDarkMode() {
 
 export default function AppLayout({ children }) {
   const [dark, setDark] = useDarkMode();
+  const [guideOpen, setGuideOpen] = useState(false);
   const { user, logout } = useAuth();
   const location = useLocation();
 
@@ -62,6 +64,15 @@ export default function AppLayout({ children }) {
           {/* Right controls */}
           <div className="flex items-center gap-1 shrink-0">
             <span className="text-sm text-muted-foreground hidden sm:block mr-2">{user?.full_name || user?.email}</span>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="w-8 h-8 text-muted-foreground hover:text-orange-500"
+              title="วิธีการใช้งาน"
+              onClick={() => setGuideOpen(true)}
+            >
+              <HelpCircle className="w-4 h-4" />
+            </Button>
             <Button variant="ghost" size="icon" className="w-8 h-8" onClick={() => setDark((v) => !v)}>
               {dark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </Button>
@@ -82,6 +93,7 @@ export default function AppLayout({ children }) {
         </div>
       </header>
       <main>{children}</main>
+      <UserGuideDialog open={guideOpen} onOpenChange={setGuideOpen} />
     </div>
   );
 }
