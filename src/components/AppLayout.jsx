@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Feather, BookOpen, Layers, Moon, Sun, Settings, Trash2, LogOut } from "lucide-react";
+import { Cat, BookOpen, Layers, Moon, Sun, Settings, Trash2, LogOut } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 
 function useDarkMode() {
@@ -33,12 +33,15 @@ export default function AppLayout({ children }) {
       <header className="border-b border-border/60 bg-card/80 backdrop-blur-md sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-6 py-3 flex items-center justify-between gap-4">
           {/* Logo */}
-          <div className="flex items-center gap-3 shrink-0">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20 flex items-center justify-center shadow-sm">
-              <Feather className="w-4.5 h-4.5 text-primary" />
+          <Link to="/" className="flex items-center gap-2.5 shrink-0 group">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 border-2 border-amber-200/70 flex items-center justify-center shadow-md shadow-amber-500/20 group-hover:scale-105 group-hover:rotate-3 transition-transform">
+              <Cat className="w-5 h-5 text-white" />
             </div>
-            <span className="text-lg font-heading font-bold text-foreground tracking-tight">NovelAi</span>
-          </div>
+            <div className="flex flex-col leading-none">
+              <span className="text-lg font-heading font-bold text-foreground tracking-tight">เนโกะ เวลธ์</span>
+              <span className="text-[10px] text-primary/70 font-medium">เนโกะ เวลธ์ ช่วยบันทึก 🐾</span>
+            </div>
+          </Link>
 
           {/* Nav */}
           <nav className="flex items-center gap-1">

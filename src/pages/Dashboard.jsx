@@ -264,10 +264,14 @@ export default function Dashboard() {
       <AppLayout>
         <main className="max-w-6xl mx-auto px-6 py-10">
           {/* Header Section */}
-          <div className="bg-gradient-to-r from-primary/5 via-secondary/30 to-primary/5 border border-border/40 rounded-2xl p-6 mb-8">
-            <div className="flex items-center justify-between">
+          <div className="relative overflow-hidden bg-gradient-to-br from-amber-100/70 via-secondary/40 to-orange-100/50 border border-amber-200/50 rounded-3xl p-6 mb-8 shadow-sm">
+            <div className="absolute -right-2 -top-3 text-6xl opacity-15 select-none pointer-events-none">🐱</div>
+            <div className="absolute right-20 bottom-2 text-2xl opacity-20 select-none pointer-events-none">🐾</div>
+            <div className="flex items-center justify-between relative">
               <div>
-                <h2 className="font-heading font-bold text-2xl text-foreground tracking-tight mb-1">ชั้นวางหนังสือ</h2>
+                <h2 className="font-heading font-bold text-2xl text-foreground tracking-tight mb-1 flex items-center gap-2">
+                  <span className="text-2xl">🐾</span> ชั้นวางหนังสือ
+                </h2>
                 {novels.length > 0 && (
                   <p className="text-sm text-muted-foreground">
                     <span className="font-semibold text-primary">{novels.length}</span> เรื่อง
@@ -284,7 +288,7 @@ export default function Dashboard() {
                   เรื่องสั้น AI
                 </Button>
 
-                <Button className="gap-2 font-body shadow-sm" onClick={() => setOpen(true)}>
+                <Button className="gap-2 font-body shadow-md shadow-amber-500/20 bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600 text-white border-0 rounded-full" onClick={() => setOpen(true)}>
                   <Plus className="w-4 h-4" />
                   สร้างเรื่องใหม่
                 </Button>
@@ -297,12 +301,12 @@ export default function Dashboard() {
 
           {novels.length === 0 ? (
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center py-24">
-              <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-primary/10 to-accent/30 flex items-center justify-center mx-auto mb-6 shadow-inner">
-                <BookOpen className="w-12 h-12 text-primary/50" />
+              <div className="w-28 h-28 rounded-[2rem] bg-gradient-to-br from-amber-200/70 to-orange-200/50 flex items-center justify-center mx-auto mb-6 shadow-inner text-6xl">
+                🐱
               </div>
               <h2 className="text-2xl font-heading font-semibold mb-3">ชั้นวางยังว่างเปล่า</h2>
-              <p className="text-muted-foreground mb-8 max-w-sm mx-auto leading-relaxed">เริ่มต้นเขียนนิยายเรื่องแรกของคุณ ทุกมหากาพย์ต้องเริ่มจากหน้าแรก</p>
-              <Button onClick={() => setOpen(true)} className="gap-2 h-11 px-6 text-base shadow-sm">
+              <p className="text-muted-foreground mb-8 max-w-sm mx-auto leading-relaxed">เริ่มต้นเขียนนิยายเรื่องแรกของคุณ ทุกมหากาพย์ต้องเริ่มจากหน้าแรก 🐾</p>
+              <Button onClick={() => setOpen(true)} className="gap-2 h-11 px-6 text-base shadow-md shadow-amber-500/20 bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600 text-white border-0 rounded-full">
                 <Plus className="w-4 h-4" />
                 สร้างเรื่องใหม่
               </Button>
@@ -318,9 +322,9 @@ export default function Dashboard() {
                   className="h-full"
                 >
                   <Link to={`/novel/${novel.id}`} className="block h-full">
-                    <div className="group relative bg-card border border-border/60 rounded-2xl overflow-hidden hover:shadow-xl hover:shadow-primary/5 hover:border-primary/25 transition-all duration-300 cursor-pointer h-full flex flex-col">
+                    <div className="group relative bg-card border border-border/60 rounded-3xl overflow-hidden hover:shadow-xl hover:shadow-amber-500/10 hover:border-primary/30 hover:-translate-y-0.5 transition-all duration-300 cursor-pointer h-full flex flex-col">
                       {/* Top Gradient Bar */}
-                      <div className="h-1.5 w-full bg-gradient-to-r from-primary/60 to-accent" />
+                      <div className="h-1.5 w-full bg-gradient-to-r from-amber-400 to-orange-500" />
 
                       {/* Badges */}
                       <div className="absolute top-3 right-3 z-10 flex items-center gap-2">
