@@ -11,6 +11,22 @@ import ReactMarkdown from "react-markdown";
 import { toast } from "sonner";
 
 const GENRES = ["โรแมนติก", "แฟนตาซี", "อิงประวัติศาสตร์", "จีนย้อนยุค", "วาย", "สยองขวัญ", "ลึกลับ", "แอ็คชั่น", "ดราม่า", "อื่นๆ"];
+
+// โทรปยอดนิยมที่ขายได้ในตลาดนิยายไทย แยกตามแนว
+const GENRE_TROPES = {
+  "โรแมนติก": "คลุมถุงชน, เกลียดกลายเป็นรัก (enemies to lovers), รักลวง/สัญญาแต่งงาน, รักข้ามชนชั้น (CEO กับสาวธรรมดา)",
+  "จีนย้อนยุค": "เกิดใหม่แก้แค้น, ชิงวังหลัง/ชิงรักในวัง, ทะลุมิติเป็นองค์หญิง, สวมรอยเป็นคนอื่น",
+  "แฟนตาซี": "เกิดใหม่ต่างโลก (isekai), ระบบเลเวลอัป/สถานะ, ตัวร้ายกลับใจ, พลังพิเศษที่ถูกซ่อนไว้",
+  "วาย": "enemies to lovers, แกล้งคบ (fake dating), เพื่อนสมัยเด็กกลับมาเจอกัน, นายเหนือ-ลูกน้อง",
+  "อิงประวัติศาสตร์": "รักต้องห้ามท่ามกลางสงคราม, ชะตากรรมข้ามยุค, ความลับของตระกูลเก่าแก่",
+  "สยองขวัญ": "บ้านผีสิง, คำสาปตกทอด, ความลับในอดีตที่กลับมาหลอกหลอน",
+  "ลึกลับ": "ฆาตกรรมปริศนา, การหายตัวไปอย่างลึกลับ, นักสืบกับคดีที่เกี่ยวพันตัวเอง",
+  "แอ็คชั่น": "ภารกิจล้างแค้น, สายลับสองหน้า, การไล่ล่าข้ามประเทศ",
+  "ดราม่า": "ความลับครอบครัว, การกลับมาของคนที่จากไป, การให้อภัยและไถ่บาป",
+};
+function getTropesForGenre(genre) {
+  return GENRE_TROPES[genre] || "โทรปยอดนิยมที่ขายได้ในตลาดนิยายไทยของแนวนี้";
+}
 const CHAR_ROLES = ["ตัวเอก", "ตัวรอง", "ตัวร้าย", "ตัวประกอบ"];
 const DIALECTS = ["กลาง", "อีสาน", "เหนือ", "ใต้", "ตะวันออก", "อื่นๆ"];
 const emptyChar = () => ({ name: "", role: "ตัวเอก", age: "", occupation: "", dialect: "กลาง", dialect_examples: "", personality: "", background: "", wound: "", desire: "" });
@@ -169,6 +185,46 @@ function Step1({ form, setForm, chars, activeWriters }) {
   const [drafting, setDrafting] = useState(false);
   const [draftError, setDraftError] = useState("");
   const [confirmMode, setConfirmMode] = useState(false);
+  const [marketDrafting, setMarketDrafting] = useState(false);
+
+  // ร่างเรื่องย่อแนวขายได้ในตลาด อิงแนว + โทรปยอดนิยม
+  const handleDraftMarketSynopsis = async () => {
+    setDraftError("");
+    if (!form.genre) {
+      setDraftError("กรุณาเลือกแนวนิยายก่อน เพื่อให้ AI ใส่โทรปที่ตรงตลาดได้");
+      return;
+    }
+    setMarketDrafting(true);
+    const namedChars = chars.filter((c) => c.name.trim());
+    const isOneShot = form.novel_type === "เรื่องสั้น";
+    const contextParts = [
+      form.title && `ชื่อเรื่อง: ${form.title}`,
+      `แนวนิยาย: ${form.genre}`,
+      `ประเภท: ${isOneShot ? "เรื่องสั้นจบในตอนเดียว" : "นิยายยาวหลายตอน"}`,
+      form.era && `ยุคสมัยและฉากหลัง: ${form.era}`,
+      namedChars.length > 0 && `ตัวละครหลัก: ${namedChars.map((c) => `${c.name} (${c.role})`).join(", ")}`,
+    ].filter(Boolean).join("\n");
+
+    const selectedWriter = activeWriters?.find((w) => w.id === form.writer_id);
+    const writerCtx = selectedWriter?.system_prompt
+      ? `[สไตล์และโทนการเขียน]\n${selectedWriter.system_prompt}\n\n`
+      : "";
+
+    const result = await base44.integrations.Core.InvokeLLM({
+      prompt: `${writerCtx}คุณคือนักเขียนนิยายไทยมือทอง ที่เชี่ยวชาญการปั้นเรื่องย่อ "พล็อตสร้างเงิน" ที่ขายได้ในแพลตฟอร์มนิยายไทย\n\n[ข้อมูลจากผู้เขียน]\n${contextParts}\n\n[โทรปยอดนิยมของแนว ${form.genre}]\n${getTropesForGenre(form.genre)}\n\n[งานที่ต้องทำ]\nร่างเรื่องย่อ (synopsis) ภาษาไทยที่ขายได้ในตลาด โดย:\n- เปิดด้วยฮุกที่ดึงดูดใจตั้งแต่ประโยคแรก\n- มีปมขัดแย้งและเดิมพันที่ชัดเจน\n- สอดแทรกโทรปยอดนิยมของแนว ${form.genre} ที่ลิสต์ไว้ข้างต้น อย่างน้อย 1 โทรปให้กลมกลืน\n- เขียนกระชับ น่าติดตาม ประมาณ 3-5 บรรทัด อย่าเปิดเผยปมสำคัญทั้งหมด\n\nตอบเฉพาะข้อความเรื่องย่อ ไม่ต้องมีหัวข้อ คำอธิบาย หรือเครื่องหมายคำพูด`,
+    });
+
+    const cleaned = (typeof result === "string" ? result : "").replace(/^```[\w]*\n?/m, "").replace(/```$/m, "").trim();
+    if (!cleaned) {
+      setDraftError("AI ไม่สามารถร่างเรื่องย่อได้ กรุณาลองใหม่อีกครั้ง");
+      setMarketDrafting(false);
+      return;
+    }
+    setForm({ ...form, synopsis: cleaned });
+    setMarketDrafting(false);
+    toast.success("ร่างเรื่องย่อจากพล็อตสร้างเงินสำเร็จ! ✨");
+  };
+
   const handleDraftSynopsis = async (append = false) => {
     setConfirmMode(false);
     setDraftError("");
@@ -273,17 +329,30 @@ function Step1({ form, setForm, chars, activeWriters }) {
         <div className="flex items-center justify-between mb-1.5">
           <label className="text-sm font-medium">เรื่องย่อ</label>
           {!confirmMode ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-7 text-xs gap-1 text-primary/70 hover:text-primary hover:bg-primary/8 px-2"
-              onClick={handleAiClick}
-              disabled={drafting}
-            >
-              {drafting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
-              {drafting ? "กำลังร่าง..." : "✨ ให้ AI ช่วยร่างเรื่องย่อ"}
-            </Button>
+            <div className="flex items-center gap-1">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs gap-1 text-primary/70 hover:text-primary hover:bg-primary/8 px-2"
+                onClick={handleAiClick}
+                disabled={drafting || marketDrafting}
+              >
+                {drafting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                {drafting ? "กำลังร่าง..." : "✨ ให้ AI ช่วยร่างเรื่องย่อ"}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs gap-1 text-amber-600 hover:text-amber-700 hover:bg-amber-500/10 px-2"
+                onClick={handleDraftMarketSynopsis}
+                disabled={drafting || marketDrafting}
+              >
+                {marketDrafting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                {marketDrafting ? "กำลังร่าง..." : "✨ ร่างเรื่องย่อจากพล็อตสร้างเงิน"}
+              </Button>
+            </div>
           ) : (
             <div className="flex items-center gap-1">
               <span className="text-xs text-muted-foreground mr-1">มีข้อความอยู่แล้ว:</span>
