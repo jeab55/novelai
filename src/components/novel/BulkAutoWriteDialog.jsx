@@ -8,6 +8,7 @@ import { Loader2, Sparkles, X, CheckCircle2, SkipForward, AlertTriangle, Bot, Re
 import { toast } from "sonner";
 import { useBulkWrite } from "@/lib/BulkWriteContext";
 import { invokeAIStable } from "@/lib/aiInvoke";
+import AiProgressBar from "@/components/novel/AiProgressBar";
 
 const DEFAULT_WRITER_PROMPT = `คุณคือนักเขียนนิยายภาษาไทยมืออาชีพที่กำลังร่างตอนใหม่ให้ผู้เขียน
 คุณต้องร่างเนื้อหาตอนที่สมบูรณ์ตามโครงที่ได้รับ รักษาสำนวนและโทนของเรื่อง ใช้ภาษาไทยที่อ่านลื่น`;
@@ -863,6 +864,17 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
               </div>
               {currentMsg && (
                 <p className="text-xs text-muted-foreground leading-relaxed animate-pulse">{currentMsg}</p>
+              )}
+              {/* โปรเกรสบาร์ย่อยสำหรับตอนที่ AI กำลังร่างอยู่ตอนนี้ */}
+              {step === "running" && (
+                <div className="pt-1">
+                  <AiProgressBar
+                    key={progress.current}
+                    active={true}
+                    label={`AI กำลังร่างตอนที่ ${progress.current}/${progress.total}...`}
+                    expectedMs={wordTarget >= 3000 ? 90000 : 55000}
+                  />
+                </div>
               )}
             </div>
 

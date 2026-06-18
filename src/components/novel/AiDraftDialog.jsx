@@ -12,6 +12,14 @@ import { toast } from "sonner";
 import { saveChapterContent } from "@/lib/saveChapterContent";
 import { saveVersion } from "@/lib/saveVersion";
 import { invokeAIStable } from "@/lib/aiInvoke";
+import AiProgressBar from "@/components/novel/AiProgressBar";
+
+const LOADING_LABELS = {
+  draft: "กำลังร่างตอน...",
+  expanding: "กำลังขยายเนื้อหาให้ครบความยาว...",
+  polish: "กำลังขัดเกลาสำนวน...",
+  saving: "กำลังบันทึกร่าง...",
+};
 
 const WORD_TARGETS = [
   { label: "สั้น ~800 คำ", value: 800 },
@@ -599,11 +607,16 @@ export default function AiDraftDialog({ open, onClose, chapter, novel, novelId, 
             </div>
             <ScrollArea className="flex-1 px-6 py-5">
               {loading ? (
-                <div className="flex flex-col items-center justify-center py-16 gap-3">
+                <div className="flex flex-col items-center justify-center py-16 gap-4 px-8">
                   <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                  <p className="text-sm text-muted-foreground">
-                    {loadingType === "polish" ? "กำลังขัดเกลาสำนวน..." : "กำลังร่างตอน... อาจใช้เวลา 30-60 วินาที"}
-                  </p>
+                  <div className="w-full max-w-sm">
+                    <AiProgressBar
+                      active={loading}
+                      label={LOADING_LABELS[loadingType] || "กำลังประมวลผลด้วย AI..."}
+                      expectedMs={loadingType === "saving" ? 8000 : 50000}
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">อาจใช้เวลา 30-60 วินาที โปรดอย่าปิดหน้าต่างนี้</p>
                 </div>
               ) : (
                 <pre
@@ -614,6 +627,17 @@ export default function AiDraftDialog({ open, onClose, chapter, novel, novelId, 
                 </pre>
               )}
             </ScrollArea>
+          </div>
+        )}
+
+        {/* Progress bar while generating from Step 1 form */}
+        {step === 1 && loading && (
+          <div className="px-6 pt-3 pb-1 shrink-0">
+            <AiProgressBar
+              active={loading}
+              label={LOADING_LABELS[loadingType] || "กำลังประมวลผลด้วย AI..."}
+              expectedMs={loadingType === "saving" ? 8000 : 50000}
+            />
           </div>
         )}
 

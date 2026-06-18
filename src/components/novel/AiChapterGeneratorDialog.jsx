@@ -17,6 +17,7 @@ import { Loader2, Sparkles, Plus, Trash2, FileText, RefreshCw } from "lucide-rea
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { invokeAIStable } from "@/lib/aiInvoke";
 import { toast } from "sonner";
+import AiProgressBar from "@/components/novel/AiProgressBar";
 
 export default function AiChapterGeneratorDialog({ open, onClose, novel, novelId }) {
   const queryClient = useQueryClient();
@@ -233,9 +234,11 @@ ${eventsContext}
           )}
 
           {step === "generating" && (
-            <div className="py-12 flex flex-col items-center gap-4">
+            <div className="py-12 flex flex-col items-center gap-4 px-8">
               <Loader2 className="w-8 h-8 animate-spin text-primary" />
-              <p className="text-sm text-muted-foreground">AI กำลังสร้างโครงตอน...</p>
+              <div className="w-full max-w-sm">
+                <AiProgressBar active={true} label="AI กำลังสร้างโครงตอน..." expectedMs={35000} />
+              </div>
               <p className="text-xs text-muted-foreground/60">อาจใช้เวลา 20-40 วินาที</p>
             </div>
           )}

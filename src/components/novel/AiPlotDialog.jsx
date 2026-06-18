@@ -20,6 +20,7 @@ import {
 import { Loader2, Sparkles, Plus, Trash2, RefreshCw, FileText, CheckCircle2, AlertCircle, ChevronDown, ChevronUp, Users, Globe } from "lucide-react";
 import AiWorldBuilderDialog from "./AiWorldBuilderDialog";
 import { invokeAIStable } from "@/lib/aiInvoke";
+import AiProgressBar from "@/components/novel/AiProgressBar";
 import { toast } from "sonner";
 
 function stripCodeFence(text) {
@@ -554,9 +555,11 @@ export default function AiPlotDialog({ open, onClose, novel, novelId, onOpenChap
           )}
 
           {step === "generating" && (
-            <div className="py-12 flex flex-col items-center gap-4">
+            <div className="py-12 flex flex-col items-center gap-4 px-8">
               <Loader2 className="w-8 h-8 animate-spin text-primary" />
-              <p className="text-sm text-muted-foreground">AI กำลังวางโครงเรื่อง...</p>
+              <div className="w-full max-w-sm">
+                <AiProgressBar active={true} label="AI กำลังวางโครงเรื่อง..." expectedMs={30000} />
+              </div>
               <p className="text-xs text-muted-foreground/60">อาจใช้เวลา 15-30 วินาที</p>
             </div>
           )}
@@ -644,10 +647,9 @@ export default function AiPlotDialog({ open, onClose, novel, novelId, onOpenChap
                               )}
                             </div>
                           ) : status === "drafting" ? (
-                            <span className="flex items-center gap-1 text-xs text-primary">
-                              <Loader2 className="w-3 h-3 animate-spin" />
-                              กำลังร่าง...
-                            </span>
+                            <div className="flex-1 min-w-[140px]">
+                              <AiProgressBar active={true} label="กำลังร่างตอน..." expectedMs={50000} />
+                            </div>
                           ) : typeof status === "string" && status.startsWith("error:") ? (
                             <span className="flex items-center gap-1 text-xs text-destructive">
                               <AlertCircle className="w-3 h-3" />

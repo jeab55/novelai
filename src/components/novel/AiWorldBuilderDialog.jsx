@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Loader2, Sparkles, Globe, RefreshCw, ChevronDown, ChevronUp, AlertCircle, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
+import AiProgressBar from "@/components/novel/AiProgressBar";
 
 const CATEGORIES = ["สถานที่", "ขนบธรรมเนียม", "ยุคสมัย", "สิ่งของ", "ระบบ", "อื่นๆ"];
 
@@ -276,17 +277,21 @@ export default function AiWorldBuilderDialog({ open, onClose, novel, novelId }) 
           )}
 
           {step === "generating" && (
-            <div className="py-12 flex flex-col items-center gap-4">
+            <div className="py-12 flex flex-col items-center gap-4 px-8">
               <Loader2 className="w-8 h-8 animate-spin text-primary" />
-              <p className="text-sm text-muted-foreground">กำลังสร้างโลก/ฉาก...</p>
+              <div className="w-full max-w-sm">
+                <AiProgressBar active={true} label="กำลังสร้างโลก/ฉาก..." expectedMs={25000} />
+              </div>
               <p className="text-xs text-muted-foreground/60">อาจใช้เวลา 15-30 วินาที</p>
             </div>
           )}
 
           {step === "saving" && (
-            <div className="py-12 flex flex-col items-center gap-4">
+            <div className="py-12 flex flex-col items-center gap-4 px-8">
               <Loader2 className="w-8 h-8 animate-spin text-primary" />
-              <p className="text-sm text-muted-foreground">กำลังบันทึกลงฐานข้อมูล...</p>
+              <div className="w-full max-w-sm">
+                <AiProgressBar active={true} label="กำลังบันทึกลงฐานข้อมูล..." expectedMs={8000} />
+              </div>
             </div>
           )}
 
