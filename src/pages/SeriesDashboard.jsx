@@ -31,7 +31,7 @@ const genreColors = {
 
 
 
-function NovelCard({ novel, chapters, uploadingFor, onUploadClick, seriesList, onMoveToSeries, onMoveChapter, onReorderChapter }) {
+function NovelCard({ novel, chapters, uploadingFor, onUploadClick, seriesList, onMoveToSeries, onMoveChapter, onReorderChapter, seasonLabel }) {
   const [isOpen, setIsOpen] = useState(false);
   const [readerStartIdx, setReaderStartIdx] = useState(null);
   const gradient = genreColors[novel.genre] || "from-gray-400 to-slate-500";
@@ -94,10 +94,10 @@ function NovelCard({ novel, chapters, uploadingFor, onUploadClick, seriesList, o
               <Badge className="bg-white/20 backdrop-blur-sm text-white text-xs font-normal h-6 px-2 border-0">
                 {novelChapters.length} ตอน
               </Badge>
-              {novel.season_number && (
+              {seasonLabel && (
                 <Badge className="bg-white/30 backdrop-blur-sm text-white text-xs font-bold h-6 px-2 border-0 flex items-center gap-1">
                   <Library className="w-3 h-3" />
-                  Season {novel.season_number}
+                  ภาค {seasonLabel}
                 </Badge>
               )}
             </div>
@@ -308,23 +308,24 @@ export default function SeriesDashboard() {
     setSeriesDialog({ open: false, novel: null, selectedSeries: "", episodeNumber: "" });
   };
 
-  // กรองนิยายที่มีอย่างน้อย 1 ตอน
-  const novelsWithChapters = novels.filter((n) => {
-    const chapCount = chapters.filter(
-      (c) => String(c.novel_id) === String(n.id) && !c.is_deleted
-    ).length;
-    return chapCount > 0;
-  });
-
-  const novelsInSeries = novelsWithChapters.filter((n) => n.series_id);
-  const novelsWithoutSeries = novelsWithChapters.filter((n) => !n.series_id);
-
-  const novelsBySeries = seriesList
-    .map((s) => ({
-      series: s,
-      novels: novelsInSeries.filter((n) => String(n.series_id) === String(s.id)),
-    }))
-    .filter((g) => g.novels.length > 0);
+  // จัดกลุ่มเป็นซีรีส์ตามเรื่อง: นิยายหลัก (ไม่มี parent_novel_id) + ภาคต่อ (parent_novel_id = นิยายหลัก)
+  // แสดงเฉพาะเรื่องที่มีมากกว่า 1 ภาค (มี Season ต่อ)
+  const seriesGroups = novels
+    .filter((n) => !n.parent_novel_id) // นิยายหลักเท่านั้น (Season 1)
+    .map((mainNovel) => {
+      const childSeasons = novels.filter(
+        (n) => String(n.parent_novel_id) === String(mainNovel.id)
+      );
+      // เรียงตาม season_number (1 → 2 → 3) แล้วใช้ created_date เป็นตัวรอง
+      const allSeasons = [mainNovel, ...childSeasons].sort((a, b) => {
+        const sa = a.season_number || 1;
+        const sb = b.season_number || 1;
+        if (sa !== sb) return sa - sb;
+        return new Date(a.created_date || 0) - new Date(b.created_date || 0);
+      });
+      return { mainNovel, seasons: allSeasons };
+    })
+    .filter((g) => g.seasons.length > 1); // เฉพาะเรื่องที่มีภาคต่อ
 
   return (
     <>
@@ -471,46 +472,40 @@ export default function SeriesDashboard() {
               </Button>
             </Link>
           </motion.div>
+        ) : seriesGroups.length === 0 ? (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center py-24">
+            <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-primary/10 to-accent/30 flex items-center justify-center mx-auto mb-6 shadow-inner">
+              <Layers className="w-12 h-12 text-primary/50" />
+            </div>
+            <h2 className="text-2xl font-heading font-semibold mb-3">ยังไม่มีเรื่องที่มีภาคต่อ</h2>
+            <p className="text-muted-foreground mb-2 max-w-sm mx-auto leading-relaxed">
+              ซีรีส์จะแสดงเฉพาะนิยายที่มีมากกว่า 1 ภาค (มี Season ต่อ)
+            </p>
+            <p className="text-muted-foreground max-w-sm mx-auto leading-relaxed">
+              สร้างภาคต่อจากในห้องเขียนเพื่อให้เรื่องนั้นปรากฏที่นี่
+            </p>
+          </motion.div>
         ) : (
           <div className="space-y-10">
-            {novelsBySeries.map(({ series, novels: sNovels }, si) => (
-              <motion.div key={series.id} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: si * 0.06 }}>
+            {seriesGroups.map(({ mainNovel, seasons: groupSeasons }, si) => (
+              <motion.div key={mainNovel.id} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: si * 0.06 }}>
                 <div className="flex items-center gap-3 mb-5">
                   <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
                     <FolderOpen className="w-4 h-4 text-primary" />
                   </div>
                   <div>
-                    <h3 className="font-heading font-bold text-lg text-foreground">{series.title}</h3>
-                    {series.description && <p className="text-xs text-muted-foreground">{series.description}</p>}
+                    <h3 className="font-heading font-bold text-lg text-foreground">{mainNovel.title}</h3>
+                    <p className="text-xs text-muted-foreground">{groupSeasons.length} ภาค</p>
                   </div>
-                  <Badge variant="outline" className="ml-auto text-xs">{sNovels.length} เรื่อง</Badge>
+                  <Badge variant="outline" className="ml-auto text-xs">{groupSeasons.length} ภาค</Badge>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                  {sNovels.map((novel) => (
-                    <NovelCard key={novel.id} novel={novel} chapters={chapters} uploadingFor={uploadingFor} onUploadClick={handleUploadClick} seriesList={seriesList} onMoveToSeries={handleMoveToSeries} onMoveChapter={handleMoveChapter} onReorderChapter={handleReorderChapter} />
+                  {groupSeasons.map((novel, idx) => (
+                    <NovelCard key={novel.id} novel={novel} seasonLabel={idx + 1} chapters={chapters} uploadingFor={uploadingFor} onUploadClick={handleUploadClick} seriesList={seriesList} onMoveToSeries={handleMoveToSeries} onMoveChapter={handleMoveChapter} onReorderChapter={handleReorderChapter} />
                   ))}
                 </div>
               </motion.div>
             ))}
-
-            {novelsWithoutSeries.length > 0 && (
-              <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: novelsBySeries.length * 0.06 }}>
-                {novelsBySeries.length > 0 && (
-                  <div className="flex items-center gap-3 mb-5">
-                    <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center">
-                      <BookOpen className="w-4 h-4 text-muted-foreground" />
-                    </div>
-                    <h3 className="font-heading font-bold text-lg text-foreground">ไม่ระบุซีรีย์</h3>
-                    <Badge variant="outline" className="ml-auto text-xs">{novelsWithoutSeries.length} เรื่อง</Badge>
-                  </div>
-                )}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                  {novelsWithoutSeries.map((novel) => (
-                    <NovelCard key={novel.id} novel={novel} chapters={chapters} uploadingFor={uploadingFor} onUploadClick={handleUploadClick} seriesList={seriesList} onMoveToSeries={handleMoveToSeries} onMoveChapter={handleMoveChapter} onReorderChapter={handleReorderChapter} />
-                  ))}
-                </div>
-              </motion.div>
-            )}
           </div>
         )}
       </div>
