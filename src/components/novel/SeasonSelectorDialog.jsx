@@ -126,7 +126,12 @@ ${charSummary || "(ยังไม่มี)"}
 2. ต้องเกิดความขัดแย้ง ปัญหา หรือเหตุการณ์สำคัญใหม่ที่ยังไม่เคยเกิดขึ้นใน Season ใด ๆ ก่อนหน้า
 3. ตัวละครเดิมต้องปรากฏในบทบาทที่ต่อเนื่อง แสดงพัฒนาการจากสิ่งที่เกิดขึ้นใน Season ก่อน
 4. บริบทของโลก ความสัมพันธ์ และผลพวงจาก Season ก่อนต้องส่งผลต่อเหตุการณ์ใหม่อย่างชัดเจน
-5. ผู้อ่านต้องรู้สึกว่าเรื่องก้าวหน้าไปข้างหน้า ไม่ได้วนอยู่กับที่`,
+5. ผู้อ่านต้องรู้สึกว่าเรื่องก้าวหน้าไปข้างหน้า ไม่ได้วนอยู่กับที่
+
+ข้อกำหนดเรื่องชื่อ Season (สำคัญมาก):
+- ตั้งชื่อภาคที่เป็นเอกลักษณ์ของตัวเองล้วน ๆ
+- ห้ามใส่คำนำหน้าว่า "Season X:", "ภาค X:" หรือเลขลำดับใด ๆ นำหน้าชื่อโดยเด็ดขาด
+- ห้ามนำชื่อเรื่องหลัก ("${novel?.title}") มาพ่วงหรือซ้ำในชื่อภาค — ให้เป็นชื่อใหม่ล้วน ๆ`,
       response_json_schema: {
         type: "object",
         properties: {
@@ -135,7 +140,11 @@ ${charSummary || "(ยังไม่มี)"}
         },
       },
     });
-    setSeasonTitle(result.title || "");
+    // ตัดคำนำหน้า "Season X:" / "ภาค X:" ออก เผื่อ AI ยังเติมมา
+    const cleanTitle = (result.title || "")
+      .replace(/^\s*(season|ภาค)\s*\d+\s*[:：\-–.]?\s*/i, "")
+      .trim();
+    setSeasonTitle(cleanTitle);
     setSeasonSynopsis(result.synopsis || "");
     setSeasonGenerated(true);
     setGeneratingSeason(false);
@@ -511,7 +520,7 @@ ${charSummary || "(ยังไม่มี)"}
                   <div>
                     <label className="text-sm font-medium mb-1.5 block">ชื่อ Season ใหม่ <span className="text-destructive">*</span></label>
                     <Input
-                      placeholder="เช่น ลับแลลายเมฆ Season 2"
+                      placeholder="ตั้งชื่อภาคนี้ (ชื่อล้วน ๆ ไม่ต้องใส่ 'Season X:' หรือชื่อเรื่องหลัก)"
                       value={seasonTitle}
                       onChange={(e) => setSeasonTitle(e.target.value)}
                     />
