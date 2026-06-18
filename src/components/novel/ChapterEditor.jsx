@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -79,6 +79,7 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
   const [balanceOpen, setBalanceOpen] = useState(false);
   const [templateOpen, setTemplateOpen] = useState(false);
   const [autoSaveStatus, setAutoSaveStatus] = useState("saved"); // "saving" | "saved"
+  const [lastSavedAt, setLastSavedAt] = useState(null);
   const [fontSize, setFontSize] = useState(19);
   const [contentWidth, setContentWidth] = useState(720);
   // inline diff state — set เมื่อ ReaderReviewRevisionPanel ได้รับผลจาก AI
@@ -124,6 +125,8 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
       queryClient.invalidateQueries({ queryKey: ["chapters", novelId] });
       toast.success("บันทึกแล้ว");
       setSaving(false);
+      setAutoSaveStatus("saved");
+      setLastSavedAt(new Date());
     },
     onError: () => setSaving(false),
   });
@@ -213,20 +216,46 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
     toast.success("ปลดการผูกแล้ว");
   };
 
-  const debouncedAutoSave = useCallback(
-    debounce((newContent) => {
-      if (!safeChapter.id) return;
-      setAutoSaveStatus("saving");
-      base44.entities.Chapter.update(safeChapter.id, {
-        content: newContent,
-        word_count: countWords(newContent),
-      }).then(() => setAutoSaveStatus("saved")).catch((err) => {
+  // เก็บค่าล่าสุดไว้ใน ref เพื่อให้ debounce บันทึกค่าปัจจุบันเสมอ (กัน stale closure)
+  const latestRef = useRef({ title, content });
+  useEffect(() => {
+    latestRef.current = { title, content };
+  }, [title, content]);
+
+  // debounce สร้างครั้งเดียว (ref-based) — กันการ recreate ทุก render และกันบันทึกซ้ำซ้อน
+  const debouncedAutoSave = useRef(
+    debounce(() => {
+      const id = latestRef.current.id;
+      if (!id) return;
+      const { title: t, content: c } = latestRef.current;
+      base44.entities.Chapter.update(id, {
+        title: t,
+        content: c,
+        word_count: countWords(c),
+      }).then(() => {
+        setAutoSaveStatus("saved");
+        setLastSavedAt(new Date());
+      }).catch((err) => {
         console.error("Auto-save failed:", err);
         setAutoSaveStatus("saved");
       });
-    }, 2000),
-    [safeChapter.id]
-  );
+    }, 2500)
+  ).current;
+
+  // sync id เข้า ref ด้วย
+  useEffect(() => {
+    latestRef.current.id = safeChapter.id;
+  }, [safeChapter.id]);
+
+  // ยกเลิก debounce ที่ค้างเมื่อ unmount
+  useEffect(() => () => debouncedAutoSave.cancel(), [debouncedAutoSave]);
+
+  // เรียกเมื่อมีการแก้ไข — อัปเดตสถานะเป็น "กำลังบันทึก" แล้วหน่วงบันทึก
+  const triggerAutoSave = useCallback(() => {
+    if (!safeChapter.id) return;
+    setAutoSaveStatus("saving");
+    debouncedAutoSave();
+  }, [safeChapter.id, debouncedAutoSave]);
 
   const toolbar = (
     <div className={`border-b border-border/60 px-4 py-2.5 flex items-center gap-3 transition-all ${focusMode ? "bg-background/95 backdrop-blur-sm" : "bg-card/30"}`}>
@@ -237,7 +266,7 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
       )}
       <Input
         value={title}
-        onChange={(e) => setTitle(e.target.value)}
+        onChange={(e) => { setTitle(e.target.value); triggerAutoSave(); }}
         className="max-w-sm font-heading font-semibold border-none bg-transparent shadow-none focus-visible:ring-0 px-0 text-base"
       />
       <div className="flex items-center gap-2 ml-auto">
@@ -245,7 +274,15 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
         <span className={`text-xs flex items-center gap-1 tabular-nums transition-colors ${autoSaveStatus === "saving" ? "text-amber-500" : "text-emerald-600"}`}>
           {autoSaveStatus === "saving"
             ? <><Loader2 className="w-3 h-3 animate-spin" />กำลังบันทึก...</>
-            : <><CheckCircle2 className="w-3 h-3" />บันทึกแล้ว</>
+            : <>
+                <CheckCircle2 className="w-3 h-3" />
+                บันทึกแล้ว
+                {lastSavedAt && (
+                  <span className="text-muted-foreground/70 ml-0.5">
+                    {lastSavedAt.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })} น.
+                  </span>
+                )}
+              </>
           }
         </span>
         <span className="text-xs text-muted-foreground tabular-nums border-l border-border/50 pl-2">
@@ -359,8 +396,8 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
           novel={novel}
           onApplyTranslation={(translatedContent) => {
             setContent(translatedContent);
-            setAutoSaveStatus("saving");
-            debouncedAutoSave(translatedContent);
+            latestRef.current.content = translatedContent;
+            triggerAutoSave();
           }}
         />
 
@@ -484,8 +521,7 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
               value={content}
               onChange={(e) => {
                 setContent(e.target.value);
-                setAutoSaveStatus("saving");
-                debouncedAutoSave(e.target.value);
+                triggerAutoSave();
               }}
               placeholder="เริ่มเขียนเรื่องราวของคุณที่นี่..."
               className="w-full min-h-[80vh] bg-transparent border-none outline-none resize-none placeholder:text-muted-foreground/40"
@@ -541,7 +577,8 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
       onInsert={(draft) => {
         const newContent = content ? content + "\n\n" + draft : draft;
         setContent(newContent);
-        if (safeChapter.id) debouncedAutoSave(newContent);
+        latestRef.current.content = newContent;
+        triggerAutoSave();
       }}
     />
 
@@ -667,8 +704,8 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
         novel={novel}
         onApplyChanges={(updatedContent) => {
           setContent(updatedContent);
-          setAutoSaveStatus("saving");
-          debouncedAutoSave(updatedContent);
+          latestRef.current.content = updatedContent;
+          triggerAutoSave();
         }}
       />
       <div className="flex flex-1 overflow-hidden">
@@ -693,8 +730,7 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
                   value={content}
                   onChange={(e) => {
                     setContent(e.target.value);
-                    setAutoSaveStatus("saving");
-                    debouncedAutoSave(e.target.value);
+                    triggerAutoSave();
                   }}
                   placeholder="เริ่มเขียนเรื่องราวของคุณที่นี่..."
                   className="w-full min-h-[65vh] bg-transparent border-none outline-none resize-none placeholder:text-muted-foreground/40"
