@@ -38,8 +38,8 @@ export default function AppLayout({ children }) {
               <Cat className="w-5 h-5 text-white" />
             </div>
             <div className="flex flex-col leading-none">
-              <span className="text-lg font-heading font-bold text-foreground tracking-tight">เนโกะ เวลธ์</span>
-              <span className="text-[10px] text-primary/70 font-medium">เนโกะ เวลธ์ ช่วยบันทึก 🐾</span>
+              <span className="text-lg font-heading font-bold text-foreground tracking-tight">novel AI</span>
+              <span className="text-[10px] text-primary/70 font-medium">novel AI ช่วยบันทึก 🐾</span>
             </div>
           </Link>
 
