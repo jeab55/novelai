@@ -77,7 +77,13 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
       const season2Plus = all.filter(
         (n) => String(n.parent_novel_id) === String(novelId) && !n.is_deleted
       );
-      return [season1, ...season2Plus].filter(Boolean);
+      // เรียงตาม season_number ก่อน (Season 1 → 2 → 3) แล้วใช้ created_date เป็นตัวรอง
+      return [season1, ...season2Plus].filter(Boolean).sort((a, b) => {
+        const sa = a.season_number || 1;
+        const sb = b.season_number || 1;
+        if (sa !== sb) return sa - sb;
+        return new Date(a.created_date || 0) - new Date(b.created_date || 0);
+      });
     },
     enabled: !!novel,
     staleTime: 30000, // 30 วินาที

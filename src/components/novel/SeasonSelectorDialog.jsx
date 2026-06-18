@@ -38,7 +38,12 @@ export default function SeasonSelectorDialog({ open, onClose, novel, onSeasonCha
       const all = await base44.entities.Novel.list();
       return all
         .filter((n) => String(n.parent_novel_id) === String(novel.id) && !n.is_deleted)
-        .sort((a, b) => (a.season_number || 1) - (b.season_number || 1));
+        .sort((a, b) => {
+          const sa = a.season_number || 1;
+          const sb = b.season_number || 1;
+          if (sa !== sb) return sa - sb;
+          return new Date(a.created_date || 0) - new Date(b.created_date || 0);
+        });
     },
     enabled: !!novel?.id && open,
   });
