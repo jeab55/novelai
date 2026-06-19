@@ -248,18 +248,6 @@ export default function Dashboard() {
               )}
             </div>
             <div>
-              <label className="text-sm font-medium mb-1.5 block">ซีรีย์ (ถ้ามี)</label>
-              <Select value={editForm.series_id || "__none__"} onValueChange={(v) => setEditForm({ ...editForm, series_id: v === "__none__" ? "" : v })}>
-                <SelectTrigger><SelectValue placeholder="ไม่ระบุซีรีย์" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">— ไม่ระบุซีรีย์ —</SelectItem>
-                  {seriesList.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>{s.title}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
               <label className="text-sm font-medium mb-1.5 block">จำนวนตอนที่ต้องการ</label>
               <Select value={(editForm.target_chapters || 10).toString()} onValueChange={(v) => setEditForm({ ...editForm, target_chapters: v })}>
                 <SelectTrigger><SelectValue placeholder="เลือกจำนวนตอน" /></SelectTrigger>
