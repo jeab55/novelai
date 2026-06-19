@@ -129,6 +129,7 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
       return all.filter((c) => !c.is_deleted);
     },
     enabled: open,
+    refetchOnMount: "always",
   });
 
   const { data: plotEvents = [] } = useQuery({
