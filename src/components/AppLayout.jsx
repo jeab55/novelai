@@ -31,7 +31,7 @@ export default function AppLayout({ children }) {
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border/60 bg-card/80 backdrop-blur-md sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-6 py-3 flex items-center justify-between gap-4">
+        <div className="max-w-6xl mx-auto px-3 sm:px-6 py-3 flex items-center justify-between gap-2 sm:gap-4">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2.5 shrink-0 group">
             <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 border-2 border-amber-200/70 flex items-center justify-center shadow-md shadow-amber-500/20 group-hover:scale-105 group-hover:rotate-3 transition-transform">
@@ -44,16 +44,16 @@ export default function AppLayout({ children }) {
           </Link>
 
           {/* Nav */}
-          <nav className="flex items-center gap-1">
+          <nav className="flex items-center gap-0.5 sm:gap-1">
             {navItems.map(({ to, label, icon: Icon }) => (
               <Link key={to} to={to}>
                 <Button
                   variant="ghost"
                   size="sm"
-                  className={`gap-1.5 ${isActive(to) ? "bg-primary/10 text-primary font-semibold" : "text-muted-foreground"}`}
+                  className={`gap-1.5 px-2 sm:px-3 ${isActive(to) ? "bg-primary/10 text-primary font-semibold" : "text-muted-foreground"}`}
                 >
                   <Icon className="w-3.5 h-3.5" />
-                  {label}
+                  <span className="hidden sm:inline">{label}</span>
                 </Button>
               </Link>
             ))}

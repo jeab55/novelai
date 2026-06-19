@@ -400,21 +400,21 @@ export default function SeriesDashboard() {
     <AppLayout>
       <div className="max-w-6xl mx-auto px-6 py-10">
         <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
             <div>
-              <h2 className="font-heading font-bold text-2xl text-foreground tracking-tight">ห้องสมุดของฉัน</h2>
+              <h2 className="font-heading font-bold text-xl sm:text-2xl text-foreground tracking-tight">ห้องสมุดของฉัน</h2>
               <p className="text-sm text-muted-foreground mt-1">
                 {novels.length > 0 ? `${novels.length} เรื่อง · คลิกที่การ์ดเพื่อดูตอน` : "ยังไม่มีนิยาย"}
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Link to="/">
-                <Button variant="outline" className="gap-2">
+                <Button variant="outline" size="sm" className="gap-2">
                   <BookOpen className="w-4 h-4" />
                   จัดการนิยาย
                 </Button>
               </Link>
-              <Button variant="outline" className="gap-2" onClick={async () => {
+              <Button variant="outline" size="sm" className="gap-2" onClick={async () => {
                 const updatePromises = novels.map(async (novel) => {
                   const novelChapters = chapters.filter(
                     (c) => String(c.novel_id) === String(novel.id) && !c.is_deleted
@@ -439,7 +439,7 @@ export default function SeriesDashboard() {
               </Button>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             <Button className="gap-2 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-md" onClick={() => setCreateSeriesOpen(true)}>
               <Plus className="w-4 h-4" />
               สร้างซีรีส์ใหม่
