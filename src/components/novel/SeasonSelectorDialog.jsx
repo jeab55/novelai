@@ -30,14 +30,17 @@ export default function SeasonSelectorDialog({ open, onClose, novel, onSeasonCha
   const [deleteDialog, setDeleteDialog] = useState({ open: false, season: null });
   const [successDialog, setSuccessDialog] = useState({ open: false, seasonTitle: "" });
 
-  // โหลดทุก Season ของนิยายเรื่องนี้
+  // หา root id ของซีรีส์ (เรื่องหลัก/Season 1) — ไม่ว่าจะกำลังดูภาคไหนอยู่
+  const rootNovelId = novel?.parent_novel_id || novel?.id;
+
+  // โหลดทุก Season (ภาคต่อ) ในซีรีส์เดียวกัน โดยอ้างอิงจาก root เสมอ
   const { data: seasons = [] } = useQuery({
-    queryKey: ["seasons", novel?.id],
+    queryKey: ["seasons", rootNovelId],
     queryFn: async () => {
-      if (!novel?.id) return [];
+      if (!rootNovelId) return [];
       const all = await base44.entities.Novel.list();
       return all
-        .filter((n) => String(n.parent_novel_id) === String(novel.id) && !n.is_deleted)
+        .filter((n) => String(n.parent_novel_id) === String(rootNovelId) && !n.is_deleted)
         .sort((a, b) => {
           const sa = a.season_number || 1;
           const sb = b.season_number || 1;
@@ -45,7 +48,19 @@ export default function SeasonSelectorDialog({ open, onClose, novel, onSeasonCha
           return new Date(a.created_date || 0) - new Date(b.created_date || 0);
         });
     },
-    enabled: !!novel?.id && open,
+    enabled: !!rootNovelId && open,
+  });
+
+  // ข้อมูลเรื่องหลัก (Season 1) — เพื่อใช้คำนวณเลข Season และ lock ค่าต่าง ๆ
+  const { data: rootNovel } = useQuery({
+    queryKey: ["root-novel", rootNovelId],
+    queryFn: async () => {
+      if (!rootNovelId) return null;
+      if (String(rootNovelId) === String(novel?.id)) return novel;
+      const all = await base44.entities.Novel.list();
+      return all.find((n) => String(n.id) === String(rootNovelId)) || null;
+    },
+    enabled: !!rootNovelId && open,
   });
 
   const deleteSeasonMutation = useMutation({
@@ -199,8 +214,13 @@ ${charSummary || "(ยังไม่มี)"}
     setCreating(true);
 
     try {
-      // หาเลข Season ถัดไป
-      const maxSeasonNumber = seasons.reduce((max, s) => Math.max(max, s.season_number || 1), 0);
+      // หาเลข Season ถัดไป — นับรวมเรื่องหลัก (Season 1) + ทุกภาคที่มีอยู่ในซีรีส์
+      // เรื่องหลัก (root) ถือเป็น Season 1 เสมอ และไม่เริ่มนับใหม่ที่ 1
+      const mainSeasonNumber = rootNovel?.season_number || 1;
+      const maxSeasonNumber = seasons.reduce(
+        (max, s) => Math.max(max, s.season_number || 1),
+        mainSeasonNumber
+      );
       const newSeasonNumber = maxSeasonNumber + 1;
 
       // สร้าง Season ใหม่ — lock writer_id จาก parent novel เสมอ
@@ -210,9 +230,9 @@ ${charSummary || "(ยังไม่มี)"}
         synopsis: seasonSynopsis || novel.synopsis,
         era: novel.era,
         status: "กำลังเขียน",
-        writer_id: novel.writer_id || "", // ★ สำคัญ: lock writer จาก parent novel — ห้ามให้ null
-        series_id: novel.series_id || "",
-        parent_novel_id: novel.id,
+        writer_id: (rootNovel || novel).writer_id || "", // ★ สำคัญ: lock writer จากเรื่องหลัก — ห้ามให้ null
+        series_id: (rootNovel || novel).series_id || "",
+        parent_novel_id: rootNovelId, // ★ ผูกกับเรื่องหลัก (root) เสมอ ให้ทุกภาคเป็น sibling
         season_number: newSeasonNumber,
         novel_type: novel.novel_type || "นิยายยาว",
         target_chapters: parseInt(targetChapters) || novel.target_chapters || 10,
@@ -294,8 +314,18 @@ ${charSummary || "(ยังไม่มี)"}
     "ตัวประกอบ": "bg-muted text-muted-foreground border-border",
   };
 
-  const currentSeason = seasons.find(s => String(s.id) === String(novel?.id));
-  const seasonNumber = currentSeason?.season_number || 1;
+  // รายการ Season ทั้งหมดสำหรับแสดงผล = เรื่องหลัก (Season 1) + ภาคต่อทั้งหมด
+  const allSeasonsDisplay = [rootNovel, ...seasons]
+    .filter(Boolean)
+    .sort((a, b) => {
+      const sa = a.season_number || 1;
+      const sb = b.season_number || 1;
+      if (sa !== sb) return sa - sb;
+      return new Date(a.created_date || 0) - new Date(b.created_date || 0);
+    });
+
+  const currentSeason = allSeasonsDisplay.find(s => String(s.id) === String(novel?.id));
+  const seasonNumber = currentSeason?.season_number || novel?.season_number || 1;
 
   // ถ้า step = 0 แสดงหน้าเลือกรายการ Season (mode เดิม)
   if (step === 0) {
@@ -329,15 +359,15 @@ ${charSummary || "(ยังไม่มี)"}
             <div>
               <h3 className="text-sm font-medium mb-2 flex items-center gap-2">
                 <BookOpen className="w-4 h-4 text-muted-foreground" />
-                Season ทั้งหมด ({seasons.length})
+                Season ทั้งหมด ({allSeasonsDisplay.length})
               </h3>
               <div className="space-y-2 max-h-60 overflow-y-auto">
-                {seasons.length === 0 ? (
+                {allSeasonsDisplay.length === 0 ? (
                   <p className="text-sm text-muted-foreground text-center py-4">
                     ยังไม่มี Season
                   </p>
                 ) : (
-                  seasons.map((season, idx) => (
+                  allSeasonsDisplay.map((season, idx) => (
                     <div
                       key={season.id}
                       className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-all ${
@@ -363,6 +393,8 @@ ${charSummary || "(ยังไม่มี)"}
                       <div className="flex items-center gap-2 shrink-0">
                         {String(season.id) === String(novel?.id) ? (
                           <Badge className="bg-primary text-primary-foreground">ปัจจุบัน</Badge>
+                        ) : String(season.id) === String(rootNovelId) ? (
+                          <Badge variant="secondary" className="text-xs">หลัก</Badge>
                         ) : (
                           <button
                             onClick={(e) => {

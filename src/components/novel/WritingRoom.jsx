@@ -355,7 +355,7 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
                           : "text-muted-foreground hover:bg-secondary"
                       }`}
                     >
-                      <span className="text-primary/70 mr-1.5">#{idx + 1}</span>
+                      <span className="text-primary/70 mr-1.5">#{season.season_number || idx + 1}</span>
                       {season.title}
                     </button>
                     {String(season.id) !== String(novelId) && (
