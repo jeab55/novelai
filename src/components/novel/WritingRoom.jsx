@@ -588,38 +588,38 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
               <div
                 ref={drag.innerRef}
                 {...drag.draggableProps}
-                className={`group flex items-center gap-4 px-5 py-4 rounded-2xl border bg-card/60 hover:border-primary/30 hover:bg-card hover:shadow-sm cursor-pointer transition-all duration-200 ${snapshot.isDragging ? "border-primary/50 shadow-lg ring-2 ring-primary/20 bg-card" : "border-border/50"}`}
+                className={`group flex items-center gap-3 sm:gap-4 px-3 sm:px-5 py-4 rounded-2xl border bg-card/60 hover:border-primary/30 hover:bg-card hover:shadow-sm cursor-pointer transition-all duration-200 ${snapshot.isDragging ? "border-primary/50 shadow-lg ring-2 ring-primary/20 bg-card" : "border-border/50"}`}
                 onClick={() => setSelectedChapter(ch)}
               >
                 {/* Drag Handle */}
                 <div
                   {...drag.dragHandleProps}
                   onClick={(e) => e.stopPropagation()}
-                  className="text-muted-foreground/40 hover:text-muted-foreground cursor-grab active:cursor-grabbing shrink-0 -ml-1"
+                  className="text-muted-foreground/40 hover:text-muted-foreground cursor-grab active:cursor-grabbing shrink-0 -ml-1 hidden sm:block"
                   title="ลากเพื่อจัดลำดับ"
                 >
                   <GripVertical className="w-4 h-4" />
                 </div>
                 
                 {/* Chapter Number Badge */}
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center text-sm font-bold text-primary shrink-0 border border-primary/15">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center text-sm font-bold text-primary shrink-0 border border-primary/15">
                   {ch.order || i + 1}
                 </div>
                 
                 {/* Title & Stats */}
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-[15px] truncate text-foreground">{ch.title}</p>
-                  <p className="text-xs text-muted-foreground mt-1 flex items-center gap-3">
-                    <span className="flex items-center gap-1">
+                  <p className="text-xs text-muted-foreground mt-1 flex items-center gap-2 flex-wrap">
+                    <span className="whitespace-nowrap">
                       <span className="font-medium text-primary/70">{(ch.word_count || 0).toLocaleString()}</span> คำ
                     </span>
                     {(selectedSeasonNovel || novel)?.word_count_target && (
-                      <span className={`flex items-center gap-1 ${
+                      <span className={`whitespace-nowrap ${
                         (ch.word_count || 0) >= (selectedSeasonNovel || novel).word_count_target * 0.9
                           ? "text-emerald-600 dark:text-emerald-400"
                           : "text-amber-600 dark:text-amber-400"
                       }`}>
-                        <span className="text-xs">({Math.round(((ch.word_count || 0) / (selectedSeasonNovel || novel).word_count_target) * 100)}% ของเป้าหมาย)</span>
+                        ({Math.round(((ch.word_count || 0) / (selectedSeasonNovel || novel).word_count_target) * 100)}% ของเป้าหมาย)
                       </span>
                     )}
                   </p>
@@ -629,7 +629,7 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
                 <Button
                   variant="outline"
                   size="sm"
-                  className="gap-1.5 h-8 text-primary/70 border-primary/20 hover:bg-primary/5 shrink-0"
+                  className="gap-1.5 h-8 px-2 sm:px-3 text-primary/70 border-primary/20 hover:bg-primary/5 shrink-0"
                   onClick={(e) => {
                     e.stopPropagation();
                     setDraftChapter(ch);
@@ -638,10 +638,10 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
                   title="ร่างด้วย AI"
                 >
                   <Sparkles className="w-3.5 h-3.5" />
-                  ร่างด้วย AI
+                  <span className="hidden sm:inline">ร่างด้วย AI</span>
                 </Button>
-                {/* Action Buttons - Show on Hover */}
-                <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-all shrink-0">
+                {/* Action Buttons - Show on Hover (desktop) / always (mobile) */}
+                <div className="flex items-center gap-1.5 sm:opacity-0 sm:group-hover:opacity-100 transition-all shrink-0">
                   {chaptersWithReaderReviews.has(ch.id) && (
                     <Button
                       variant="outline"
