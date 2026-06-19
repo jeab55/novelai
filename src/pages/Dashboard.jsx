@@ -8,11 +8,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Plus, BookOpen, Pencil, Trash2, Share2, CheckCircle2, Loader2 } from "lucide-react";
+import { Plus, BookOpen, Pencil, Trash2, Share2, CheckCircle2, Loader2, Sparkles } from "lucide-react";
 import DeleteNovelDialog from "@/components/novel/DeleteNovelDialog";
 import CreateNovelWizard from "@/components/novel/CreateNovelWizard";
 import ShortStoryCreatorDialog from "@/components/novel/ShortStoryCreatorDialog";
 import ShareNovelDialog from "@/components/novel/ShareNovelDialog";
+import BlurbPicker from "@/components/novel/BlurbPicker";
+import { useBlurbDrafter } from "@/hooks/useBlurbDrafter";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { useAuth } from "@/lib/AuthContext";
@@ -40,6 +42,8 @@ export default function Dashboard() {
   const [editOpen, setEditOpen] = useState(false);
   const [editForm, setEditForm] = useState({});
   const [editingId, setEditingId] = useState(null);
+  const [editingNovel, setEditingNovel] = useState(null);
+  const { drafting, blurbs, pickerOpen, draftFromPlot, closePicker } = useBlurbDrafter();
   const [deleteDialog, setDeleteDialog] = useState({ open: false, novel: null });
   const [shareDialog, setShareDialog] = useState({ open: false, novel: null });
   const queryClient = useQueryClient();
@@ -124,6 +128,7 @@ export default function Dashboard() {
     e.preventDefault();
     e.stopPropagation();
     setEditingId(novel.id);
+    setEditingNovel(novel);
     setEditForm({
       title: novel.title,
       genre: novel.genre || "",
@@ -156,6 +161,12 @@ export default function Dashboard() {
         open={shareDialog.open}
         onClose={() => setShareDialog({ open: false, novel: null })}
         novel={shareDialog.novel}
+      />
+      <BlurbPicker
+        open={pickerOpen}
+        onClose={closePicker}
+        blurbs={blurbs}
+        onSelect={(b) => { setEditForm((f) => ({ ...f, synopsis: b })); closePicker(); }}
       />
       <ShortStoryCreatorDialog open={shortStoryOpen} onOpenChange={setShortStoryOpen} />
       <CreateNovelWizard
@@ -190,7 +201,20 @@ export default function Dashboard() {
               <Input value={editForm.era || ""} onChange={(e) => setEditForm({ ...editForm, era: e.target.value })} />
             </div>
             <div>
-              <label className="text-sm font-medium mb-1.5 block">คำโปรย / เรื่องย่อ</label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-sm font-medium block">คำโปรย / เรื่องย่อ</label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs gap-1 text-amber-600 hover:text-amber-700 hover:bg-amber-500/10 px-2"
+                  onClick={() => draftFromPlot(editingNovel, { title: editForm.title, genre: editForm.genre, synopsis: editForm.synopsis, era: editForm.era })}
+                  disabled={drafting}
+                >
+                  {drafting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                  {drafting ? "กำลังร่าง..." : "✨ ร่างคำโปรยจากพล็อต"}
+                </Button>
+              </div>
               <Textarea rows={4} value={editForm.synopsis || ""} onChange={(e) => setEditForm({ ...editForm, synopsis: e.target.value })} />
             </div>
             <div>
