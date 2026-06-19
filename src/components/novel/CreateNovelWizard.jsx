@@ -9,24 +9,11 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, X, Sparkles, Loader2, ChevronDown, ChevronUp, Check, Users, BookOpen, Feather } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { toast } from "sonner";
+import { generateBlurbs } from "@/lib/synopsisPrompt";
+import BlurbPicker from "@/components/novel/BlurbPicker";
 
 const GENRES = ["โรแมนติก", "แฟนตาซี", "อิงประวัติศาสตร์", "จีนย้อนยุค", "วาย", "สยองขวัญ", "ลึกลับ", "แอ็คชั่น", "ดราม่า", "อื่นๆ"];
 
-// โทรปยอดนิยมที่ขายได้ในตลาดนิยายไทย แยกตามแนว
-const GENRE_TROPES = {
-  "โรแมนติก": "คลุมถุงชน, เกลียดกลายเป็นรัก (enemies to lovers), รักลวง/สัญญาแต่งงาน, รักข้ามชนชั้น (CEO กับสาวธรรมดา)",
-  "จีนย้อนยุค": "เกิดใหม่แก้แค้น, ชิงวังหลัง/ชิงรักในวัง, ทะลุมิติเป็นองค์หญิง, สวมรอยเป็นคนอื่น",
-  "แฟนตาซี": "เกิดใหม่ต่างโลก (isekai), ระบบเลเวลอัป/สถานะ, ตัวร้ายกลับใจ, พลังพิเศษที่ถูกซ่อนไว้",
-  "วาย": "enemies to lovers, แกล้งคบ (fake dating), เพื่อนสมัยเด็กกลับมาเจอกัน, นายเหนือ-ลูกน้อง",
-  "อิงประวัติศาสตร์": "รักต้องห้ามท่ามกลางสงคราม, ชะตากรรมข้ามยุค, ความลับของตระกูลเก่าแก่",
-  "สยองขวัญ": "บ้านผีสิง, คำสาปตกทอด, ความลับในอดีตที่กลับมาหลอกหลอน",
-  "ลึกลับ": "ฆาตกรรมปริศนา, การหายตัวไปอย่างลึกลับ, นักสืบกับคดีที่เกี่ยวพันตัวเอง",
-  "แอ็คชั่น": "ภารกิจล้างแค้น, สายลับสองหน้า, การไล่ล่าข้ามประเทศ",
-  "ดราม่า": "ความลับครอบครัว, การกลับมาของคนที่จากไป, การให้อภัยและไถ่บาป",
-};
-function getTropesForGenre(genre) {
-  return GENRE_TROPES[genre] || "โทรปยอดนิยมที่ขายได้ในตลาดนิยายไทยของแนวนี้";
-}
 const CHAR_ROLES = ["ตัวเอก", "ตัวรอง", "ตัวร้าย", "ตัวประกอบ"];
 const DIALECTS = ["กลาง", "อีสาน", "เหนือ", "ใต้", "ตะวันออก", "อื่นๆ"];
 const emptyChar = () => ({ name: "", role: "ตัวเอก", age: "", occupation: "", dialect: "กลาง", dialect_examples: "", personality: "", background: "", wound: "", desire: "" });
@@ -188,6 +175,31 @@ function Step1({ form, setForm, chars, activeWriters }) {
   const [marketDrafting, setMarketDrafting] = useState(false);
   const [titleSuggesting, setTitleSuggesting] = useState(false);
   const [eraSuggesting, setEraSuggesting] = useState(false);
+  const [blurbOptions, setBlurbOptions] = useState([]);
+  const [blurbPickerOpen, setBlurbPickerOpen] = useState(false);
+
+  const selectedWriter = activeWriters?.find((w) => w.id === form.writer_id);
+
+  // ร่างคำโปรยหลายแบบ อิงข้อมูลจริงของเรื่อง + หลัก 6 ข้อ แล้วเปิดให้เลือก
+  const draftBlurbVariants = async ({ marketMode = false } = {}) => {
+    setDraftError("");
+    if (!form.title.trim() && !form.genre && !form.synopsis.trim()) {
+      setDraftError("กรุณากรอกชื่อเรื่อง แนว หรือเรื่องย่อก่อน ให้ AI ร่างคำโปรยได้ตรงเนื้อเรื่อง");
+      return false;
+    }
+    const blurbs = await generateBlurbs(
+      { title: form.title, genre: form.genre, synopsis: form.synopsis, era: form.era },
+      chars,
+      { variants: 3, writerSystemPrompt: selectedWriter?.system_prompt || "", marketMode }
+    );
+    if (!blurbs.length) {
+      setDraftError("AI ไม่สามารถร่างคำโปรยได้ กรุณาลองใหม่อีกครั้ง");
+      return false;
+    }
+    setBlurbOptions(blurbs);
+    setBlurbPickerOpen(true);
+    return true;
+  };
 
   // ให้ AI สร้างยุคสมัยและฉากหลังจากพล็อต/แนว
   const handleSuggestEra = async () => {
@@ -243,97 +255,35 @@ function Step1({ form, setForm, chars, activeWriters }) {
     setTitleSuggesting(false);
   };
 
-  // ร่างเรื่องย่อแนวขายได้ในตลาด อิงแนว + โทรปยอดนิยม
+  // ร่างคำโปรยจากพล็อตสร้างเงิน — เสนอหลายแบบให้เลือก (ใช้ helper กลาง)
   const handleDraftMarketSynopsis = async () => {
-    setDraftError("");
-    if (!form.genre) {
-      setDraftError("กรุณาเลือกแนวนิยายก่อน เพื่อให้ AI ใส่โทรปที่ตรงตลาดได้");
-      return;
-    }
+    setConfirmMode(false);
     setMarketDrafting(true);
-    const namedChars = chars.filter((c) => c.name.trim());
-    const isOneShot = form.novel_type === "เรื่องสั้น";
-    const contextParts = [
-      form.title && `ชื่อเรื่อง: ${form.title}`,
-      `แนวนิยาย: ${form.genre}`,
-      `ประเภท: ${isOneShot ? "เรื่องสั้นจบในตอนเดียว" : "นิยายยาวหลายตอน"}`,
-      form.era && `ยุคสมัยและฉากหลัง: ${form.era}`,
-      namedChars.length > 0 && `ตัวละครหลัก: ${namedChars.map((c) => `${c.name} (${c.role})`).join(", ")}`,
-    ].filter(Boolean).join("\n");
-
-    const selectedWriter = activeWriters?.find((w) => w.id === form.writer_id);
-    const writerCtx = selectedWriter?.system_prompt
-      ? `[สไตล์และโทนการเขียน]\n${selectedWriter.system_prompt}\n\n`
-      : "";
-
-    const result = await base44.integrations.Core.InvokeLLM({
-      prompt: `${writerCtx}คุณคือนักเขียนนิยายไทยมือทอง ที่เชี่ยวชาญการปั้นเรื่องย่อ "พล็อตสร้างเงิน" ที่ขายได้ในแพลตฟอร์มนิยายไทย\n\n[ข้อมูลจากผู้เขียน]\n${contextParts}\n\n[โทรปยอดนิยมของแนว ${form.genre}]\n${getTropesForGenre(form.genre)}\n\n[งานที่ต้องทำ]\nร่างเรื่องย่อ (synopsis) ภาษาไทยที่ขายได้ในตลาด โดย:\n- เปิดด้วยฮุกที่ดึงดูดใจตั้งแต่ประโยคแรก\n- มีปมขัดแย้งและเดิมพันที่ชัดเจน\n- สอดแทรกโทรปยอดนิยมของแนว ${form.genre} ที่ลิสต์ไว้ข้างต้น อย่างน้อย 1 โทรปให้กลมกลืน\n- เขียนกระชับ น่าติดตาม ประมาณ 3-5 บรรทัด อย่าเปิดเผยปมสำคัญทั้งหมด\n\nตอบเฉพาะข้อความเรื่องย่อ ไม่ต้องมีหัวข้อ คำอธิบาย หรือเครื่องหมายคำพูด`,
-    });
-
-    const cleaned = (typeof result === "string" ? result : "").replace(/^```[\w]*\n?/m, "").replace(/```$/m, "").trim();
-    if (!cleaned) {
-      setDraftError("AI ไม่สามารถร่างเรื่องย่อได้ กรุณาลองใหม่อีกครั้ง");
-      setMarketDrafting(false);
-      return;
-    }
-    setForm({ ...form, synopsis: cleaned });
+    await draftBlurbVariants({ marketMode: true });
     setMarketDrafting(false);
-    toast.success("ร่างเรื่องย่อจากพล็อตสร้างเงินสำเร็จ! ✨");
   };
 
-  const handleDraftSynopsis = async (append = false) => {
+  // ร่างคำโปรย — เสนอหลายแบบให้เลือก (ใช้ helper กลาง)
+  const handleDraftSynopsis = async () => {
     setConfirmMode(false);
-    setDraftError("");
     setDrafting(true);
-    const namedChars = chars.filter((c) => c.name.trim());
-    const isOneShot = form.novel_type === "เรื่องสั้น";
-    const contextParts = [
-      `ชื่อเรื่อง: ${form.title}`,
-      `ประเภท: ${isOneShot ? "เรื่องสั้นจบในตอนเดียว" : "นิยายยาวหลายตอน"}`,
-      form.genre && `แนวนิยาย: ${form.genre}`,
-      form.era && `ยุคสมัยและฉากหลัง: ${form.era}`,
-      isOneShot 
-        ? `ความยาวเป้าหมาย: ${form.word_count_target || 3000} คำ`
-        : form.target_chapters && `จำนวนตอน: ${form.target_chapters} ตอน`,
-      namedChars.length > 0 && `ตัวละครหลัก: ${namedChars.map((c) => `${c.name} (${c.role})`).join(", ")}`,
-    ].filter(Boolean).join("\n");
-
-    // ดึง writer system_prompt ถ้าเลือกแล้ว
-    const selectedWriter = activeWriters?.find((w) => w.id === form.writer_id);
-    const writerCtx = selectedWriter?.system_prompt
-      ? `[สไตล์และโทนการเขียน]\n${selectedWriter.system_prompt}\n\n`
-      : "";
-
-    const result = await base44.integrations.Core.InvokeLLM({
-      prompt: `${writerCtx}คุณคือนักเขียนนิยายมืออาชีพ ช่วยร่างเรื่องย่อ${isOneShot ? "เรื่องสั้น" : "นิยาย"}เรื่องนี้:\n\n${contextParts}\n\nเขียนเรื่องย่อภาษาไทย 3-5 ประโยค กระชับ น่าสนใจ ดึงดูดให้อยากอ่าน เหมาะกับแนว${form.genre || "นิยาย"}ที่เลือก อย่าเพิ่งเปิดเผยปมสำคัญทั้งหมด ให้รู้สึกอยากติดตาม ตอบเฉพาะเรื่องย่อ ไม่ต้องมีหัวข้อหรือคำอธิบายเพิ่มเติม`,
-    });
-
-    // Strip code fences
-    const cleaned = result.replace(/^```[\w]*\n?/m, "").replace(/```$/m, "").trim();
-    if (!cleaned) {
-      setDraftError("AI ไม่สามารถร่างเรื่องย่อได้ กรุณาลองใหม่อีกครั้ง");
-      setDrafting(false);
-      return;
-    }
-
-    if (append && form.synopsis.trim()) {
-      setForm({ ...form, synopsis: form.synopsis.trim() + "\n\n" + cleaned });
-    } else {
-      setForm({ ...form, synopsis: cleaned });
-    }
+    await draftBlurbVariants();
     setDrafting(false);
   };
 
+  // เลือกคำโปรยจาก picker
+  const handlePickBlurb = (blurb) => {
+    setForm((f) => ({ ...f, synopsis: blurb }));
+    setBlurbPickerOpen(false);
+    toast.success("ใช้คำโปรยที่เลือกแล้ว ✨");
+  };
+
   const handleAiClick = () => {
-    if (!form.title.trim()) {
-      setDraftError("กรุณากรอกชื่อเรื่องก่อนให้ AI ช่วยร่าง");
-      return;
-    }
     if (form.synopsis.trim()) {
-      setConfirmMode(true); // ask overwrite or append
+      setConfirmMode(true); // ถามแทนที่หรือร่างใหม่
       return;
     }
-    handleDraftSynopsis(false);
+    handleDraftSynopsis();
   };
 
   const isOneShot = form.novel_type === "เรื่องสั้น";
@@ -423,7 +373,7 @@ function Step1({ form, setForm, chars, activeWriters }) {
                 disabled={drafting || marketDrafting}
               >
                 {drafting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
-                {drafting ? "กำลังร่าง..." : "✨ ให้ AI ช่วยร่างเรื่องย่อ"}
+                {drafting ? "กำลังร่าง..." : "✨ ร่างคำโปรย (เลือกได้หลายแบบ)"}
               </Button>
               <Button
                 type="button"
@@ -434,17 +384,14 @@ function Step1({ form, setForm, chars, activeWriters }) {
                 disabled={drafting || marketDrafting}
               >
                 {marketDrafting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
-                {marketDrafting ? "กำลังร่าง..." : "✨ ร่างเรื่องย่อจากพล็อตสร้างเงิน"}
+                {marketDrafting ? "กำลังร่าง..." : "✨ ร่างคำโปรยพล็อตสร้างเงิน"}
               </Button>
             </div>
           ) : (
             <div className="flex items-center gap-1">
-              <span className="text-xs text-muted-foreground mr-1">มีข้อความอยู่แล้ว:</span>
-              <Button type="button" size="sm" variant="outline" className="h-6 text-xs px-2 border-destructive/40 text-destructive hover:bg-destructive/8" onClick={() => handleDraftSynopsis(false)}>
-                แทนที่
-              </Button>
-              <Button type="button" size="sm" variant="outline" className="h-6 text-xs px-2 border-primary/40 text-primary hover:bg-primary/8" onClick={() => handleDraftSynopsis(true)}>
-                ต่อท้าย
+              <span className="text-xs text-muted-foreground mr-1">มีคำโปรยอยู่แล้ว:</span>
+              <Button type="button" size="sm" variant="outline" className="h-6 text-xs px-2 border-primary/40 text-primary hover:bg-primary/8" onClick={handleDraftSynopsis} disabled={drafting}>
+                {drafting ? <Loader2 className="w-3 h-3 animate-spin" /> : "ร่างใหม่ให้เลือก"}
               </Button>
               <Button type="button" size="sm" variant="ghost" className="h-6 text-xs px-1.5 text-muted-foreground" onClick={() => setConfirmMode(false)}>
                 ยกเลิก
@@ -453,8 +400,15 @@ function Step1({ form, setForm, chars, activeWriters }) {
           )}
         </div>
         {draftError && <p className="text-xs text-destructive mb-1.5">{draftError}</p>}
-        <Textarea placeholder="เล่าเรื่องย่อของนิยาย..." rows={4} value={form.synopsis} onChange={(e) => setForm({ ...form, synopsis: e.target.value })} />
+        <Textarea placeholder="เล่าคำโปรย/เรื่องย่อของนิยาย..." rows={4} value={form.synopsis} onChange={(e) => setForm({ ...form, synopsis: e.target.value })} />
       </div>
+
+      <BlurbPicker
+        open={blurbPickerOpen}
+        onClose={() => setBlurbPickerOpen(false)}
+        blurbs={blurbOptions}
+        onSelect={handlePickBlurb}
+      />
     </div>
   );
 }
