@@ -630,12 +630,18 @@ export default function CreateNovelWizard({ open, onOpenChange, activeWriters, o
       const namedChars = chars.filter((c) => c.name.trim());
       const isOneShot = novelData.novel_type === "เรื่องสั้น";
 
+      // helper: กันค้างถ้าเครือข่ายมือถือช้า/หลุด — timeout 30s
+      const withTimeout = (promise, ms = 30000) => Promise.race([
+        promise,
+        new Promise((_, reject) => setTimeout(() => reject(new Error("เครือข่ายช้าหรือหลุด กรุณาลองใหม่อีกครั้ง")), ms)),
+      ]);
+
       // ── ขั้น 2: บันทึก Novel ลงฐานข้อมูลก่อนเสมอ ──
-      const novel = await base44.entities.Novel.create(novelData);
+      const novel = await withTimeout(base44.entities.Novel.create(novelData));
 
       // ── ขั้น 3: บันทึกตัวละคร ──
       if (namedChars.length > 0) {
-        await Promise.all(namedChars.map((c) =>
+        await withTimeout(Promise.all(namedChars.map((c) =>
           base44.entities.Character.create({
             novel_id: novel.id,
             name: c.name.trim(),
@@ -650,7 +656,7 @@ export default function CreateNovelWizard({ open, onOpenChange, activeWriters, o
             desire: c.desire || undefined,
             ai_analysis: c.ai_analysis || undefined,
           })
-        ));
+        )));
       }
 
       // ── ขั้น 4: สร้าง plot_outline หลังจากบันทึกสำเร็จแล้ว ──
