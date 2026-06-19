@@ -343,17 +343,18 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
         {/* Season Tabs & Management */}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3 flex-1">
-            <div className="flex items-center gap-1.5 bg-secondary/50 p-1 rounded-xl flex-1">
+            <div className="flex items-center gap-1.5 bg-secondary/50 p-1 rounded-xl flex-1 overflow-x-auto">
               {seasons.length > 1 ? (
                 seasons.map((season, idx) => (
-                  <div key={season.id} className="flex items-center gap-1">
+                  <div key={season.id} className="flex items-center gap-1 shrink-0">
                     <button
                       onClick={() => setSelectedSeasonTab(season.id)}
-                      className={`px-3 py-1.5 text-sm rounded-lg transition-all font-medium ${
+                      className={`px-3 py-1.5 text-sm rounded-lg transition-all font-medium whitespace-nowrap max-w-[160px] sm:max-w-[220px] truncate ${
                         String(selectedSeasonTab) === String(season.id)
                           ? "bg-primary text-primary-foreground shadow-sm"
                           : "text-muted-foreground hover:bg-secondary"
                       }`}
+                      title={season.title}
                     >
                       <span className="text-primary/70 mr-1.5">#{season.season_number || idx + 1}</span>
                       {season.title}
