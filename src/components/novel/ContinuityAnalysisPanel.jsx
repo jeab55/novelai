@@ -18,6 +18,7 @@ import {
 import { base44 } from "@/api/base44Client";
 import { useMutation } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
+import BlurbDrafterSection from "@/components/novel/BlurbDrafterSection";
 
 const severityColors = {
   low: "bg-blue-100 text-blue-800 border-blue-300",
@@ -37,7 +38,7 @@ const typeLabels = {
   timeline: "ไทม์ไลน์"
 };
 
-export default function ContinuityAnalysisPanel({ novelId, chapters }) {
+export default function ContinuityAnalysisPanel({ novelId, chapters, novel }) {
   const [analysis, setAnalysis] = useState(null);
   const [expandedIssues, setExpandedIssues] = useState({});
 
@@ -59,28 +60,33 @@ export default function ContinuityAnalysisPanel({ novelId, chapters }) {
     }));
   };
 
-  if (chapters.length === 0) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="font-heading flex items-center gap-2">
-            <Brain className="w-5 h-5" />
-            วิเคราะห์ความต่อเนื่อง
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground text-sm">
-            ไม่มีตอนให้วิเคราะห์ กรุณาสร้างตอนก่อน
-          </p>
-        </CardContent>
-      </Card>
-    );
-  }
-
   const isLoading = analyzeMutation.isPending;
   const analysisData = analysis || analyzeMutation.data?.analysis;
 
+  if (chapters.length === 0) {
+    return (
+      <div className="space-y-4">
+        <BlurbDrafterSection novel={novel} novelId={novelId} analysisSummary={analysisData?.summary} />
+        <Card>
+          <CardHeader>
+            <CardTitle className="font-heading flex items-center gap-2">
+              <Brain className="w-5 h-5" />
+              วิเคราะห์ความต่อเนื่อง
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground text-sm">
+              ไม่มีตอนให้วิเคราะห์ กรุณาสร้างตอนก่อน
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
+    <div className="space-y-4">
+    <BlurbDrafterSection novel={novel} novelId={novelId} analysisSummary={analysisData?.summary} />
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
@@ -320,5 +326,6 @@ export default function ContinuityAnalysisPanel({ novelId, chapters }) {
         )}
       </CardContent>
     </Card>
+    </div>
   );
 }

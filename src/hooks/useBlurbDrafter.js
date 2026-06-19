@@ -29,6 +29,7 @@ export function useBlurbDrafter() {
         synopsis: overrides.synopsis ?? novel.synopsis,
         era: overrides.era ?? novel.era,
         plot_outline: novel.plot_outline,
+        analysis_summary: overrides.analysis_summary,
       };
 
       const result = await generateBlurbs(story, mainChars, { variants: 3, writerSystemPrompt });

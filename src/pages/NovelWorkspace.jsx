@@ -336,7 +336,7 @@ export default function NovelWorkspace() {
             <WriterManager />
           </TabsContent>
           <TabsContent value="analysis" className="m-0">
-            <ContinuityAnalysisPanel novelId={activeNovelId} chapters={chapters || []} />
+            <ContinuityAnalysisPanel novelId={activeNovelId} chapters={chapters || []} novel={novel} />
           </TabsContent>
         </div>
       </Tabs>

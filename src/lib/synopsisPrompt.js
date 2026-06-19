@@ -42,6 +42,7 @@ export function buildStoryContext(story = {}, characters = []) {
     story.era && `ยุคสมัย/ฉากหลัง: ${story.era}`,
     story.synopsis && `เรื่องย่อปัจจุบัน: ${story.synopsis}`,
     story.plot_outline && `โครงเรื่อง: ${story.plot_outline}`,
+    story.analysis_summary && `ผลวิเคราะห์พล็อต: ${story.analysis_summary}`,
     `ตัวละครหลักและปมขัดแย้ง:\n${charLines}`,
   ].filter(Boolean).join("\n");
 }
