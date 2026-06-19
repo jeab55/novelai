@@ -72,8 +72,8 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
     queryKey: ["seasons", novelId],
     queryFn: async () => {
       const all = await base44.entities.Novel.list();
-      // Season 1 คือนิยายหลัก, Season 2+ คือ novels ที่มี parent_novel_id = novelId
-      const season1 = novel;
+      // Season 1 คือนิยายหลัก (ข้ามถ้าถูกลบ), Season 2+ คือ novels ที่มี parent_novel_id = novelId
+      const season1 = novel && !novel.is_deleted ? novel : null;
       const season2Plus = all.filter(
         (n) => String(n.parent_novel_id) === String(novelId) && !n.is_deleted
       );
@@ -95,7 +95,7 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
     queryKey: ["novel", selectedSeasonTab],
     queryFn: async () => {
       const all = await base44.entities.Novel.list();
-      return all.find((n) => String(n.id) === String(selectedSeasonTab));
+      return all.find((n) => String(n.id) === String(selectedSeasonTab) && !n.is_deleted);
     },
     enabled: !!selectedSeasonTab,
     staleTime: 30000,

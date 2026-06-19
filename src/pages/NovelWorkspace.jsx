@@ -40,7 +40,7 @@ export default function NovelWorkspace() {
     queryKey: ["novel", novelId],
     queryFn: async () => {
       const all = await base44.entities.Novel.list();
-      return all.find((n) => String(n.id) === String(novelId));
+      return all.find((n) => String(n.id) === String(novelId) && !n.is_deleted);
     },
     enabled: !!novelId,
     staleTime: 60000, // 1 นาที

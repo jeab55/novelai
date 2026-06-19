@@ -58,7 +58,7 @@ export default function SeasonSelectorDialog({ open, onClose, novel, onSeasonCha
       if (!rootNovelId) return null;
       if (String(rootNovelId) === String(novel?.id)) return novel;
       const all = await base44.entities.Novel.list();
-      return all.find((n) => String(n.id) === String(rootNovelId)) || null;
+      return all.find((n) => String(n.id) === String(rootNovelId) && !n.is_deleted) || null;
     },
     enabled: !!rootNovelId && open,
   });
