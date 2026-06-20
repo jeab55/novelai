@@ -41,8 +41,15 @@ export async function invokeAIStable(params, options = {}) {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       const result = await invokeOnce(params, timeoutMs);
-      const text = typeof result === "string" ? result : (result?.text || "");
-      return stripFences(text);
+      if (typeof result === "string") return stripFences(result);
+      // บางโมเดล (เช่น claude) ห่อผลลัพธ์ไว้ใน result.response / result.output / result.text
+      if (result && typeof result === "object") {
+        const inner = result.response ?? result.output ?? result.text ?? result;
+        if (typeof inner === "string") return stripFences(inner);
+        // เป็น object (เช่นตอนใช้ response_json_schema) — คืนเป็น JSON string ให้ parser ปลายทางจัดการ
+        return JSON.stringify(inner);
+      }
+      return "";
     } catch (err) {
       lastError = err;
       if (attempt < maxAttempts) {

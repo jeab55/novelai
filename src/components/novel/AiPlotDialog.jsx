@@ -17,9 +17,10 @@ import {
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
   AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Loader2, Sparkles, Plus, Trash2, RefreshCw, FileText, CheckCircle2, AlertCircle, ChevronDown, ChevronUp, Users, Globe } from "lucide-react";
+import { Loader2, Sparkles, Plus, Trash2, RefreshCw, FileText, CheckCircle2, AlertCircle, ChevronDown, ChevronUp, Users, Globe, Maximize2 } from "lucide-react";
 import AiWorldBuilderDialog from "./AiWorldBuilderDialog";
 import { invokeAIStable } from "@/lib/aiInvoke";
+import { generatePlotSkeleton, generateTimelineOutline, expandTimelineEvent } from "@/lib/plotProgressive";
 import { enforceWordRange, buildWordCountInstruction, getWordRange } from "@/lib/wordCountControl";
 import AiProgressBar from "@/components/novel/AiProgressBar";
 import { toast } from "sonner";
@@ -220,6 +221,10 @@ export default function AiPlotDialog({ open, onClose, novel, novelId, onOpenChap
   const [draftStatus, setDraftStatus] = useState({});
   const [worldBuilderOpen, setWorldBuilderOpen] = useState(false);
   const [savedSuccessfully, setSavedSuccessfully] = useState(false);
+  // ความคืบหน้าแบบ progressive: แต่ละสเตปทยอยเสร็จ
+  const [progress, setProgress] = useState({ outline: false, timeline: false });
+  // สถานะการขยายรายละเอียดต่อเหตุการณ์: map index -> "expanding" | ""
+  const [expandStatus, setExpandStatus] = useState({});
 
   const { data: writer } = useQuery({
     queryKey: ["writer", novel?.writer_id],
@@ -316,59 +321,9 @@ export default function AiPlotDialog({ open, onClose, novel, novelId, onOpenChap
     },
   });
 
-  const generate = async () => {
-    if (!novel || step === "generating") return;
-    if (!writer) {
-      setParseError("นิยายนี้ยังไม่มีนักเขียน AI ที่ล็อกไว้ กรุณาแก้ไขนิยายและเลือกนักเขียน AI ก่อน");
-      setStep("review");
-      return;
-    }
-    setStep("generating");
-    setParseError("");
-
-    const userPrompt = buildPrompt(novel, writer, characters);
-
-    let raw;
-    try {
-      raw = await invokeAIStable(
-        { prompt: userPrompt, model: "claude_sonnet_4_6" },
-        { onRetry: ({ attempt, maxAttempts }) => toast.info(`AI ไม่ตอบสนอง กำลังลองใหม่ (${attempt}/${maxAttempts - 1})...`) }
-      );
-    } catch (err) {
-      setParseError(`เรียก AI ไม่สำเร็จ: ${err.message} — กรุณากด "เขียนใหม่"`);
-      setStep("review");
-      toast.error("วางพล็อตไม่สำเร็จหลังลองใหม่หลายครั้ง");
-      return;
-    }
-
-    let parsedOutline = "";
-    let eventsRaw = [];
-    let charsRaw = [];
-    try {
-      const parsed = parseAiResult(raw);
-      parsedOutline = parsed.outline;
-      eventsRaw = parsed.eventsRaw;
-      charsRaw = parsed.charsRaw;
-      if (!parsedOutline && !eventsRaw.length) throw new Error("ไม่พบข้อมูลใน response");
-    } catch (err) {
-      if (typeof raw === "string" && raw.length > 10) {
-        parsedOutline = raw;
-        eventsRaw = [];
-        charsRaw = [];
-        setParseError("ไม่สามารถแยก JSON ได้ แสดงข้อความดิบจาก AI ในช่องโครงเรื่อง กรุณาแก้ไขหรือลองใหม่");
-      } else {
-        setParseError(`แยกผลลัพธ์ไม่สำเร็จ: ${err.message} — กรุณากด "เขียนใหม่"`);
-        setStep("review");
-        setOutline("");
-        setEvents([]);
-        setAiCharacters([]);
-        return;
-      }
-    }
-
-    // Build character list with duplicate detection
+  const mapAiChars = (charsRaw) => {
     const existingNames = new Set(characters.map((c) => c.name.toLowerCase().trim()));
-    const mappedChars = charsRaw.map((c) => {
+    return charsRaw.map((c) => {
       const alreadyExists = existingNames.has((c.name || "").toLowerCase().trim());
       return {
         name: c.name || "",
@@ -385,15 +340,74 @@ export default function AiPlotDialog({ open, onClose, novel, novelId, onOpenChap
         alreadyExists,
       };
     });
+  };
 
-    setOutline(parsedOutline);
-    setEvents(eventsRaw.map((e, i) => ({
-      order: e.order ?? i + 1,
-      title: e.title || e.name || "",
-      description: e.description || e.desc || e.content || "",
-    })));
-    setAiCharacters(mappedChars);
+  // Progressive + parallel: ยิงโครง+ไทม์ไลน์พร้อมกัน ทยอยแสดงทันทีที่แต่ละสเตปเสร็จ
+  const generate = async () => {
+    if (!novel || step === "generating") return;
+    if (!writer) {
+      setParseError("นิยายนี้ยังไม่มีนักเขียน AI ที่ล็อกไว้ กรุณาแก้ไขนิยายและเลือกนักเขียน AI ก่อน");
+      setStep("review");
+      return;
+    }
+    setStep("generating");
+    setParseError("");
+    setOutline("");
+    setEvents([]);
+    setAiCharacters([]);
+    setProgress({ outline: false, timeline: false });
+
+    const ctx = { novel, writer, characters };
+
+    // สเตปที่ 1: โครงเรื่อง + ตัวละครหลัก (output เล็ก ตอบไว) — แสดงทันทีที่เสร็จ
+    const skeletonPromise = generatePlotSkeleton(ctx)
+      .then((res) => {
+        setOutline(res.outline);
+        setAiCharacters(mapAiChars(res.characters));
+        setProgress((p) => ({ ...p, outline: true }));
+        return true;
+      })
+      .catch((err) => {
+        toast.error(`วางโครงเรื่องไม่สำเร็จ: ${err.message}`);
+        return false;
+      });
+
+    // สเตปที่ 2 (ขนานกับสเตป 1): ไทม์ไลน์กระชับ — แสดงทันทีที่เสร็จ
+    const timelinePromise = generateTimelineOutline(ctx)
+      .then((evs) => {
+        setEvents(evs.map((e) => ({ order: e.order, title: e.title, description: e.description })));
+        setProgress((p) => ({ ...p, timeline: true }));
+        return true;
+      })
+      .catch((err) => {
+        toast.error(`วางไทม์ไลน์ไม่สำเร็จ: ${err.message}`);
+        return false;
+      });
+
+    // ทันทีที่สเตปแรกเสร็จ ให้สลับไปหน้า review (ไม่ต้องรออีกสเตป)
+    Promise.race([skeletonPromise, timelinePromise]).then(() => setStep("review"));
+
+    const [okOutline, okTimeline] = await Promise.all([skeletonPromise, timelinePromise]);
+    if (!okOutline && !okTimeline) {
+      setParseError('สร้างไม่สำเร็จทั้งโครงเรื่องและไทม์ไลน์ — กรุณากด "เขียนใหม่"');
+    }
     setStep("review");
+  };
+
+  // ขยายรายละเอียดเฉพาะเหตุการณ์ที่เลือก (on-demand)
+  const handleExpandEvent = async (idx) => {
+    const ev = events[idx];
+    if (!ev?.title || expandStatus[idx] === "expanding") return;
+    setExpandStatus((p) => ({ ...p, [idx]: "expanding" }));
+    try {
+      const detailed = await expandTimelineEvent({ novel, writer, characters, event: ev, outline });
+      if (detailed) updateEvent(idx, "description", detailed);
+      toast.success(`ขยายรายละเอียดตอน "${ev.title}" แล้ว`);
+    } catch (err) {
+      toast.error(`ขยายรายละเอียดไม่สำเร็จ: ${err.message}`);
+    } finally {
+      setExpandStatus((p) => ({ ...p, [idx]: "" }));
+    }
   };
 
   const handleSave = () => {
@@ -520,6 +534,8 @@ export default function AiPlotDialog({ open, onClose, novel, novelId, onOpenChap
     setDraftStatus({});
     setParseError("");
     setSavedSuccessfully(false);
+    setProgress({ outline: false, timeline: false });
+    setExpandStatus({});
   };
 
   const updateAiChar = (idx, field, value) => {
@@ -563,12 +579,31 @@ export default function AiPlotDialog({ open, onClose, novel, novelId, onOpenChap
           )}
 
           {step === "generating" && (
-            <div className="py-12 flex flex-col items-center gap-4 px-8">
+            <div className="py-12 flex flex-col items-center gap-5 px-8">
               <Loader2 className="w-8 h-8 animate-spin text-primary" />
-              <div className="w-full max-w-sm">
-                <AiProgressBar active={true} label="AI กำลังวางโครงเรื่อง..." expectedMs={30000} />
+              <div className="w-full max-w-sm space-y-2.5">
+                <div className="flex items-center gap-2 text-sm">
+                  {progress.outline ? (
+                    <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0" />
+                  ) : (
+                    <Loader2 className="w-4 h-4 animate-spin text-primary shrink-0" />
+                  )}
+                  <span className={progress.outline ? "text-green-700" : "text-muted-foreground"}>
+                    วางโครงเรื่อง 3 องก์ + ตัวละครหลัก
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  {progress.timeline ? (
+                    <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0" />
+                  ) : (
+                    <Loader2 className="w-4 h-4 animate-spin text-primary shrink-0" />
+                  )}
+                  <span className={progress.timeline ? "text-green-700" : "text-muted-foreground"}>
+                    แตกไทม์ไลน์เหตุการณ์ (กระชับ)
+                  </span>
+                </div>
               </div>
-              <p className="text-xs text-muted-foreground/60">อาจใช้เวลา 15-30 วินาที</p>
+              <p className="text-xs text-muted-foreground/60">ผลลัพธ์จะทยอยแสดงทันทีที่แต่ละส่วนเสร็จ</p>
             </div>
           )}
 
@@ -581,19 +616,34 @@ export default function AiPlotDialog({ open, onClose, novel, novelId, onOpenChap
               )}
               {/* Plot outline */}
               <div>
-                <label className="text-sm font-semibold mb-2 block text-foreground">โครงเรื่อง (3 องก์)</label>
+                <label className="text-sm font-semibold mb-2 flex items-center gap-2 text-foreground">
+                  โครงเรื่อง (3 องก์)
+                  {step === "review" && !progress.outline && (
+                    <span className="flex items-center gap-1 text-xs font-normal text-muted-foreground">
+                      <Loader2 className="w-3 h-3 animate-spin" /> กำลังสร้าง...
+                    </span>
+                  )}
+                </label>
                 <Textarea
                   value={outline}
                   onChange={(e) => setOutline(e.target.value)}
                   rows={6}
                   className="text-sm leading-relaxed"
+                  placeholder={!progress.outline ? "AI กำลังวางโครงเรื่อง..." : ""}
                 />
               </div>
 
               {/* Events list */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <label className="text-sm font-semibold text-foreground">ไทม์ไลน์เหตุการณ์</label>
+                  <label className="text-sm font-semibold text-foreground flex items-center gap-2">
+                    ไทม์ไลน์เหตุการณ์
+                    {step === "review" && !progress.timeline && (
+                      <span className="flex items-center gap-1 text-xs font-normal text-muted-foreground">
+                        <Loader2 className="w-3 h-3 animate-spin" /> กำลังสร้าง...
+                      </span>
+                    )}
+                  </label>
                   <Button variant="outline" size="sm" className="gap-1.5 h-7 text-xs" onClick={addEvent}>
                     <Plus className="w-3 h-3" />
                     เพิ่ม
@@ -666,20 +716,37 @@ export default function AiPlotDialog({ open, onClose, novel, novelId, onOpenChap
                           ) : (
                             <span />
                           )}
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-6 text-xs gap-1 px-2 shrink-0"
-                            disabled={status === "drafting" || !ev.title}
-                            onClick={() => { setDraftStatus((p) => ({ ...p, [idx]: "" })); handleDraftChapter(idx); }}
-                          >
-                            {status === "drafting" ? (
-                              <Loader2 className="w-3 h-3 animate-spin" />
-                            ) : (
-                              <FileText className="w-3 h-3" />
-                            )}
-                            {status?.state === "done" ? "ร่างใหม่" : "สร้างร่างตอน"}
-                          </Button>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 text-xs gap-1 px-2 text-muted-foreground hover:text-primary"
+                              disabled={expandStatus[idx] === "expanding" || !ev.title}
+                              onClick={() => handleExpandEvent(idx)}
+                              title="ให้ AI ขยายรายละเอียดเหตุการณ์ตอนนี้ให้ลึกขึ้น"
+                            >
+                              {expandStatus[idx] === "expanding" ? (
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                              ) : (
+                                <Maximize2 className="w-3 h-3" />
+                              )}
+                              ขยายรายละเอียด
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-6 text-xs gap-1 px-2"
+                              disabled={status === "drafting" || !ev.title}
+                              onClick={() => { setDraftStatus((p) => ({ ...p, [idx]: "" })); handleDraftChapter(idx); }}
+                            >
+                              {status === "drafting" ? (
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                              ) : (
+                                <FileText className="w-3 h-3" />
+                              )}
+                              {status?.state === "done" ? "ร่างใหม่" : "สร้างร่างตอน"}
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     );
