@@ -1,22 +1,29 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Megaphone, Loader2, Sparkles, Copy, Check, Tag, FileText } from "lucide-react";
+import { Megaphone, Loader2, Sparkles, Copy, Check, Tag, FileText, Save, X } from "lucide-react";
 import { toast } from "sonner";
 import { invokeAIStable } from "@/lib/aiInvoke";
 
 const PLATFORMS = ["เด็กดี (Dek-D)", "ธัญวลัย (Tunwalai)", "ReadAWrite", "จอยลดา (Joylada)"];
 
+const emptyKit = { hook: "", synopsis_short: "", synopsis_medium: "", synopsis_long: "", tags: [] };
+
 export default function PublishKitDialog({ open, onClose, novels = [] }) {
   const [novelId, setNovelId] = useState("");
   const [platform, setPlatform] = useState(PLATFORMS[0]);
   const [generating, setGenerating] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [kit, setKit] = useState(null);
+  const [tagInput, setTagInput] = useState("");
   const [copiedKey, setCopiedKey] = useState("");
+  const queryClient = useQueryClient();
 
   const { data: chapters = [] } = useQuery({
     queryKey: ["chapters-for-publishkit", novelId],
@@ -29,11 +36,31 @@ export default function PublishKitDialog({ open, onClose, novels = [] }) {
 
   const selectedNovel = novels.find((n) => n.id === novelId);
 
+  // โหลดค่าที่บันทึกไว้เมื่อเลือกนิยาย
+  useEffect(() => {
+    if (!selectedNovel) { setKit(null); return; }
+    const hasSaved =
+      selectedNovel.synopsis_short || selectedNovel.synopsis_medium ||
+      selectedNovel.synopsis_long || selectedNovel.publish_hook ||
+      (selectedNovel.publish_tags?.length > 0);
+    if (hasSaved) {
+      setKit({
+        hook: selectedNovel.publish_hook || "",
+        synopsis_short: selectedNovel.synopsis_short || "",
+        synopsis_medium: selectedNovel.synopsis_medium || "",
+        synopsis_long: selectedNovel.synopsis_long || "",
+        tags: Array.isArray(selectedNovel.publish_tags) ? selectedNovel.publish_tags : [],
+      });
+    } else {
+      setKit(null);
+    }
+  }, [novelId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const reset = () => {
-    setNovelId(""); setPlatform(PLATFORMS[0]); setKit(null); setCopiedKey("");
+    setNovelId(""); setPlatform(PLATFORMS[0]); setKit(null); setCopiedKey(""); setTagInput("");
   };
   const handleClose = () => {
-    if (generating) return;
+    if (generating || saving) return;
     reset();
     onClose();
   };
@@ -43,6 +70,15 @@ export default function PublishKitDialog({ open, onClose, novels = [] }) {
     setCopiedKey(key);
     toast.success("คัดลอกแล้ว");
     setTimeout(() => setCopiedKey(""), 1500);
+  };
+
+  const updateField = (k, v) => setKit((prev) => ({ ...(prev || emptyKit), [k]: v }));
+  const removeTag = (i) => setKit((prev) => ({ ...prev, tags: prev.tags.filter((_, idx) => idx !== i) }));
+  const addTag = () => {
+    const t = tagInput.trim().replace(/^#/, "");
+    if (!t) return;
+    setKit((prev) => ({ ...(prev || emptyKit), tags: [...((prev || emptyKit).tags || []), t] }));
+    setTagInput("");
   };
 
   const handleGenerate = async () => {
@@ -88,7 +124,7 @@ ${sample || "(ยังไม่มีเนื้อหา ใช้ข้อ�
       const parsed = typeof result === "string" ? JSON.parse(result) : result;
       const data = parsed?.response ?? parsed?.output ?? parsed;
       if (!data?.synopsis_short && !data?.hook) throw new Error("ไม่สามารถสร้างชุดข้อความได้");
-      setKit({ ...data, tags: Array.isArray(data.tags) ? data.tags : [] });
+      setKit({ ...emptyKit, ...data, tags: Array.isArray(data.tags) ? data.tags : [] });
       toast.success("สร้างชุดประกาศสำเร็จ");
     } catch (e) {
       toast.error("สร้างไม่สำเร็จ: " + (e.message || ""));
@@ -97,16 +133,42 @@ ${sample || "(ยังไม่มีเนื้อหา ใช้ข้อ�
     }
   };
 
-  const Block = ({ label, value, k }) => (
+  const handleSave = async () => {
+    if (!novelId || !kit) return;
+    setSaving(true);
+    try {
+      await base44.entities.Novel.update(novelId, {
+        synopsis_short: kit.synopsis_short || "",
+        synopsis_medium: kit.synopsis_medium || "",
+        synopsis_long: kit.synopsis_long || "",
+        publish_hook: kit.hook || "",
+        publish_tags: Array.isArray(kit.tags) ? kit.tags : [],
+      });
+      await queryClient.invalidateQueries({ queryKey: ["novels"] });
+      toast.success("บันทึกลงเล่มเรียบร้อยแล้ว");
+    } catch (e) {
+      toast.error("บันทึกไม่สำเร็จ: " + (e.message || ""));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const EditBlock = ({ label, value, k, long }) => (
     <div className="rounded-xl border border-border/60 bg-background p-3">
       <div className="flex items-center justify-between mb-1.5">
         <span className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5"><FileText className="w-3.5 h-3.5" />{label}</span>
-        <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={() => copy(value, k)}>
+        <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={() => copy(value, k)} disabled={!value}>
           {copiedKey === k ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
           {copiedKey === k ? "คัดลอกแล้ว" : "คัดลอก"}
         </Button>
       </div>
-      <p className="text-sm leading-relaxed whitespace-pre-wrap">{value}</p>
+      <Textarea
+        value={value}
+        onChange={(e) => updateField(k === "short" ? "synopsis_short" : k === "medium" ? "synopsis_medium" : k === "long" ? "synopsis_long" : "hook", e.target.value)}
+        rows={long ? 5 : 2}
+        className="text-sm leading-relaxed resize-y"
+        placeholder={`แก้ไข${label}ได้ที่นี่`}
+      />
     </div>
   );
 
@@ -138,33 +200,57 @@ ${sample || "(ยังไม่มีเนื้อหา ใช้ข้อ�
               </div>
             </div>
             <Button className="w-full gap-2 h-11" onClick={handleGenerate} disabled={generating || !novelId}>
-              {generating ? <><Loader2 className="w-4 h-4 animate-spin" />กำลังสร้างชุดประกาศ...</> : <><Sparkles className="w-4 h-4" />สร้างชุดข้อความ</>}
+              {generating ? <><Loader2 className="w-4 h-4 animate-spin" />กำลังสร้างชุดประกาศ...</> : <><Sparkles className="w-4 h-4" />{kit ? "สร้างใหม่อีกครั้ง" : "สร้างชุดข้อความ"}</>}
             </Button>
           </div>
 
           {kit && (
             <div className="space-y-3">
-              {kit.hook && <Block label="คำโปรยดึงดูด" value={kit.hook} k="hook" />}
-              {kit.synopsis_short && <Block label="เรื่องย่อสั้น" value={kit.synopsis_short} k="short" />}
-              {kit.synopsis_medium && <Block label="เรื่องย่อกลาง" value={kit.synopsis_medium} k="medium" />}
-              {kit.synopsis_long && <Block label="เรื่องย่อยาว" value={kit.synopsis_long} k="long" />}
-              {kit.tags?.length > 0 && (
-                <div className="rounded-xl border border-border/60 bg-background p-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5"><Tag className="w-3.5 h-3.5" />แท็ก / หมวดหมู่</span>
-                    <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={() => copy(kit.tags.join(", "), "tags")}>
-                      {copiedKey === "tags" ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                      {copiedKey === "tags" ? "คัดลอกแล้ว" : "คัดลอกทั้งหมด"}
-                    </Button>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {kit.tags.map((t, i) => <Badge key={i} variant="secondary" className="font-normal">#{t}</Badge>)}
-                  </div>
+              <p className="text-xs text-muted-foreground">แก้ไขข้อความได้ตามต้องการก่อนบันทึกลงเล่ม</p>
+              <EditBlock label="คำโปรยดึงดูด" value={kit.hook} k="hook" />
+              <EditBlock label="เรื่องย่อสั้น" value={kit.synopsis_short} k="short" />
+              <EditBlock label="เรื่องย่อกลาง" value={kit.synopsis_medium} k="medium" />
+              <EditBlock label="เรื่องย่อยาว" value={kit.synopsis_long} k="long" long />
+
+              <div className="rounded-xl border border-border/60 bg-background p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5"><Tag className="w-3.5 h-3.5" />แท็ก / หมวดหมู่</span>
+                  <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={() => copy((kit.tags || []).join(", "), "tags")} disabled={!kit.tags?.length}>
+                    {copiedKey === "tags" ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                    {copiedKey === "tags" ? "คัดลอกแล้ว" : "คัดลอกทั้งหมด"}
+                  </Button>
                 </div>
-              )}
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {(kit.tags || []).map((t, i) => (
+                    <Badge key={i} variant="secondary" className="font-normal gap-1 pr-1">
+                      #{t}
+                      <button onClick={() => removeTag(i)} className="hover:text-destructive"><X className="w-3 h-3" /></button>
+                    </Badge>
+                  ))}
+                  {(!kit.tags || kit.tags.length === 0) && <span className="text-xs text-muted-foreground">ยังไม่มีแท็ก</span>}
+                </div>
+                <div className="flex gap-2">
+                  <Input
+                    value={tagInput}
+                    onChange={(e) => setTagInput(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addTag(); } }}
+                    placeholder="เพิ่มแท็ก แล้วกด Enter"
+                    className="h-8 text-sm"
+                  />
+                  <Button variant="outline" size="sm" className="h-8" onClick={addTag}>เพิ่ม</Button>
+                </div>
+              </div>
             </div>
           )}
         </div>
+
+        {kit && (
+          <div className="pt-3 border-t border-border/50">
+            <Button className="w-full gap-2 h-11" onClick={handleSave} disabled={saving || generating}>
+              {saving ? <><Loader2 className="w-4 h-4 animate-spin" />กำลังบันทึก...</> : <><Save className="w-4 h-4" />บันทึกลงเล่ม</>}
+            </Button>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
