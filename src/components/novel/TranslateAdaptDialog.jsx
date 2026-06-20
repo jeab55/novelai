@@ -7,9 +7,10 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Languages, Link2, FileText, Upload, Loader2, CheckCircle2, Sparkles, Wand2, Save, ChevronRight } from "lucide-react";
+import { Languages, Plus, Loader2, CheckCircle2, Sparkles, Wand2, Save, Layers, Files } from "lucide-react";
 import { toast } from "sonner";
 import { invokeAIStable } from "@/lib/aiInvoke";
+import SourceItemCard from "@/components/novel/SourceItemCard";
 
 const GENRES = ["โรแมนติก", "แฟนตาซี", "อิงประวัติศาสตร์", "จีนย้อนยุค", "วาย", "สยองขวัญ", "ลึกลับ", "แอ็คชั่น", "ดราม่า", "อื่นๆ"];
 const TONES = ["ดราม่าเข้มข้น", "อบอุ่นซึ้งกินใจ", "ลึกลับชวนติดตาม", "สนุกสดใส", "โศกเศร้าสะเทือนใจ", "ตื่นเต้นเร้าใจ", "โรแมนติกหวานซึ้ง"];
@@ -21,6 +22,9 @@ const LENGTHS = [
 ];
 
 const STEPS = ["นำเข้า", "แปล", "ดัดแปลง", "บันทึก"];
+
+let _sid = 0;
+const newSource = () => ({ id: ++_sid, mode: "text", text: "", url: "", title: "" });
 
 function countWords(text) {
   if (!text) return 0;
@@ -36,24 +40,21 @@ export default function TranslateAdaptDialog({ open, onClose, novels = [] }) {
   const queryClient = useQueryClient();
   const [step, setStep] = useState(0);
 
-  // import
-  const [inputMode, setInputMode] = useState("text"); // text | url | file
-  const [sourceText, setSourceText] = useState("");
-  const [url, setUrl] = useState("");
-  const [sourceTitle, setSourceTitle] = useState("");
-  const [fetching, setFetching] = useState(false);
-  const [uploading, setUploading] = useState(false);
+  // import — multiple sources
+  const [sources, setSources] = useState([newSource()]);
+  const [combineMode, setCombineMode] = useState("merge"); // merge | separate
 
-  // translate
+  // translate (array, one per source)
   const [translating, setTranslating] = useState(false);
-  const [translation, setTranslation] = useState("");
+  const [translations, setTranslations] = useState([]); // [{ title, text }]
 
-  // adapt
+  // adapt settings + result
   const [genre, setGenre] = useState("โรแมนติก");
   const [tone, setTone] = useState("ดราม่าเข้มข้น");
   const [wordTarget, setWordTarget] = useState(1500);
   const [adapting, setAdapting] = useState(false);
-  const [adapted, setAdapted] = useState("");
+  const [adaptProgress, setAdaptProgress] = useState("");
+  const [drafts, setDrafts] = useState([]); // [{ title, content }]
 
   // save
   const [saveMode, setSaveMode] = useState("new"); // new | existing
@@ -67,99 +68,54 @@ export default function TranslateAdaptDialog({ open, onClose, novels = [] }) {
     enabled: open,
   });
 
+  const busy = translating || adapting || saving;
+  const filledSources = sources.filter((s) => s.text?.trim());
+
   const reset = () => {
     setStep(0);
-    setInputMode("text");
-    setSourceText(""); setUrl(""); setSourceTitle("");
-    setTranslation(""); setAdapted("");
+    setSources([newSource()]);
+    setCombineMode("merge");
+    setTranslations([]); setDrafts([]);
     setGenre("โรแมนติก"); setTone("ดราม่าเข้มข้น"); setWordTarget(1500);
     setSaveMode("new"); setNewTitle(""); setTargetNovelId("");
+    setAdaptProgress("");
   };
 
   const handleClose = () => {
-    if (translating || adapting || saving || fetching || uploading) return;
+    if (busy) return;
     reset();
     onClose();
   };
 
-  const handleFetchUrl = async () => {
-    if (!url.trim()) return;
-    setFetching(true);
-    try {
-      const res = await base44.functions.invoke("fetchUrlContent", { url: url.trim() });
-      const data = res.data;
-      if (!data || data.error) throw new Error(data?.error || "ดึงเนื้อหาไม่สำเร็จ");
-      setSourceText(data.text);
-      if (data.title && !sourceTitle) setSourceTitle(data.title);
-      toast.success(`ดึงเนื้อหาสำเร็จ: ${data.character_count.toLocaleString()} ตัวอักษร`);
-    } catch (e) {
-      toast.error(e.message || "ดึงเนื้อหาจากลิงก์ไม่สำเร็จ");
-    } finally {
-      setFetching(false);
-    }
-  };
-
-  const handleFileUpload = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const validTypes = [".txt", ".md", ".docx", ".pdf"];
-    const ext = "." + file.name.split(".").pop().toLowerCase();
-    if (!validTypes.includes(ext)) {
-      toast.error("รองรับ: TXT, MD, DOCX, PDF");
-      e.target.value = "";
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("ไฟล์ใหญ่เกินไป (สูงสุด 5MB)");
-      e.target.value = "";
-      return;
-    }
-    setUploading(true);
-    try {
-      const reader = new FileReader();
-      const b64 = await new Promise((resolve, reject) => {
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-      const res = await base44.functions.invoke("extractTextFromFile", {
-        file_name: file.name,
-        file_type: file.type,
-        file_data: b64,
-      });
-      const data = res.data;
-      if (!data || data.error) throw new Error(data?.error || "อ่านไฟล์ไม่สำเร็จ");
-      setSourceText(data.text);
-      if (!sourceTitle) setSourceTitle(file.name.replace(/\.[^.]+$/, ""));
-      toast.success(`อ่านไฟล์สำเร็จ: ${data.character_count.toLocaleString()} ตัวอักษร`);
-      e.target.value = "";
-    } catch (err) {
-      toast.error(err.message || "อ่านไฟล์ไม่สำเร็จ");
-    } finally {
-      setUploading(false);
-    }
-  };
+  const updateSource = (id, next) => setSources((arr) => arr.map((s) => (s.id === id ? next : s)));
+  const addSource = () => setSources((arr) => [...arr, newSource()]);
+  const removeSource = (id) => setSources((arr) => arr.filter((s) => s.id !== id));
 
   const handleTranslate = async () => {
-    if (!sourceText.trim()) {
-      toast.error("กรุณาใส่เนื้อหาต้นทางก่อน");
+    if (filledSources.length === 0) {
+      toast.error("กรุณาใส่เนื้อหาต้นทางอย่างน้อย 1 แหล่ง");
       return;
     }
     setTranslating(true);
     setStep(1);
     try {
-      const prompt = `คุณคือนักแปลมืออาชีพ จงตรวจจับภาษาต้นทางอัตโนมัติ แล้วแปลข้อความต่อไปนี้เป็น "ภาษาไทย" ที่เป็นธรรมชาติ สละสลวย รักษาความหมาย อารมณ์ และโครงสร้างย่อหน้า/บรรทัด (เช่น เนื้อเพลงให้คงการขึ้นบรรทัด) ไว้ให้ครบถ้วน
+      const results = await Promise.all(
+        filledSources.map(async (s, i) => {
+          const prompt = `คุณคือนักแปลมืออาชีพ จงตรวจจับภาษาต้นทางอัตโนมัติ แล้วแปลข้อความต่อไปนี้เป็น "ภาษาไทย" ที่เป็นธรรมชาติ สละสลวย รักษาความหมาย อารมณ์ และโครงสร้างย่อหน้า/บรรทัด (เช่น เนื้อเพลงให้คงการขึ้นบรรทัด) ไว้ให้ครบถ้วน
 
 ห้ามเพิ่มคำอธิบายหรือความเห็น ให้ส่งเฉพาะคำแปลภาษาไทยเท่านั้น
 
 ข้อความต้นทาง:
 """
-${sourceText.slice(0, 12000)}
+${s.text.slice(0, 12000)}
 """
 
 คำแปลภาษาไทย:`;
-      const result = await invokeAIStable({ prompt, model: "claude_sonnet_4_6" });
-      setTranslation((result || "").trim());
+          const result = await invokeAIStable({ prompt, model: "claude_sonnet_4_6" });
+          return { title: s.title?.trim() || `แหล่งที่ ${i + 1}`, text: (result || "").trim() };
+        })
+      );
+      setTranslations(results);
     } catch (e) {
       toast.error("แปลไม่สำเร็จ: " + (e.message || ""));
       setStep(0);
@@ -168,43 +124,79 @@ ${sourceText.slice(0, 12000)}
     }
   };
 
-  const handleAdapt = async () => {
-    if (!translation.trim()) return;
-    setAdapting(true);
-    try {
-      const writerPrompt = writers.find((w) => w.is_active !== false)?.system_prompt || "";
+  const adaptMerged = async () => {
+    const writerPrompt = writers.find((w) => w.is_active !== false)?.system_prompt || "";
+    const combined = translations
+      .map((t, i) => `[แหล่งที่ ${i + 1}: ${t.title}]\n${t.text}`)
+      .join("\n\n---\n\n");
+    const prompt = `${writerPrompt ? `[สไตล์การเขียน]\n${writerPrompt}\n\n` : ""}คุณคือนักเขียนนิยายมืออาชีพ ด้านล่างคือเนื้อหา ${translations.length} แหล่งที่แปลเป็นภาษาไทยแล้ว จงนำเนื้อหาทั้งหมดมา "หลอมรวมและเรียบเรียงใหม่เป็นเนื้อเรื่องนิยายเรื่องเดียว" ที่ต่อเนื่องกลมกลืน ไม่ใช่การนำมาต่อท้ายกันแบบแยกส่วน
+
+[ข้อกำหนด]
+- เชื่อมโยงแก่นเรื่อง ตัวละคร และเหตุการณ์จากทุกแหล่งให้เป็นเรื่องเดียวที่ลื่นไหล มีจุดเริ่ม-กลาง-จบ
+- แนวเรื่อง: ${genre}
+- โทน/อารมณ์: ${tone}
+- ความยาวประมาณ: ${wordTarget} คำ (±15%)
+- เขียนเป็นร้อยแก้วนิยายภาษาไทย มีการบรรยายฉาก อารมณ์ และมุมมองตัวละคร ไม่ใช่การแปลตรงตัว
+- ส่งเฉพาะเนื้อเรื่องที่เรียบเรียงแล้ว ไม่ต้องมีคำนำหรือหัวข้อ
+
+[เนื้อหาที่แปลแล้วทั้งหมด]
+${combined.slice(0, 20000)}
+
+[เนื้อเรื่องนิยายที่หลอมรวมแล้ว]`;
+    const result = await invokeAIStable({ prompt, model: "claude_sonnet_4_6" });
+    return [{ title: newTitle.trim() || "เนื้อเรื่องที่ดัดแปลง", content: (result || "").trim() }];
+  };
+
+  const adaptSeparate = async () => {
+    const writerPrompt = writers.find((w) => w.is_active !== false)?.system_prompt || "";
+    const out = [];
+    for (let i = 0; i < translations.length; i++) {
+      const t = translations[i];
+      setAdaptProgress(`กำลังดัดแปลงชิ้นที่ ${i + 1}/${translations.length}...`);
       const prompt = `${writerPrompt ? `[สไตล์การเขียน]\n${writerPrompt}\n\n` : ""}คุณคือนักเขียนนิยายมืออาชีพ จงนำ "เนื้อหาที่แปลแล้ว" ด้านล่างมาดัดแปลงและเรียบเรียงใหม่ให้กลายเป็น "เนื้อเรื่องนิยาย" ที่อ่านลื่นไหล มีบรรยากาศ มีการบรรยายฉาก อารมณ์ และมุมมองตัวละคร
 
 [ข้อกำหนด]
 - แนวเรื่อง: ${genre}
 - โทน/อารมณ์: ${tone}
 - ความยาวประมาณ: ${wordTarget} คำ (±15%)
-- เขียนเป็นร้อยแก้วนิยายภาษาไทย ไม่ใช่การแปลตรงตัว
-- รักษาแก่นเนื้อหาและความหมายเดิมไว้ แต่เพิ่มชั้นเชิงวรรณศิลป์
+- เขียนเป็นร้อยแก้วนิยายภาษาไทย ไม่ใช่การแปลตรงตัว รักษาแก่นเนื้อหาเดิมไว้
 - ส่งเฉพาะเนื้อเรื่องที่ดัดแปลงแล้ว ไม่ต้องมีคำนำหรือหัวข้อ
 
 [เนื้อหาที่แปลแล้ว]
 """
-${translation.slice(0, 12000)}
+${t.text.slice(0, 12000)}
 """
 
 [เนื้อเรื่องนิยายที่ดัดแปลงแล้ว]`;
       const result = await invokeAIStable({ prompt, model: "claude_sonnet_4_6" });
-      setAdapted((result || "").trim());
+      out.push({ title: t.title, content: (result || "").trim() });
+    }
+    return out;
+  };
+
+  const handleAdapt = async () => {
+    if (translations.length === 0) return;
+    setAdapting(true);
+    setAdaptProgress("");
+    try {
+      const result = combineMode === "merge" || translations.length === 1
+        ? await adaptMerged()
+        : await adaptSeparate();
+      setDrafts(result);
       setStep(2);
     } catch (e) {
       toast.error("ดัดแปลงไม่สำเร็จ: " + (e.message || ""));
     } finally {
       setAdapting(false);
+      setAdaptProgress("");
     }
   };
 
   const handleSave = async () => {
-    if (!adapted.trim()) return;
+    if (drafts.length === 0 || drafts.every((d) => !d.content.trim())) return;
     setSaving(true);
     try {
       let novelId = targetNovelId;
-      const chapterTitle = sourceTitle.trim() || "ตอนที่ดัดแปลง";
 
       if (saveMode === "new") {
         if (!newTitle.trim()) {
@@ -215,7 +207,7 @@ ${translation.slice(0, 12000)}
         const novel = await base44.entities.Novel.create({
           title: newTitle.trim(),
           genre,
-          synopsis: translation.slice(0, 300),
+          synopsis: (translations[0]?.text || "").slice(0, 300),
         });
         novelId = novel.id;
       }
@@ -227,15 +219,20 @@ ${translation.slice(0, 12000)}
       }
 
       const existing = await base44.entities.Chapter.filter({ novel_id: novelId });
-      const maxOrder = existing.reduce((m, c) => Math.max(m, c.order || 0), 0);
-      await base44.entities.Chapter.create({
-        novel_id: novelId,
-        title: chapterTitle,
-        content: adapted,
-        order: maxOrder + 1,
-        word_count: countWords(adapted),
-        status: "ร่าง",
-      });
+      let maxOrder = existing.reduce((m, c) => Math.max(m, c.order || 0), 0);
+
+      for (const d of drafts) {
+        if (!d.content.trim()) continue;
+        maxOrder += 1;
+        await base44.entities.Chapter.create({
+          novel_id: novelId,
+          title: d.title || `ตอนที่ ${maxOrder}`,
+          content: d.content,
+          order: maxOrder,
+          word_count: countWords(d.content),
+          status: "ร่าง",
+        });
+      }
 
       queryClient.invalidateQueries({ queryKey: ["chapters-all"] });
       queryClient.invalidateQueries({ queryKey: ["chapters", novelId] });
@@ -249,6 +246,8 @@ ${translation.slice(0, 12000)}
       setSaving(false);
     }
   };
+
+  const updateDraft = (idx, patch) => setDrafts((arr) => arr.map((d, i) => (i === idx ? { ...d, ...patch } : d)));
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && handleClose()}>
@@ -277,69 +276,51 @@ ${translation.slice(0, 12000)}
         </div>
 
         <div className="flex-1 overflow-y-auto min-h-0 pr-1">
-          {/* Step 0: นำเข้า */}
+          {/* Step 0: นำเข้าหลายแหล่ง */}
           {step === 0 && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  { v: "text", icon: FileText, label: "วางข้อความ" },
-                  { v: "url", icon: Link2, label: "ลิงก์ URL" },
-                  { v: "file", icon: Upload, label: "อัปโหลดไฟล์" },
-                ].map(({ v, icon: Icon, label }) => (
-                  <Button
-                    key={v}
-                    variant={inputMode === v ? "default" : "outline"}
-                    className="h-11 gap-1.5 text-sm"
-                    onClick={() => setInputMode(v)}
-                  >
-                    <Icon className="w-4 h-4" />{label}
-                  </Button>
-                ))}
-              </div>
+            <div className="space-y-3">
+              {sources.map((s, i) => (
+                <SourceItemCard
+                  key={s.id}
+                  source={s}
+                  index={i}
+                  total={sources.length}
+                  onChange={(next) => updateSource(s.id, next)}
+                  onRemove={() => removeSource(s.id)}
+                />
+              ))}
 
-              {inputMode === "url" && (
-                <div>
-                  <label className="text-sm font-medium mb-1.5 block">ลิงก์บทความ / เนื้อเพลง</label>
-                  <div className="flex gap-2">
-                    <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://..." className="flex-1" />
-                    <Button onClick={handleFetchUrl} disabled={fetching || !url.trim()}>
-                      {fetching ? <Loader2 className="w-4 h-4 animate-spin" /> : "ดึงเนื้อหา"}
+              <Button variant="outline" className="w-full gap-2 border-dashed h-11" onClick={addSource}>
+                <Plus className="w-4 h-4" />เพิ่มแหล่งเนื้อหา
+              </Button>
+
+              {sources.length > 1 && (
+                <div className="bg-secondary/40 rounded-xl border border-border/50 p-3 space-y-2">
+                  <p className="text-sm font-medium">วิธีประมวลผลหลายแหล่ง</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      variant={combineMode === "merge" ? "default" : "outline"}
+                      className="h-auto py-2.5 flex-col gap-1 items-start text-left"
+                      onClick={() => setCombineMode("merge")}
+                    >
+                      <span className="flex items-center gap-1.5 text-sm font-medium"><Layers className="w-4 h-4" />รวมเป็นเรื่องเดียว</span>
+                      <span className="text-[11px] font-normal opacity-80 leading-tight">หลอมทุกแหล่งเป็นนิยายเรื่องเดียวที่ต่อเนื่อง</span>
+                    </Button>
+                    <Button
+                      variant={combineMode === "separate" ? "default" : "outline"}
+                      className="h-auto py-2.5 flex-col gap-1 items-start text-left"
+                      onClick={() => setCombineMode("separate")}
+                    >
+                      <span className="flex items-center gap-1.5 text-sm font-medium"><Files className="w-4 h-4" />แปลแยกแต่ละชิ้น</span>
+                      <span className="text-[11px] font-normal opacity-80 leading-tight">ดัดแปลงแยกเป็นคนละตอน</span>
                     </Button>
                   </div>
                 </div>
               )}
 
-              {inputMode === "file" && (
-                <div>
-                  <label className="text-sm font-medium mb-1.5 block">อัปโหลดไฟล์ (TXT, MD, DOCX, PDF · สูงสุด 5MB)</label>
-                  <div className="flex items-center gap-2">
-                    <Input type="file" accept=".txt,.md,.docx,.pdf" onChange={handleFileUpload} disabled={uploading} className="flex-1 text-sm" />
-                    {uploading && <Loader2 className="w-4 h-4 animate-spin text-primary" />}
-                  </div>
-                </div>
-              )}
-
-              <div>
-                <label className="text-sm font-medium mb-1.5 block flex items-center justify-between">
-                  <span>เนื้อหาต้นทาง {inputMode !== "text" && <span className="text-xs font-normal text-muted-foreground">(แก้ไขได้)</span>}</span>
-                  {sourceText.trim() && <Badge variant="outline" className="text-xs">{sourceText.length.toLocaleString()} ตัวอักษร</Badge>}
-                </label>
-                <Textarea
-                  value={sourceText}
-                  onChange={(e) => setSourceText(e.target.value)}
-                  placeholder="วางเนื้อเพลงหรือบทความภาษาใดก็ได้ที่นี่ ระบบจะตรวจจับภาษาต้นทางและแปลเป็นไทยให้อัตโนมัติ..."
-                  className="min-h-[180px] text-sm resize-none"
-                />
-              </div>
-
-              <div>
-                <label className="text-sm font-medium mb-1.5 block">ชื่อต้นฉบับ (ไม่บังคับ — ใช้เป็นชื่อตอน)</label>
-                <Input value={sourceTitle} onChange={(e) => setSourceTitle(e.target.value)} placeholder="เช่น ชื่อเพลง / ชื่อบทความ" className="text-sm" />
-              </div>
-
-              <Button className="w-full gap-2 h-11" onClick={handleTranslate} disabled={!sourceText.trim()}>
+              <Button className="w-full gap-2 h-11" onClick={handleTranslate} disabled={filledSources.length === 0}>
                 <Languages className="w-4 h-4" />
-                แปลเป็นภาษาไทย →
+                แปลเป็นภาษาไทย ({filledSources.length} แหล่ง) →
               </Button>
             </div>
           )}
@@ -350,20 +331,33 @@ ${translation.slice(0, 12000)}
               {translating ? (
                 <div className="flex flex-col items-center py-12 text-center gap-3">
                   <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                  <p className="text-sm text-muted-foreground">กำลังตรวจจับภาษาและแปลเป็นไทย...</p>
+                  <p className="text-sm text-muted-foreground">กำลังตรวจจับภาษาและแปล {filledSources.length} แหล่งเป็นไทย...</p>
                 </div>
               ) : (
                 <>
-                  <div>
-                    <label className="text-sm font-medium mb-1.5 block flex items-center justify-between">
-                      <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-emerald-500" />คำแปลภาษาไทย (แก้ไขได้)</span>
-                      <Badge variant="outline" className="text-xs">{countWords(translation).toLocaleString()} คำ</Badge>
-                    </label>
-                    <Textarea value={translation} onChange={(e) => setTranslation(e.target.value)} className="min-h-[220px] text-sm resize-none" />
+                  <div className="space-y-3">
+                    {translations.map((t, i) => (
+                      <div key={i}>
+                        <label className="text-sm font-medium mb-1.5 block flex items-center justify-between">
+                          <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-emerald-500" />คำแปล: {t.title}</span>
+                          <Badge variant="outline" className="text-xs">{countWords(t.text).toLocaleString()} คำ</Badge>
+                        </label>
+                        <Textarea
+                          value={t.text}
+                          onChange={(e) => setTranslations((arr) => arr.map((x, idx) => (idx === i ? { ...x, text: e.target.value } : x)))}
+                          className="min-h-[140px] text-sm resize-none"
+                        />
+                      </div>
+                    ))}
                   </div>
 
                   <div className="bg-secondary/40 rounded-xl border border-border/50 p-4 space-y-3">
                     <p className="text-sm font-medium flex items-center gap-1.5"><Wand2 className="w-4 h-4 text-primary" />ตั้งค่าการดัดแปลงเป็นเนื้อเรื่อง</p>
+                    {translations.length > 1 && (
+                      <p className="text-xs text-muted-foreground">
+                        โหมด: {combineMode === "merge" ? "รวมทุกแหล่งเป็นเรื่องเดียว" : "ดัดแปลงแยกเป็นคนละตอน"}
+                      </p>
+                    )}
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="text-xs text-muted-foreground mb-1 block">แนวเรื่อง</label>
@@ -380,7 +374,7 @@ ${translation.slice(0, 12000)}
                         </Select>
                       </div>
                       <div className="col-span-2">
-                        <label className="text-xs text-muted-foreground mb-1 block">ความยาว</label>
+                        <label className="text-xs text-muted-foreground mb-1 block">ความยาว{combineMode === "separate" && translations.length > 1 ? " (ต่อชิ้น)" : ""}</label>
                         <Select value={String(wordTarget)} onValueChange={(v) => setWordTarget(Number(v))}>
                           <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
                           <SelectContent>{LENGTHS.map((l) => <SelectItem key={l.value} value={String(l.value)}>{l.label}</SelectItem>)}</SelectContent>
@@ -391,8 +385,8 @@ ${translation.slice(0, 12000)}
 
                   <div className="flex gap-2">
                     <Button variant="outline" className="flex-1" onClick={() => setStep(0)} disabled={adapting}>ย้อนกลับ</Button>
-                    <Button className="flex-[2] gap-2" onClick={handleAdapt} disabled={adapting || !translation.trim()}>
-                      {adapting ? <><Loader2 className="w-4 h-4 animate-spin" />กำลังดัดแปลง...</> : <><Sparkles className="w-4 h-4" />ดัดแปลงเป็นเนื้อเรื่อง →</>}
+                    <Button className="flex-[2] gap-2" onClick={handleAdapt} disabled={adapting || translations.every((t) => !t.text.trim())}>
+                      {adapting ? <><Loader2 className="w-4 h-4 animate-spin" />{adaptProgress || "กำลังดัดแปลง..."}</> : <><Sparkles className="w-4 h-4" />ดัดแปลงเป็นเนื้อเรื่อง →</>}
                     </Button>
                   </div>
                 </>
@@ -403,21 +397,23 @@ ${translation.slice(0, 12000)}
           {/* Step 2: ดัดแปลง + บันทึก */}
           {step === 2 && (
             <div className="space-y-4">
-              <div>
-                <label className="text-sm font-medium mb-1.5 block flex items-center justify-between">
-                  <span className="flex items-center gap-1.5"><Sparkles className="w-4 h-4 text-primary" />ร่างเนื้อเรื่องที่ดัดแปลง (แก้ไขได้)</span>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="text-xs">{countWords(adapted).toLocaleString()} คำ</Badge>
-                    <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={handleAdapt} disabled={adapting}>
-                      {adapting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />}สร้างใหม่
-                    </Button>
+              <div className="space-y-3">
+                {drafts.map((d, i) => (
+                  <div key={i}>
+                    <label className="text-sm font-medium mb-1.5 block flex items-center justify-between">
+                      <span className="flex items-center gap-1.5"><Sparkles className="w-4 h-4 text-primary" />{drafts.length > 1 ? `ตอน: ${d.title}` : "ร่างเนื้อเรื่องที่ดัดแปลง (แก้ไขได้)"}</span>
+                      <Badge variant="outline" className="text-xs">{countWords(d.content).toLocaleString()} คำ</Badge>
+                    </label>
+                    <Textarea value={d.content} onChange={(e) => updateDraft(i, { content: e.target.value })} className="min-h-[200px] text-sm resize-none" />
                   </div>
-                </label>
-                <Textarea value={adapted} onChange={(e) => setAdapted(e.target.value)} className="min-h-[240px] text-sm resize-none" />
+                ))}
+                <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5" onClick={handleAdapt} disabled={adapting}>
+                  {adapting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />}สร้างใหม่ทั้งหมด
+                </Button>
               </div>
 
               <div className="bg-secondary/40 rounded-xl border border-border/50 p-4 space-y-3">
-                <p className="text-sm font-medium flex items-center gap-1.5"><Save className="w-4 h-4 text-primary" />บันทึกเข้าโปรเจกต์</p>
+                <p className="text-sm font-medium flex items-center gap-1.5"><Save className="w-4 h-4 text-primary" />บันทึกเข้าโปรเจกต์ {drafts.length > 1 && <span className="text-xs font-normal text-muted-foreground">({drafts.length} ตอน)</span>}</p>
                 <div className="flex gap-2">
                   <Button variant={saveMode === "new" ? "default" : "outline"} className="flex-1 h-10" onClick={() => setSaveMode("new")}>📖 นิยายใหม่</Button>
                   <Button variant={saveMode === "existing" ? "default" : "outline"} className="flex-1 h-10" onClick={() => setSaveMode("existing")}>📁 นิยายที่มีอยู่</Button>
@@ -437,7 +433,7 @@ ${translation.slice(0, 12000)}
                 <Button
                   className="flex-[2] gap-2"
                   onClick={handleSave}
-                  disabled={saving || !adapted.trim() || (saveMode === "new" ? !newTitle.trim() : !targetNovelId)}
+                  disabled={saving || drafts.every((d) => !d.content.trim()) || (saveMode === "new" ? !newTitle.trim() : !targetNovelId)}
                 >
                   {saving ? <><Loader2 className="w-4 h-4 animate-spin" />กำลังบันทึก...</> : <><Save className="w-4 h-4" />บันทึกเข้าโปรเจกต์</>}
                 </Button>
@@ -452,9 +448,9 @@ ${translation.slice(0, 12000)}
                 <CheckCircle2 className="w-8 h-8 text-green-600" />
               </div>
               <h3 className="text-lg font-heading font-semibold mb-2">บันทึกสำเร็จ!</h3>
-              <p className="text-sm text-muted-foreground mb-6">เนื้อเรื่องที่ดัดแปลงถูกบันทึกเป็นตอนใหม่ในโปรเจกต์แล้ว</p>
+              <p className="text-sm text-muted-foreground mb-6">เนื้อเรื่องที่ดัดแปลงถูกบันทึก{drafts.length > 1 ? `เป็น ${drafts.length} ตอน` : "เป็นตอนใหม่"}ในโปรเจกต์แล้ว</p>
               <div className="flex gap-2">
-                <Button variant="outline" onClick={() => { reset(); }}>ดัดแปลงอีกชิ้น</Button>
+                <Button variant="outline" onClick={() => { reset(); }}>ดัดแปลงอีกชุด</Button>
                 <Button onClick={handleClose}>ปิด</Button>
               </div>
             </div>
