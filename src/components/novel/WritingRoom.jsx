@@ -341,22 +341,28 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
       {/* Header Card */}
       <div className="bg-card border border-border rounded-2xl p-5 mb-6 shadow-sm">
         {/* Season Tabs & Management */}
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3 flex-1">
-            <div className="flex items-center gap-1.5 bg-secondary/50 p-1 rounded-xl flex-1 overflow-x-auto">
-              {seasons.length > 1 ? (
-                seasons.map((season, idx) => (
-                  <div key={season.id} className="flex items-center gap-1 shrink-0">
+        <div className="mb-4">
+          <div className="flex flex-wrap items-center gap-1.5 bg-secondary/50 p-1.5 rounded-xl">
+            {seasons.length > 1 ? (
+              seasons.map((season, idx) => {
+                const isActive = String(selectedSeasonTab) === String(season.id);
+                return (
+                  <div
+                    key={season.id}
+                    className={`flex items-center gap-0.5 rounded-lg transition-all ${
+                      isActive ? "bg-primary shadow-sm" : "hover:bg-secondary"
+                    }`}
+                  >
                     <button
                       onClick={() => setSelectedSeasonTab(season.id)}
-                      className={`px-3 py-1.5 text-sm rounded-lg transition-all font-medium whitespace-nowrap max-w-[160px] sm:max-w-[220px] truncate ${
-                        String(selectedSeasonTab) === String(season.id)
-                          ? "bg-primary text-primary-foreground shadow-sm"
-                          : "text-muted-foreground hover:bg-secondary"
+                      className={`px-3 py-1.5 text-sm rounded-lg transition-all font-medium max-w-[140px] sm:max-w-[220px] truncate ${
+                        isActive ? "text-primary-foreground" : "text-muted-foreground"
                       }`}
                       title={season.title}
                     >
-                      <span className="text-primary/70 mr-1.5">#{season.season_number || idx + 1}</span>
+                      <span className={`mr-1.5 ${isActive ? "text-primary-foreground/80" : "text-primary/70"}`}>
+                        #{season.season_number || idx + 1}
+                      </span>
                       {season.title}
                     </button>
                     {String(season.id) !== String(novelId) && (
@@ -366,21 +372,25 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
                           setSelectedSeasonTab(season.id);
                           setDeleteSeasonDialogOpen(true);
                         }}
-                        className="w-6 h-6 rounded-md hover:bg-destructive/10 text-destructive flex items-center justify-center transition-all"
+                        className={`w-6 h-6 mr-0.5 rounded-md flex items-center justify-center transition-all shrink-0 ${
+                          isActive
+                            ? "text-primary-foreground/80 hover:bg-primary-foreground/20"
+                            : "text-destructive hover:bg-destructive/10"
+                        }`}
                         title="ลบ Season นี้"
                       >
                         <Trash2 className="w-3 h-3" />
                       </button>
                     )}
                   </div>
-                ))
-              ) : (
-                <div className="px-3 py-1.5 text-sm text-muted-foreground">
-                  <span className="text-primary/70 mr-1.5">#1</span>
-                  {novel?.title}
-                </div>
-              )}
-            </div>
+                );
+              })
+            ) : (
+              <div className="px-3 py-1.5 text-sm text-muted-foreground">
+                <span className="text-primary/70 mr-1.5">#1</span>
+                {novel?.title}
+              </div>
+            )}
           </div>
         </div>
 
