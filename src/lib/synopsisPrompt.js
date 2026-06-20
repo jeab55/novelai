@@ -75,33 +75,79 @@ ${BLURB_RULES}
 ตอบเป็นภาษาไทย JSON ล้วน ไม่ต้องมีคำอธิบายเพิ่มเติม`;
 }
 
+// แปลง error จาก InvokeLLM เป็นข้อความภาษาไทยที่บอกสาเหตุจริง
+function describeLlmError(err) {
+  const status = err?.response?.status || err?.status;
+  const raw = err?.response?.data?.error || err?.response?.data?.detail || err?.message || "";
+  const text = typeof raw === "string" ? raw : JSON.stringify(raw);
+  if (status === 401 || /unauthorized|invalid api key|incorrect api key/i.test(text)) {
+    return "API key ไม่ถูกต้องหรือหมดอายุ (401) กรุณาตรวจสอบ OpenAI API key ในหน้าตั้งค่า";
+  }
+  if (status === 429 || /quota|rate limit|insufficient_quota/i.test(text)) {
+    return "เกินโควต้าหรือเรียกถี่เกินไป (429) กรุณาตรวจสอบเครดิต/โควต้า แล้วลองใหม่";
+  }
+  if (/model|not found|does not exist/i.test(text)) {
+    return `ชื่อโมเดลไม่ถูกต้องหรือใช้งานไม่ได้: ${text}`;
+  }
+  if (status) return `เรียก AI ไม่สำเร็จ (${status}) — ${text || "ไม่ทราบสาเหตุ"}`;
+  return text || "เรียก AI ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง";
+}
+
+// ดึง array คำโปรยจากผลลัพธ์ได้หลายรูปแบบ (object / JSON string / ข้อความล้วน)
+function parseBlurbs(result) {
+  if (result && Array.isArray(result.blurbs)) return result.blurbs;
+  if (typeof result === "string") {
+    const cleaned = result.replace(/^```[\w]*\n?/m, "").replace(/```$/m, "").trim();
+    // ลอง parse เป็น JSON ทั้งก้อนหรือเฉพาะส่วน {...}
+    const tryParse = (s) => { try { return JSON.parse(s); } catch { return null; } };
+    const match = cleaned.match(/\{[\s\S]*\}/);
+    const parsed = tryParse(cleaned) || (match && tryParse(match[0]));
+    if (parsed?.blurbs && Array.isArray(parsed.blurbs)) return parsed.blurbs;
+    // ไม่มี JSON — แยกตามบรรทัด/ตัวเลขนำหน้า
+    if (cleaned) {
+      return cleaned.split(/\n{2,}|\n(?=\d+[.)])/).map((s) => s.replace(/^\d+[.)]\s*/, "").trim()).filter(Boolean);
+    }
+  }
+  return [];
+}
+
 /**
  * เรียก AI ร่างคำโปรยหลายแบบ คืน array ของคำโปรย
+ * โยน Error ที่มีสาเหตุจริงถ้าเรียก AI ไม่สำเร็จ
  */
 export async function generateBlurbs(story = {}, characters = [], options = {}) {
   const prompt = buildBlurbPrompt(story, characters, options);
-  const result = await base44.integrations.Core.InvokeLLM({
-    prompt,
-    model: "claude_sonnet_4_6",
-    response_json_schema: {
-      type: "object",
-      properties: {
-        blurbs: { type: "array", items: { type: "string" } },
-      },
-      required: ["blurbs"],
-    },
-  });
+  const schema = {
+    type: "object",
+    properties: { blurbs: { type: "array", items: { type: "string" } } },
+    required: ["blurbs"],
+  };
 
-  let blurbs = [];
-  if (result && Array.isArray(result.blurbs)) {
-    blurbs = result.blurbs;
-  } else if (typeof result === "string") {
+  let result;
+  let firstError;
+  // ลองโมเดลคุณภาพสูงก่อน ถ้าล้มเหลว (เช่นโมเดลใช้ไม่ได้) ลองโมเดล default อัตโนมัติ
+  try {
+    result = await base44.integrations.Core.InvokeLLM({
+      prompt,
+      model: "claude_sonnet_4_6",
+      response_json_schema: schema,
+    });
+  } catch (err) {
+    firstError = err;
     try {
-      const parsed = JSON.parse(result.replace(/^```[\w]*\n?/m, "").replace(/```$/m, "").trim());
-      blurbs = parsed.blurbs || [];
-    } catch {
-      blurbs = [];
+      result = await base44.integrations.Core.InvokeLLM({
+        prompt,
+        response_json_schema: schema,
+      });
+    } catch (err2) {
+      // ทั้งสองโมเดลล้มเหลว — โยนสาเหตุจริง
+      throw new Error(describeLlmError(firstError || err2));
     }
   }
-  return blurbs.map((b) => (b || "").trim()).filter(Boolean);
+
+  const blurbs = parseBlurbs(result).map((b) => (b || "").trim()).filter(Boolean);
+  if (!blurbs.length) {
+    throw new Error("AI ตอบกลับมาแต่ไม่พบคำโปรยที่ใช้ได้ กรุณาลองใหม่อีกครั้ง");
+  }
+  return blurbs;
 }

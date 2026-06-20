@@ -187,18 +187,19 @@ function Step1({ form, setForm, chars, activeWriters }) {
       setDraftError("กรุณากรอกชื่อเรื่อง แนว หรือเรื่องย่อก่อน ให้ AI ร่างคำโปรยได้ตรงเนื้อเรื่อง");
       return false;
     }
-    const blurbs = await generateBlurbs(
-      { title: form.title, genre: form.genre, synopsis: form.synopsis, era: form.era },
-      chars,
-      { variants: 3, writerSystemPrompt: selectedWriter?.system_prompt || "", marketMode }
-    );
-    if (!blurbs.length) {
-      setDraftError("AI ไม่สามารถร่างคำโปรยได้ กรุณาลองใหม่อีกครั้ง");
+    try {
+      const blurbs = await generateBlurbs(
+        { title: form.title, genre: form.genre, synopsis: form.synopsis, era: form.era },
+        chars,
+        { variants: 3, writerSystemPrompt: selectedWriter?.system_prompt || "", marketMode }
+      );
+      setBlurbOptions(blurbs);
+      setBlurbPickerOpen(true);
+      return true;
+    } catch (err) {
+      setDraftError(err?.message || "AI ไม่สามารถร่างคำโปรยได้ กรุณาลองใหม่อีกครั้ง");
       return false;
     }
-    setBlurbOptions(blurbs);
-    setBlurbPickerOpen(true);
-    return true;
   };
 
   // ให้ AI สร้างยุคสมัยและฉากหลังจากพล็อต/แนว

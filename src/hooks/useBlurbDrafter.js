@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { base44 } from "@/api/base44Client";
+import { toast } from "sonner";
 import { generateBlurbs } from "@/lib/synopsisPrompt";
 
 // Hook กลางสำหรับร่างคำโปรยจากพล็อตของนิยายเรื่องที่มีอยู่แล้ว
@@ -33,11 +34,12 @@ export function useBlurbDrafter() {
       };
 
       const result = await generateBlurbs(story, mainChars, { variants: 3, writerSystemPrompt });
-      if (result.length > 0) {
-        setBlurbs(result);
-        setPickerOpen(true);
-      }
+      setBlurbs(result);
+      setPickerOpen(true);
       return result;
+    } catch (err) {
+      toast.error(err?.message || "AI ไม่สามารถร่างคำโปรยได้ กรุณาลองใหม่อีกครั้ง");
+      return [];
     } finally {
       setDrafting(false);
     }
