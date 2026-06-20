@@ -172,36 +172,32 @@ export default function CharacterBible({ novelId, novel }) {
                     <User className="w-5 h-5 text-primary/60" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium">{char.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {char.age ? `${char.age} ปี` : ""}
-                      {char.dialect && char.dialect !== "กลาง" && (
-                        <span className="mx-1">•</span>
-                      )}
-                      {char.dialect && char.dialect !== "กลาง" && (
-                        <span className="text-primary/70">{char.dialect}</span>
-                      )}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    {char.dialect && char.dialect !== "กลาง" && (
-                      <Badge variant="outline" className="text-[10px] border-primary/30 text-primary">
-                        {char.dialect}
+                    <p className="font-medium truncate">{char.name}</p>
+                    <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                      <Badge className={`${roleColors[char.role] || roleColors["ตัวประกอบ"]} text-xs`}>
+                        {char.role || "ตัวประกอบ"}
                       </Badge>
-                    )}
-                    <Badge className={`${roleColors[char.role] || roleColors["ตัวประกอบ"]} text-xs`}>
-                      {char.role || "ตัวประกอบ"}
-                    </Badge>
+                      {char.dialect && char.dialect !== "กลาง" && (
+                        <Badge variant="outline" className="text-[10px] border-primary/30 text-primary">
+                          {char.dialect}
+                        </Badge>
+                      )}
+                      {char.age && (
+                        <span className="text-xs text-muted-foreground">{char.age} ปี</span>
+                      )}
+                    </div>
                   </div>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" title="ประวัติเวอร์ชัน" onClick={(e) => { e.stopPropagation(); setVersionChar(char); }}>
-                    <History className="w-3.5 h-3.5" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleOpenEdit(char); }}>
-                    <Edit2 className="w-3.5 h-3.5" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={(e) => { e.stopPropagation(); deleteMutation.mutate(char.id); }}>
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </Button>
+                  <div className="flex items-center gap-0.5 shrink-0">
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" title="ประวัติเวอร์ชัน" onClick={(e) => { e.stopPropagation(); setVersionChar(char); }}>
+                      <History className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" title="แก้ไข" onClick={(e) => { e.stopPropagation(); handleOpenEdit(char); }}>
+                      <Edit2 className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" title="ลบ" onClick={(e) => { e.stopPropagation(); deleteMutation.mutate(char.id); }}>
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
                 </div>
                 {expandedId === char.id && (
                   <motion.div
