@@ -1,13 +1,15 @@
 import React, { useState } from "react";
 import { base44 } from "@/api/base44Client";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Clapperboard, Loader2, Sparkles, FileText, Table, Download, Film } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Clapperboard, Loader2, Sparkles, FileText, Table, Film, Save, Library } from "lucide-react";
 import { toast } from "sonner";
 import { invokeAIStable } from "@/lib/aiInvoke";
-import StoryboardSceneCard from "@/components/novel/StoryboardSceneCard";
+import StoryboardSceneEditor from "@/components/novel/StoryboardSceneEditor";
+import SavedStoryboardLibrary from "@/components/novel/SavedStoryboardLibrary";
 import { storyboardToText, storyboardToCsv, downloadFile } from "@/lib/storyboardExport";
 
 const DURATIONS = [
@@ -24,14 +26,18 @@ const PLATFORMS = [
 const TONES = ["ดราม่าเข้มข้น", "อบอุ่นซึ้งกินใจ", "ลึกลับชวนติดตาม", "สนุกสดใส", "ตื่นเต้นเร้าใจ", "สารคดี/บรรยาย"];
 
 export default function StoryboardDialog({ open, onClose, novels = [] }) {
+  const queryClient = useQueryClient();
+  const [tab, setTab] = useState("create");
   const [novelId, setNovelId] = useState("");
   const [chapterId, setChapterId] = useState("");
   const [duration, setDuration] = useState(60);
   const [platform, setPlatform] = useState(PLATFORMS[1].value);
   const [tone, setTone] = useState("ดราม่าเข้มข้น");
   const [generating, setGenerating] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [scenes, setScenes] = useState([]);
   const [meta, setMeta] = useState(null);
+  const [savedId, setSavedId] = useState(null);
 
   const { data: chapters = [] } = useQuery({
     queryKey: ["chapters-for-storyboard", novelId],
@@ -45,15 +51,20 @@ export default function StoryboardDialog({ open, onClose, novels = [] }) {
   const selectedNovel = novels.find((n) => n.id === novelId);
 
   const reset = () => {
+    setTab("create");
     setNovelId(""); setChapterId(""); setDuration(60);
     setPlatform(PLATFORMS[1].value); setTone("ดราม่าเข้มข้น");
-    setScenes([]); setMeta(null);
+    setScenes([]); setMeta(null); setSavedId(null);
   };
 
   const handleClose = () => {
-    if (generating) return;
+    if (generating || saving) return;
     reset();
     onClose();
+  };
+
+  const updateScene = (index, newScene) => {
+    setScenes((prev) => prev.map((s, i) => (i === index ? newScene : s)));
   };
 
   const handleGenerate = async () => {
@@ -63,7 +74,6 @@ export default function StoryboardDialog({ open, onClose, novels = [] }) {
     }
     setGenerating(true);
     try {
-      // รวมเนื้อหา: ถ้าเลือกตอน = ตอนนั้น, ถ้าไม่เลือก = ทุกตอนเรียงลำดับ
       let sourceText = "";
       let sourceTitle = selectedNovel?.title || "";
       if (chapterId) {
@@ -126,12 +136,57 @@ ${sourceText.slice(0, 16000)}
       if (!Array.isArray(list) || list.length === 0) throw new Error("ไม่สามารถสร้างฉากได้");
       setScenes(list);
       setMeta({ title: sourceTitle, platform, duration, tone });
+      setSavedId(null);
       toast.success(`สร้างสตอรีบอร์ดสำเร็จ: ${list.length} ฉาก`);
     } catch (e) {
       toast.error("สร้างสตอรีบอร์ดไม่สำเร็จ: " + (e.message || ""));
     } finally {
       setGenerating(false);
     }
+  };
+
+  const handleSave = async () => {
+    if (scenes.length === 0) return;
+    setSaving(true);
+    try {
+      const payload = {
+        name: meta?.title || selectedNovel?.title || "สตอรีบอร์ด",
+        novel_id: novelId || "",
+        novel_title: meta?.title || "",
+        chapter_id: chapterId || "",
+        platform: meta?.platform || platform,
+        duration: meta?.duration || duration,
+        tone: meta?.tone || tone,
+        scenes: JSON.stringify(scenes),
+      };
+      if (savedId) {
+        await base44.entities.StoryboardProject.update(savedId, payload);
+        toast.success("บันทึกทับงานเดิมแล้ว");
+      } else {
+        const created = await base44.entities.StoryboardProject.create(payload);
+        setSavedId(created.id);
+        toast.success("บันทึกสตอรีบอร์ดลงคลังแล้ว");
+      }
+      queryClient.invalidateQueries({ queryKey: ["storyboard-projects"] });
+    } catch (e) {
+      toast.error("บันทึกไม่สำเร็จ: " + (e.message || ""));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const openProject = (p) => {
+    let list = [];
+    try { list = JSON.parse(p.scenes || "[]"); } catch { list = []; }
+    setScenes(Array.isArray(list) ? list : []);
+    setMeta({ title: p.novel_title || p.name, platform: p.platform, duration: p.duration, tone: p.tone });
+    setNovelId(p.novel_id || "");
+    setChapterId(p.chapter_id || "");
+    if (p.platform) setPlatform(p.platform);
+    if (p.duration) setDuration(p.duration);
+    if (p.tone) setTone(p.tone);
+    setSavedId(p.id);
+    setTab("create");
   };
 
   const exportText = () => {
@@ -153,76 +208,91 @@ ${sourceText.slice(0, 16000)}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto min-h-0 pr-1 space-y-4">
-          {/* Settings */}
-          <div className="bg-secondary/40 rounded-xl border border-border/50 p-4 space-y-3">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs text-muted-foreground mb-1 block">เลือกนิยาย</label>
-                <Select value={novelId} onValueChange={(v) => { setNovelId(v); setChapterId(""); }}>
-                  <SelectTrigger className="h-9"><SelectValue placeholder="เลือกนิยาย" /></SelectTrigger>
-                  <SelectContent>{novels.map((n) => <SelectItem key={n.id} value={n.id}>{n.title}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label className="text-xs text-muted-foreground mb-1 block">เลือกตอน (ไม่เลือก = ทั้งเรื่อง)</label>
-                <Select value={chapterId || "all"} onValueChange={(v) => setChapterId(v === "all" ? "" : v)} disabled={!novelId}>
-                  <SelectTrigger className="h-9"><SelectValue placeholder="ทั้งเรื่อง" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">ทั้งเรื่อง ({chapters.length} ตอน)</SelectItem>
-                    {chapters.map((c) => <SelectItem key={c.id} value={c.id}>{c.order ? `${c.order}. ` : ""}{c.title}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label className="text-xs text-muted-foreground mb-1 block">ความยาวคลิป</label>
-                <Select value={String(duration)} onValueChange={(v) => setDuration(Number(v))}>
-                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                  <SelectContent>{DURATIONS.map((d) => <SelectItem key={d.value} value={String(d.value)}>{d.label}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label className="text-xs text-muted-foreground mb-1 block">แพลตฟอร์ม</label>
-                <Select value={platform} onValueChange={setPlatform}>
-                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                  <SelectContent>{PLATFORMS.map((p) => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-              <div className="sm:col-span-2">
-                <label className="text-xs text-muted-foreground mb-1 block">โทนเรื่อง</label>
-                <Select value={tone} onValueChange={setTone}>
-                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                  <SelectContent>{TONES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-            </div>
-            <Button className="w-full gap-2 h-11" onClick={handleGenerate} disabled={generating || !novelId}>
-              {generating ? <><Loader2 className="w-4 h-4 animate-spin" />กำลังแบ่งฉากและเขียนสคริปต์...</> : <><Sparkles className="w-4 h-4" />สร้างสตอรีบอร์ด</>}
-            </Button>
-          </div>
+        <Tabs value={tab} onValueChange={setTab} className="flex-1 flex flex-col min-h-0">
+          <TabsList className="grid grid-cols-2 w-full shrink-0">
+            <TabsTrigger value="create" className="gap-1.5"><Sparkles className="w-4 h-4" />สร้าง / แก้ไข</TabsTrigger>
+            <TabsTrigger value="library" className="gap-1.5"><Library className="w-4 h-4" />คลังที่บันทึกไว้</TabsTrigger>
+          </TabsList>
 
-          {/* Results */}
-          {scenes.length > 0 && (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                <span className="flex items-center gap-1.5 text-sm font-semibold">
-                  <Film className="w-4 h-4 text-primary" />{scenes.length} ฉาก · {meta?.platform}
-                </span>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs" onClick={exportText}>
-                    <FileText className="w-3.5 h-3.5" />ข้อความ
-                  </Button>
-                  <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs" onClick={exportCsv}>
-                    <Table className="w-3.5 h-3.5" />ตาราง CSV
-                  </Button>
+          <TabsContent value="create" className="flex-1 overflow-y-auto min-h-0 pr-1 space-y-4 mt-3">
+            {/* Settings */}
+            <div className="bg-secondary/40 rounded-xl border border-border/50 p-4 space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-muted-foreground mb-1 block">เลือกนิยาย</label>
+                  <Select value={novelId} onValueChange={(v) => { setNovelId(v); setChapterId(""); }}>
+                    <SelectTrigger className="h-9"><SelectValue placeholder="เลือกนิยาย" /></SelectTrigger>
+                    <SelectContent>{novels.map((n) => <SelectItem key={n.id} value={n.id}>{n.title}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground mb-1 block">เลือกตอน (ไม่เลือก = ทั้งเรื่อง)</label>
+                  <Select value={chapterId || "all"} onValueChange={(v) => setChapterId(v === "all" ? "" : v)} disabled={!novelId}>
+                    <SelectTrigger className="h-9"><SelectValue placeholder="ทั้งเรื่อง" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">ทั้งเรื่อง ({chapters.length} ตอน)</SelectItem>
+                      {chapters.map((c) => <SelectItem key={c.id} value={c.id}>{c.order ? `${c.order}. ` : ""}{c.title}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground mb-1 block">ความยาวคลิป</label>
+                  <Select value={String(duration)} onValueChange={(v) => setDuration(Number(v))}>
+                    <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                    <SelectContent>{DURATIONS.map((d) => <SelectItem key={d.value} value={String(d.value)}>{d.label}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground mb-1 block">แพลตฟอร์ม</label>
+                  <Select value={platform} onValueChange={setPlatform}>
+                    <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                    <SelectContent>{PLATFORMS.map((p) => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="text-xs text-muted-foreground mb-1 block">โทนเรื่อง</label>
+                  <Select value={tone} onValueChange={setTone}>
+                    <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                    <SelectContent>{TONES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+                  </Select>
                 </div>
               </div>
-              {scenes.map((s, i) => (
-                <StoryboardSceneCard key={i} scene={s} index={i} />
-              ))}
+              <Button className="w-full gap-2 h-11" onClick={handleGenerate} disabled={generating || !novelId}>
+                {generating ? <><Loader2 className="w-4 h-4 animate-spin" />กำลังแบ่งฉากและเขียนสคริปต์...</> : <><Sparkles className="w-4 h-4" />สร้างสตอรีบอร์ด</>}
+              </Button>
             </div>
-          )}
-        </div>
+
+            {/* Results */}
+            {scenes.length > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <span className="flex items-center gap-1.5 text-sm font-semibold">
+                    <Film className="w-4 h-4 text-primary" />{scenes.length} ฉาก · {meta?.platform}
+                  </span>
+                  <div className="flex gap-2">
+                    <Button size="sm" className="gap-1.5 h-8 text-xs" onClick={handleSave} disabled={saving}>
+                      {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                      {savedId ? "บันทึกทับ" : "บันทึก"}
+                    </Button>
+                    <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs" onClick={exportText}>
+                      <FileText className="w-3.5 h-3.5" />ข้อความ
+                    </Button>
+                    <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs" onClick={exportCsv}>
+                      <Table className="w-3.5 h-3.5" />ตาราง CSV
+                    </Button>
+                  </div>
+                </div>
+                {scenes.map((s, i) => (
+                  <StoryboardSceneEditor key={i} scene={s} index={i} onChange={(ns) => updateScene(i, ns)} />
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="library" className="flex-1 overflow-y-auto min-h-0 pr-1 mt-3">
+            <SavedStoryboardLibrary onOpen={openProject} />
+          </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );
