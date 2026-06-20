@@ -69,8 +69,8 @@ ${BLURB_RULES}
 [งานที่ต้องทำ]
 เขียนคำโปรย ${variants} แบบที่แตกต่างกัน โดยทุกแบบต้องสะท้อนเนื้อเรื่องจริงจากข้อมูลด้านบน (แนว, เรื่องย่อ, โครงเรื่อง, ยุค/ฉาก, ตัวละครและปม) และทำตามหลัก 6 ข้อ + โครงสร้างที่กำหนด
 
-ตอบกลับเป็น JSON เท่านั้น รูปแบบนี้:
-{"blurbs":["คำโปรยแบบที่ 1","คำโปรยแบบที่ 2","คำโปรยแบบที่ 3"]}
+ตอบกลับเป็น JSON เท่านั้น รูปแบบนี้ (แต่ละแบบมีตัวคำโปรย text และโทน tone):
+{"blurbs":[{"text":"คำโปรยแบบที่ 1","tone":"ดราม่า"},{"text":"คำโปรยแบบที่ 2","tone":"ลึกลับ"},{"text":"คำโปรยแบบที่ 3","tone":"อารมณ์"}]}
 
 ตอบเป็นภาษาไทย JSON ล้วน ไม่ต้องมีคำอธิบายเพิ่มเติม`;
 }
@@ -93,19 +93,63 @@ function describeLlmError(err) {
   return text || "เรียก AI ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง";
 }
 
-// ดึง array คำโปรยจากผลลัพธ์ได้หลายรูปแบบ (object / JSON string / ข้อความล้วน)
+// แปลงรายการ 1 รายการให้เป็นข้อความคำโปรย (รองรับ string หรือ object {text/blurb/content/synopsis})
+function toBlurbText(item) {
+  if (typeof item === "string") return item.trim();
+  if (item && typeof item === "object") {
+    const v = item.text || item.blurb || item.content || item.synopsis || item.value;
+    return typeof v === "string" ? v.trim() : "";
+  }
+  return "";
+}
+
+// ดึง array คำโปรยจากผลลัพธ์ได้หลายรูปแบบ:
+//  - array ตรงๆ (string หรือ object)
+//  - object ที่มี key blurbs/options/results/items (เป็น array)
+//  - JSON string ที่ห่อ object/array ไว้
+//  - string หลายย่อหน้า/ตัวเลขนำหน้า
 function parseBlurbs(result) {
-  if (result && Array.isArray(result.blurbs)) return result.blurbs;
+  const fromContainer = (obj) => {
+    if (Array.isArray(obj)) return obj;
+    if (obj && typeof obj === "object") {
+      const key = ["blurbs", "options", "results", "items"].find((k) => Array.isArray(obj[k]));
+      if (key) return obj[key];
+    }
+    return null;
+  };
+
+  // บางโมเดล (เช่น claude) ห่อผลลัพธ์ไว้ใน result.response / result.output
+  const unwrapped = (result && typeof result === "object" && !Array.isArray(result))
+    ? (result.response ?? result.output ?? result)
+    : result;
+
+  // กรณีเป็น object/array อยู่แล้ว
+  const direct = fromContainer(unwrapped);
+  if (direct) return direct.map(toBlurbText).filter(Boolean);
+  // result อาจมี blurbs ตรงๆ ขณะที่ unwrapped ชี้ไปที่ response (กันพลาด)
+  if (unwrapped !== result) {
+    const direct2 = fromContainer(result);
+    if (direct2) return direct2.map(toBlurbText).filter(Boolean);
+  }
+
+  // ถ้า unwrapped เป็น string ให้ไปต่อด้วย logic string ด้านล่าง
+  if (typeof unwrapped === "string") result = unwrapped;
+
+  // กรณีเป็น string — ลอง parse JSON ทั้งก้อนหรือเฉพาะส่วน {...} / [...]
   if (typeof result === "string") {
     const cleaned = result.replace(/^```[\w]*\n?/m, "").replace(/```$/m, "").trim();
-    // ลอง parse เป็น JSON ทั้งก้อนหรือเฉพาะส่วน {...}
     const tryParse = (s) => { try { return JSON.parse(s); } catch { return null; } };
-    const match = cleaned.match(/\{[\s\S]*\}/);
+    const match = cleaned.match(/[[{][\s\S]*[\]}]/);
     const parsed = tryParse(cleaned) || (match && tryParse(match[0]));
-    if (parsed?.blurbs && Array.isArray(parsed.blurbs)) return parsed.blurbs;
-    // ไม่มี JSON — แยกตามบรรทัด/ตัวเลขนำหน้า
+    const fromParsed = parsed && fromContainer(parsed);
+    if (fromParsed) return fromParsed.map(toBlurbText).filter(Boolean);
+
+    // ไม่มี JSON — แยกตามย่อหน้า/ตัวเลขนำหน้า
     if (cleaned) {
-      return cleaned.split(/\n{2,}|\n(?=\d+[.)])/).map((s) => s.replace(/^\d+[.)]\s*/, "").trim()).filter(Boolean);
+      return cleaned
+        .split(/\n{2,}|\n(?=\d+[.)])/)
+        .map((s) => s.replace(/^\d+[.)]\s*/, "").trim())
+        .filter(Boolean);
     }
   }
   return [];
@@ -119,7 +163,19 @@ export async function generateBlurbs(story = {}, characters = [], options = {}) 
   const prompt = buildBlurbPrompt(story, characters, options);
   const schema = {
     type: "object",
-    properties: { blurbs: { type: "array", items: { type: "string" } } },
+    properties: {
+      blurbs: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            text: { type: "string", description: "ตัวคำโปรย" },
+            tone: { type: "string", description: "โทนของคำโปรย เช่น ดราม่า/ลึกลับ/อารมณ์" },
+          },
+          required: ["text"],
+        },
+      },
+    },
     required: ["blurbs"],
   };
 
