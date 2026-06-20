@@ -3,7 +3,7 @@ import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Save, Loader2, Download, Copy, MoreHorizontal, Maximize2, Minimize2, Sparkles, Clock, X, RefreshCw, History, PieChart, FileText, CheckCircle2, Type, AlignJustify, ShieldCheck, Image } from "lucide-react";
+import { ArrowLeft, Save, Loader2, Download, Copy, MoreHorizontal, Maximize2, Minimize2, Sparkles, Clock, X, RefreshCw, History, PieChart, FileText, CheckCircle2, Type, AlignJustify, ShieldCheck, Image, Wand2, Users2, Lightbulb } from "lucide-react";
 import AiDraftDialog from "./AiDraftDialog";
 import EditorReviewPanel from "./EditorReviewPanel";
 import VersionHistoryDialog from "./VersionHistoryDialog";
@@ -17,6 +17,9 @@ import ChapterIllustrationPanel from "./ChapterIllustrationPanel";
 import ThaiProofreaderPanel from "./ThaiProofreaderPanel";
 import ThaiSpellCheckerDialog from "./ThaiSpellCheckerDialog";
 import DialectTranslationPanel from "./DialectTranslationPanel";
+import RewritePolishPanel from "./RewritePolishPanel";
+import PovSwitchPanel from "./PovSwitchPanel";
+import WritersBlockPanel from "./WritersBlockPanel";
 import { saveVersion } from "@/lib/saveVersion";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -88,6 +91,9 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
   const [illustrationOpen, setIllustrationOpen] = useState(false);
   const [proofreaderOpen, setProofreaderOpen] = useState(false);
   const [spellCheckerOpen, setSpellCheckerOpen] = useState(false);
+  const [polishOpen, setPolishOpen] = useState(false);
+  const [povOpen, setPovOpen] = useState(false);
+  const [blockOpen, setBlockOpen] = useState(false);
   const [titleSuggesting, setTitleSuggesting] = useState(false);
   const queryClient = useQueryClient();
 
@@ -428,6 +434,42 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
           ตรวจคำผิด
         </Button>
 
+        {/* Rewrite / Polish button */}
+        <Button
+          variant="outline"
+          size="sm"
+          className={`gap-1.5 h-8 text-xs border-fuchsia-300 hover:bg-fuchsia-50 ${polishOpen ? "bg-fuchsia-100 text-fuchsia-800" : "text-fuchsia-700"}`}
+          onClick={() => setPolishOpen((v) => !v)}
+          title="ขัดเกลาสำนวน: กระชับ/ละเอียด/เปลี่ยนโทน/แก้คำซ้ำ"
+        >
+          <Wand2 className="w-3.5 h-3.5" />
+          ขัดเกลา
+        </Button>
+
+        {/* POV Switch button */}
+        <Button
+          variant="outline"
+          size="sm"
+          className={`gap-1.5 h-8 text-xs border-teal-300 hover:bg-teal-50 ${povOpen ? "bg-teal-100 text-teal-800" : "text-teal-700"}`}
+          onClick={() => setPovOpen((v) => !v)}
+          title="ปรับมุมมองการเล่า บุรุษที่ 1 ↔ บุรุษที่ 3"
+        >
+          <Users2 className="w-3.5 h-3.5" />
+          มุมมอง
+        </Button>
+
+        {/* Writer's Block Helper button */}
+        <Button
+          variant="outline"
+          size="sm"
+          className={`gap-1.5 h-8 text-xs border-amber-300 hover:bg-amber-50 ${blockOpen ? "bg-amber-100 text-amber-800" : "text-amber-700"}`}
+          onClick={() => setBlockOpen((v) => !v)}
+          title="แก้ตัน: เสนอทางเดินเรื่องต่อหลายแบบ"
+        >
+          <Lightbulb className="w-3.5 h-3.5" />
+          แก้ตัน
+        </Button>
+
         {/* Dialect Translation button */}
         <DialectTranslationPanel
           content={content}
@@ -733,6 +775,29 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
             onApplySuggestions={(updatedContent) => setContent(updatedContent)}
           />
         </div>
+      )}
+      {polishOpen && (
+        <RewritePolishPanel
+          content={content}
+          novel={novel}
+          onApply={(updated) => { setContent(updated); latestRef.current.content = updated; triggerAutoSave(); }}
+          onClose={() => setPolishOpen(false)}
+        />
+      )}
+      {povOpen && (
+        <PovSwitchPanel
+          content={content}
+          novel={novel}
+          onApply={(updated) => { setContent(updated); latestRef.current.content = updated; triggerAutoSave(); }}
+          onClose={() => setPovOpen(false)}
+        />
+      )}
+      {blockOpen && (
+        <WritersBlockPanel
+          content={content}
+          novel={novel}
+          onClose={() => setBlockOpen(false)}
+        />
       )}
       
       <ThaiSpellCheckerDialog
