@@ -7,10 +7,11 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Languages, Plus, Loader2, CheckCircle2, Sparkles, Wand2, Save, Layers, Files } from "lucide-react";
+import { Languages, Plus, Loader2, CheckCircle2, Sparkles, Wand2, Save, Layers, Files, Archive, Bookmark } from "lucide-react";
 import { toast } from "sonner";
 import { invokeAIStable } from "@/lib/aiInvoke";
 import SourceItemCard from "@/components/novel/SourceItemCard";
+import SavedTranslationsLibrary from "@/components/novel/SavedTranslationsLibrary";
 
 const GENRES = ["โรแมนติก", "แฟนตาซี", "อิงประวัติศาสตร์", "จีนย้อนยุค", "วาย", "สยองขวัญ", "ลึกลับ", "แอ็คชั่น", "ดราม่า", "อื่นๆ"];
 const TONES = ["ดราม่าเข้มข้น", "อบอุ่นซึ้งกินใจ", "ลึกลับชวนติดตาม", "สนุกสดใส", "โศกเศร้าสะเทือนใจ", "ตื่นเต้นเร้าใจ", "โรแมนติกหวานซึ้ง"];
@@ -38,7 +39,9 @@ function countWords(text) {
 
 export default function TranslateAdaptDialog({ open, onClose, novels = [] }) {
   const queryClient = useQueryClient();
+  const [view, setView] = useState("create"); // create | library
   const [step, setStep] = useState(0);
+  const [savingProject, setSavingProject] = useState(false);
 
   // import — multiple sources
   const [sources, setSources] = useState([newSource()]);
@@ -72,6 +75,7 @@ export default function TranslateAdaptDialog({ open, onClose, novels = [] }) {
   const filledSources = sources.filter((s) => s.text?.trim());
 
   const reset = () => {
+    setView("create");
     setStep(0);
     setSources([newSource()]);
     setCombineMode("merge");
@@ -249,6 +253,33 @@ ${t.text.slice(0, 12000)}
 
   const updateDraft = (idx, patch) => setDrafts((arr) => arr.map((d, i) => (i === idx ? { ...d, ...patch } : d)));
 
+  const handleSaveProject = async () => {
+    if (drafts.length === 0 || drafts.every((d) => !d.content.trim())) {
+      toast.error("ยังไม่มีร่างเนื้อเรื่องให้บันทึก");
+      return;
+    }
+    setSavingProject(true);
+    try {
+      const name = newTitle.trim() || translations[0]?.title || drafts[0]?.title || "งานแปล";
+      await base44.entities.TranslationProject.create({
+        name,
+        translations: JSON.stringify(translations),
+        drafts: JSON.stringify(drafts),
+        genre,
+        tone,
+        word_target: wordTarget,
+        combine_mode: combineMode,
+        source_count: translations.length || 1,
+      });
+      queryClient.invalidateQueries({ queryKey: ["translation-projects"] });
+      toast.success("บันทึกงานแปลเข้าคลังแล้ว ดูซ้ำได้ทุกเมื่อ");
+    } catch (e) {
+      toast.error("บันทึกงานแปลไม่สำเร็จ: " + (e.message || ""));
+    } finally {
+      setSavingProject(false);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={(v) => !v && handleClose()}>
       <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col">
@@ -259,7 +290,30 @@ ${t.text.slice(0, 12000)}
           </DialogTitle>
         </DialogHeader>
 
+        {/* View tabs */}
+        <div className="flex gap-1 p-1 bg-muted rounded-xl mb-1">
+          <button
+            onClick={() => setView("create")}
+            className={`flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-1.5 rounded-lg transition-colors ${view === "create" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground"}`}
+          >
+            <Languages className="w-4 h-4" />แปลใหม่
+          </button>
+          <button
+            onClick={() => setView("library")}
+            className={`flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-1.5 rounded-lg transition-colors ${view === "library" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground"}`}
+          >
+            <Archive className="w-4 h-4" />คลังงานแปลที่บันทึกไว้
+          </button>
+        </div>
+
+        {view === "library" && (
+          <div className="flex-1 overflow-y-auto min-h-0 pr-1">
+            <SavedTranslationsLibrary enabled={open && view === "library"} novels={novels} />
+          </div>
+        )}
+
         {/* Step indicator */}
+        {view === "create" && (
         <div className="flex items-center gap-1 mb-2">
           {STEPS.map((s, i) => (
             <React.Fragment key={s}>
@@ -274,7 +328,9 @@ ${t.text.slice(0, 12000)}
             </React.Fragment>
           ))}
         </div>
+        )}
 
+        {view === "create" && (
         <div className="flex-1 overflow-y-auto min-h-0 pr-1">
           {/* Step 0: นำเข้าหลายแหล่ง */}
           {step === 0 && (
@@ -407,9 +463,19 @@ ${t.text.slice(0, 12000)}
                     <Textarea value={d.content} onChange={(e) => updateDraft(i, { content: e.target.value })} className="min-h-[200px] text-sm resize-none" />
                   </div>
                 ))}
-                <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5" onClick={handleAdapt} disabled={adapting}>
-                  {adapting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />}สร้างใหม่ทั้งหมด
-                </Button>
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5" onClick={handleAdapt} disabled={adapting}>
+                    {adapting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />}สร้างใหม่ทั้งหมด
+                  </Button>
+                  <Button
+                    variant="outline" size="sm"
+                    className="h-8 text-xs gap-1.5 border-primary/40 text-primary hover:bg-primary/10"
+                    onClick={handleSaveProject}
+                    disabled={savingProject || drafts.every((d) => !d.content.trim())}
+                  >
+                    {savingProject ? <Loader2 className="w-3 h-3 animate-spin" /> : <Bookmark className="w-3 h-3" />}บันทึกงานแปลเข้าคลัง
+                  </Button>
+                </div>
               </div>
 
               <div className="bg-secondary/40 rounded-xl border border-border/50 p-4 space-y-3">
@@ -450,12 +516,16 @@ ${t.text.slice(0, 12000)}
               <h3 className="text-lg font-heading font-semibold mb-2">บันทึกสำเร็จ!</h3>
               <p className="text-sm text-muted-foreground mb-6">เนื้อเรื่องที่ดัดแปลงถูกบันทึก{drafts.length > 1 ? `เป็น ${drafts.length} ตอน` : "เป็นตอนใหม่"}ในโปรเจกต์แล้ว</p>
               <div className="flex gap-2">
+                <Button variant="outline" className="gap-1.5" onClick={handleSaveProject} disabled={savingProject}>
+                  {savingProject ? <Loader2 className="w-4 h-4 animate-spin" /> : <Bookmark className="w-4 h-4" />}บันทึกงานแปลเข้าคลัง
+                </Button>
                 <Button variant="outline" onClick={() => { reset(); }}>ดัดแปลงอีกชุด</Button>
                 <Button onClick={handleClose}>ปิด</Button>
               </div>
             </div>
           )}
         </div>
+        )}
       </DialogContent>
     </Dialog>
   );
