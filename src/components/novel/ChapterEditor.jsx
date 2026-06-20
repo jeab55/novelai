@@ -291,7 +291,7 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
   }, [safeChapter.id, debouncedAutoSave]);
 
   const toolbar = (
-    <div className={`border-b border-border/60 px-4 py-2.5 flex items-center gap-3 transition-all ${focusMode ? "bg-background/95 backdrop-blur-sm" : "bg-card/30"}`}>
+    <div className={`border-b border-border/60 px-3 sm:px-4 py-2.5 flex flex-wrap items-center gap-2 sm:gap-3 transition-all ${focusMode ? "bg-background/95 backdrop-blur-sm" : "bg-card/30"}`}>
       {!focusMode && (
         <Button variant="ghost" size="icon" onClick={onBack} className="shrink-0">
           <ArrowLeft className="w-4 h-4" />
@@ -300,7 +300,7 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
       <Input
         value={title}
         onChange={(e) => { setTitle(e.target.value); triggerAutoSave(); }}
-        className="max-w-xs font-heading font-semibold border-none bg-transparent shadow-none focus-visible:ring-0 px-0 text-base"
+        className="flex-1 min-w-[8rem] max-w-xs font-heading font-semibold border-none bg-transparent shadow-none focus-visible:ring-0 px-0 text-base"
       />
       <Button
         variant="ghost"
@@ -313,7 +313,7 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
         {titleSuggesting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
         <span className="hidden lg:inline">{titleSuggesting ? "กำลังคิด..." : "AI ตั้งชื่อตอน"}</span>
       </Button>
-      <div className="flex items-center gap-2 ml-auto">
+      <div className="flex flex-wrap items-center gap-2 ml-auto">
         {/* Autosave indicator */}
         <span className={`text-xs flex items-center gap-1 tabular-nums transition-colors ${autoSaveStatus === "saving" ? "text-amber-500" : "text-emerald-600"}`}>
           {autoSaveStatus === "saving"

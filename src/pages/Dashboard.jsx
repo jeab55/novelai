@@ -280,14 +280,14 @@ export default function Dashboard() {
       </Dialog>
 
       <AppLayout>
-        <main className="max-w-6xl mx-auto px-6 py-10">
+        <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
           {/* Header Section */}
-          <div className="relative overflow-hidden bg-gradient-to-br from-amber-100/70 via-secondary/40 to-orange-100/50 border border-amber-200/50 rounded-3xl p-6 mb-8 shadow-sm">
+          <div className="relative overflow-hidden bg-gradient-to-br from-amber-100/70 via-secondary/40 to-orange-100/50 border border-amber-200/50 rounded-3xl p-4 sm:p-6 mb-8 shadow-sm">
             <div className="absolute -right-2 -top-3 text-6xl opacity-15 select-none pointer-events-none">🐱</div>
             <div className="absolute right-20 bottom-2 text-2xl opacity-20 select-none pointer-events-none">🐾</div>
-            <div className="flex items-center justify-between relative">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 relative">
               <div>
-                <h2 className="font-heading font-bold text-2xl text-foreground tracking-tight mb-1 flex items-center gap-2">
+                <h2 className="font-heading font-bold text-xl sm:text-2xl text-foreground tracking-tight mb-1 flex items-center gap-2">
                   <span className="text-2xl">🐾</span> ชั้นวางหนังสือ
                 </h2>
                 {novels.length > 0 && (
@@ -296,36 +296,36 @@ export default function Dashboard() {
                   </p>
                 )}
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Button 
                   variant="outline" 
-                  className="gap-2 font-body border-sky-300 text-sky-700 hover:bg-sky-50 dark:text-sky-400 dark:border-sky-800/40 dark:hover:bg-sky-950/20" 
+                  className="gap-2 font-body border-sky-300 text-sky-700 hover:bg-sky-50 dark:text-sky-400 dark:border-sky-800/40 dark:hover:bg-sky-950/20 flex-1 sm:flex-none min-w-0" 
                   onClick={() => setShortStoryOpen(true)}
                 >
-                  <BookOpen className="w-4 h-4" />
+                  <BookOpen className="w-4 h-4 shrink-0" />
                   เรื่องสั้น AI
                 </Button>
 
                 <Button 
                   variant="outline" 
-                  className="gap-2 font-body border-violet-300 text-violet-700 hover:bg-violet-50 dark:text-violet-400 dark:border-violet-800/40 dark:hover:bg-violet-950/20" 
+                  className="gap-2 font-body border-violet-300 text-violet-700 hover:bg-violet-50 dark:text-violet-400 dark:border-violet-800/40 dark:hover:bg-violet-950/20 flex-1 sm:flex-none min-w-0" 
                   onClick={() => setTranslateOpen(true)}
                 >
-                  <Languages className="w-4 h-4" />
+                  <Languages className="w-4 h-4 shrink-0" />
                   แปล & ดัดแปลง
                 </Button>
 
                 <Button 
                   variant="outline" 
-                  className="gap-2 font-body border-rose-300 text-rose-700 hover:bg-rose-50 dark:text-rose-400 dark:border-rose-800/40 dark:hover:bg-rose-950/20" 
+                  className="gap-2 font-body border-rose-300 text-rose-700 hover:bg-rose-50 dark:text-rose-400 dark:border-rose-800/40 dark:hover:bg-rose-950/20 flex-1 sm:flex-none min-w-0" 
                   onClick={() => setStoryboardOpen(true)}
                 >
-                  <Clapperboard className="w-4 h-4" />
+                  <Clapperboard className="w-4 h-4 shrink-0" />
                   สตอรีบอร์ดวิดีโอ
                 </Button>
 
-                <Button className="gap-2 font-body shadow-md shadow-amber-500/20 bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600 text-white border-0 rounded-full" onClick={() => setOpen(true)}>
-                  <Plus className="w-4 h-4" />
+                <Button className="gap-2 font-body shadow-md shadow-amber-500/20 bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600 text-white border-0 rounded-full flex-1 sm:flex-none min-w-0" onClick={() => setOpen(true)}>
+                  <Plus className="w-4 h-4 shrink-0" />
                   สร้างเรื่องใหม่
                 </Button>
               </div>

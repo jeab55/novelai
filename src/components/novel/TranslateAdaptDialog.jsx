@@ -282,7 +282,7 @@ ${t.text.slice(0, 12000)}
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && handleClose()}>
-      <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col">
+      <DialogContent className="w-[calc(100vw-1.5rem)] sm:max-w-2xl max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="font-heading flex items-center gap-2">
             <Languages className="w-5 h-5 text-primary" />
@@ -515,7 +515,7 @@ ${t.text.slice(0, 12000)}
               </div>
               <h3 className="text-lg font-heading font-semibold mb-2">บันทึกสำเร็จ!</h3>
               <p className="text-sm text-muted-foreground mb-6">เนื้อเรื่องที่ดัดแปลงถูกบันทึก{drafts.length > 1 ? `เป็น ${drafts.length} ตอน` : "เป็นตอนใหม่"}ในโปรเจกต์แล้ว</p>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap justify-center gap-2">
                 <Button variant="outline" className="gap-1.5" onClick={handleSaveProject} disabled={savingProject}>
                   {savingProject ? <Loader2 className="w-4 h-4 animate-spin" /> : <Bookmark className="w-4 h-4" />}บันทึกงานแปลเข้าคลัง
                 </Button>

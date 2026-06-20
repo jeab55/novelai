@@ -186,7 +186,7 @@ ${text.slice(0, 14000)}
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && handleClose()}>
-      <DialogContent className="sm:max-w-xl max-h-[90vh] flex flex-col">
+      <DialogContent className="w-[calc(100vw-1.5rem)] sm:max-w-xl max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="font-heading flex items-center gap-2">
             <MessagesSquare className="w-5 h-5 text-primary" />โหมดแชต (จอยลดา)

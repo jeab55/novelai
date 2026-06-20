@@ -245,7 +245,7 @@ ${buildWordCountInstruction(form.word_count_target)}- เขียนเรื�
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-md max-h-[90vh] flex flex-col gap-0 p-0">
+      <DialogContent className="w-[calc(100vw-1.5rem)] sm:max-w-md max-h-[90vh] flex flex-col gap-0 p-0">
         <DialogHeader className="px-6 pt-5 pb-4 border-b border-border/60 shrink-0">
           <DialogTitle className="font-heading flex items-center gap-2">
             <BookOpen className="w-5 h-5 text-sky-600" />
