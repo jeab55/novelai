@@ -8,11 +8,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Plus, BookOpen, Pencil, Trash2, Share2, CheckCircle2, Loader2, Sparkles, Languages } from "lucide-react";
+import { Plus, BookOpen, Pencil, Trash2, Share2, CheckCircle2, Loader2, Sparkles, Languages, Clapperboard } from "lucide-react";
 import DeleteNovelDialog from "@/components/novel/DeleteNovelDialog";
 import CreateNovelWizard from "@/components/novel/CreateNovelWizard";
 import ShortStoryCreatorDialog from "@/components/novel/ShortStoryCreatorDialog";
 import TranslateAdaptDialog from "@/components/novel/TranslateAdaptDialog";
+import StoryboardDialog from "@/components/novel/StoryboardDialog";
 import ShareNovelDialog from "@/components/novel/ShareNovelDialog";
 import BlurbPicker from "@/components/novel/BlurbPicker";
 import { useBlurbDrafter } from "@/hooks/useBlurbDrafter";
@@ -41,6 +42,7 @@ export default function Dashboard() {
   const [open, setOpen] = useState(false);
   const [shortStoryOpen, setShortStoryOpen] = useState(false);
   const [translateOpen, setTranslateOpen] = useState(false);
+  const [storyboardOpen, setStoryboardOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [editForm, setEditForm] = useState({});
   const [editingId, setEditingId] = useState(null);
@@ -172,6 +174,7 @@ export default function Dashboard() {
       />
       <ShortStoryCreatorDialog open={shortStoryOpen} onOpenChange={setShortStoryOpen} />
       <TranslateAdaptDialog open={translateOpen} onClose={() => setTranslateOpen(false)} novels={novels} />
+      <StoryboardDialog open={storyboardOpen} onClose={() => setStoryboardOpen(false)} novels={novels} />
       <CreateNovelWizard
         open={open}
         onOpenChange={setOpen}
@@ -310,6 +313,15 @@ export default function Dashboard() {
                 >
                   <Languages className="w-4 h-4" />
                   แปล & ดัดแปลง
+                </Button>
+
+                <Button 
+                  variant="outline" 
+                  className="gap-2 font-body border-rose-300 text-rose-700 hover:bg-rose-50 dark:text-rose-400 dark:border-rose-800/40 dark:hover:bg-rose-950/20" 
+                  onClick={() => setStoryboardOpen(true)}
+                >
+                  <Clapperboard className="w-4 h-4" />
+                  สตอรีบอร์ดวิดีโอ
                 </Button>
 
                 <Button className="gap-2 font-body shadow-md shadow-amber-500/20 bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600 text-white border-0 rounded-full" onClick={() => setOpen(true)}>
