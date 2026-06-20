@@ -1,0 +1,21 @@
+{
+  "name": "WritingGoal",
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "type": "string",
+      "description": "ID ของผู้ใช้เจ้าของเป้าหมาย"
+    },
+    "daily_word_goal": {
+      "type": "number",
+      "default": 1000,
+      "description": "เป้าหมายจำนวนคำต่อวัน"
+    },
+    "novel_word_goal": {
+      "type": "number",
+      "default": 50000,
+      "description": "เป้าหมายจำนวนคำต่อเรื่อง"
+    }
+  },
+  "required": ["user_id"]
+}

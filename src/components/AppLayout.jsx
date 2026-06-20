@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Cat, BookOpen, Layers, Moon, Sun, Settings, Trash2, LogOut } from "lucide-react";
+import { Cat, BookOpen, Layers, BarChart3, Moon, Sun, Settings, Trash2, LogOut } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 
 function useDarkMode() {
@@ -21,6 +21,7 @@ export default function AppLayout({ children }) {
   const navItems = [
     { to: "/", label: "นิยาย", icon: BookOpen },
     { to: "/series", label: "งานของฉัน", icon: Layers },
+    { to: "/stats", label: "สถิติ", icon: BarChart3 },
   ];
 
   const isActive = (to) => {
