@@ -8,9 +8,13 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Plus, Globe, Trash2, Edit2, Loader2, History, BookOpen,
   ChevronDown, ChevronUp, CheckCircle2, Search, X, Settings2,
-  ChevronRight, Clock, Sparkles,
+  ChevronRight, Clock, Sparkles, Eraser,
 } from "lucide-react";
 import VersionHistoryDialog from "./VersionHistoryDialog";
 import { saveVersion } from "@/lib/saveVersion";
@@ -44,6 +48,7 @@ export default function WorldBible({ novelId, onNavigateToTimeline, novel }) {
   const [catManagerOpen, setCatManagerOpen] = useState(false);
   const [expandedId, setExpandedId] = useState(null);
   const [worldBuilderOpen, setWorldBuilderOpen] = useState(false);
+  const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: entries = [], isLoading } = useQuery({
@@ -120,6 +125,30 @@ export default function WorldBible({ novelId, onNavigateToTimeline, novel }) {
     onError: (err) => toast.error(`ลบไม่สำเร็จ: ${err?.message || "กรุณาลองใหม่"}`),
   });
 
+  const clearAllMutation = useMutation({
+    mutationFn: async () => {
+      // ดึงเฉพาะของนิยายเรื่องนี้เท่านั้น (กรองด้วย novel_id)
+      const [allEntries, allCats] = await Promise.all([
+        base44.entities.WorldEntry.filter({ novel_id: novelId }),
+        base44.entities.WorldCategory.filter({ novel_id: novelId }),
+      ]);
+      const liveEntries = allEntries.filter((e) => !e.is_deleted && e.novel_id === novelId);
+      const liveCats = allCats.filter((c) => c.novel_id === novelId);
+      await Promise.all(liveEntries.map((e) => base44.entities.WorldEntry.delete(e.id)));
+      await Promise.all(liveCats.map((c) => base44.entities.WorldCategory.delete(c.id)));
+      return liveEntries.length + liveCats.length;
+    },
+    onSuccess: (count) => {
+      queryClient.invalidateQueries({ queryKey: ["worldEntries", novelId] });
+      queryClient.invalidateQueries({ queryKey: ["worldCategories", novelId] });
+      setClearConfirmOpen(false);
+      toast.success(`ล้างโลก/ฉากทั้งหมดแล้ว ${count} รายการ`);
+    },
+    onError: (err) => toast.error(`ล้างไม่สำเร็จ: ${err?.message || "กรุณาลองใหม่"}`),
+  });
+
+  const totalToClear = entries.length + customCategories.length;
+
   const openEdit = (entry) => {
     setEditing(entry);
     setForm({ title: entry.title, category: entry.category || "", description: entry.description || "" });
@@ -177,6 +206,34 @@ export default function WorldBible({ novelId, onNavigateToTimeline, novel }) {
         novelId={novelId}
       />
 
+      <AlertDialog open={clearConfirmOpen} onOpenChange={setClearConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-heading flex items-center gap-2">
+              <Eraser className="w-5 h-5 text-destructive" />
+              ล้างโลก/ฉากทั้งหมด?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              จะลบข้อมูลโลก/ฉาก <strong>{entries.length}</strong> รายการ
+              {customCategories.length > 0 && <> และหมวดหมู่ <strong>{customCategories.length}</strong> รายการ</>}
+              {" "}ของนิยายเรื่องนี้ (รวม <strong>{totalToClear}</strong> รายการ) อย่างถาวร — ไม่กระทบเรื่องอื่น
+              <br />การกระทำนี้ไม่สามารถย้อนกลับได้
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={clearAllMutation.isPending}>ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); clearAllMutation.mutate(); }}
+              disabled={clearAllMutation.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 gap-2"
+            >
+              {clearAllMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Eraser className="w-4 h-4" />}
+              ล้างทั้งหมด
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {versionEntry && (
          <VersionHistoryDialog
            open={!!versionEntry}
@@ -208,6 +265,13 @@ export default function WorldBible({ novelId, onNavigateToTimeline, novel }) {
              เทมเพลตยุคสมัย
              {templatePickerOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
            </Button>
+           {totalToClear > 0 && (
+             <Button size="sm" variant="outline" className="gap-1.5 border-destructive/30 text-destructive hover:bg-destructive/5"
+               onClick={() => setClearConfirmOpen(true)}>
+               <Eraser className="w-3.5 h-3.5" />
+               ล้างทั้งหมด
+             </Button>
+           )}
            <Dialog open={dialogOpen} onOpenChange={(v) => { setDialogOpen(v); if (!v) { setEditing(null); setForm({ title: "", category: "", description: "" }); } }}>
             <DialogTrigger asChild>
               <Button size="sm" className="gap-1.5"><Plus className="w-3.5 h-3.5" />เพิ่มข้อมูล</Button>
