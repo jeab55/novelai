@@ -299,7 +299,7 @@ export default function Dashboard() {
               <div className="flex flex-wrap items-center gap-2">
                 <Button 
                   variant="outline" 
-                  className="gap-2 font-body border-sky-300 text-sky-700 hover:bg-sky-50 dark:text-sky-400 dark:border-sky-800/40 dark:hover:bg-sky-950/20 flex-1 sm:flex-none min-w-0" 
+                  className="gap-2 font-body border-sky-300 text-sky-700 hover:bg-sky-50 dark:text-sky-400 dark:border-sky-800/40 dark:hover:bg-sky-950/20 w-[calc(50%-0.25rem)] sm:w-auto shrink-0" 
                   onClick={() => setShortStoryOpen(true)}
                 >
                   <BookOpen className="w-4 h-4 shrink-0" />
@@ -308,7 +308,7 @@ export default function Dashboard() {
 
                 <Button 
                   variant="outline" 
-                  className="gap-2 font-body border-violet-300 text-violet-700 hover:bg-violet-50 dark:text-violet-400 dark:border-violet-800/40 dark:hover:bg-violet-950/20 flex-1 sm:flex-none min-w-0" 
+                  className="gap-2 font-body border-violet-300 text-violet-700 hover:bg-violet-50 dark:text-violet-400 dark:border-violet-800/40 dark:hover:bg-violet-950/20 w-[calc(50%-0.25rem)] sm:w-auto shrink-0" 
                   onClick={() => setTranslateOpen(true)}
                 >
                   <Languages className="w-4 h-4 shrink-0" />
@@ -317,14 +317,14 @@ export default function Dashboard() {
 
                 <Button 
                   variant="outline" 
-                  className="gap-2 font-body border-rose-300 text-rose-700 hover:bg-rose-50 dark:text-rose-400 dark:border-rose-800/40 dark:hover:bg-rose-950/20 flex-1 sm:flex-none min-w-0" 
+                  className="gap-2 font-body border-rose-300 text-rose-700 hover:bg-rose-50 dark:text-rose-400 dark:border-rose-800/40 dark:hover:bg-rose-950/20 w-[calc(50%-0.25rem)] sm:w-auto shrink-0" 
                   onClick={() => setStoryboardOpen(true)}
                 >
                   <Clapperboard className="w-4 h-4 shrink-0" />
                   สตอรีบอร์ดวิดีโอ
                 </Button>
 
-                <Button className="gap-2 font-body shadow-md shadow-amber-500/20 bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600 text-white border-0 rounded-full flex-1 sm:flex-none min-w-0" onClick={() => setOpen(true)}>
+                <Button className="gap-2 font-body shadow-md shadow-amber-500/20 bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600 text-white border-0 rounded-full w-[calc(50%-0.25rem)] sm:w-auto shrink-0" onClick={() => setOpen(true)}>
                   <Plus className="w-4 h-4 shrink-0" />
                   สร้างเรื่องใหม่
                 </Button>
