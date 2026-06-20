@@ -395,42 +395,40 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
         </div>
 
         {/* Title, Stats & Main Actions */}
-        <div className="flex items-center justify-between">
-          <div>
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+          <div className="min-w-0">
             <h2 className="font-heading text-xl font-bold text-foreground mb-1">ห้องเขียน</h2>
             <p className="text-sm text-muted-foreground">
               <span className="font-semibold text-primary">{chapters.length}</span> ตอน · 
               <span className="font-semibold text-primary ml-1">{chapters.reduce((acc, c) => acc + (c.word_count || 0), 0).toLocaleString()}</span> คำ
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <Button size="sm" className="gap-1.5 h-9" onClick={() => setNewChapterOpen(true)}>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button size="sm" className="gap-1.5 h-9 shrink-0" onClick={() => setNewChapterOpen(true)}>
               <Plus className="w-4 h-4" />
               ตอนใหม่
             </Button>
-            <div className="flex items-center gap-1.5 border-l border-border pl-3 ml-1">
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1.5 h-9 text-purple-700 border-purple-300 hover:bg-purple-50 dark:text-purple-400 dark:border-purple-800/40 dark:hover:bg-purple-950/20"
-                onClick={() => setSeasonSelectorOpen(true)}
-                title="เพิ่ม Season ใหม่"
-              >
-                <Layers className="w-4 h-4" />
-                เพิ่ม Season
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1.5 h-9 text-destructive border-destructive/30 hover:bg-destructive/10"
-                onClick={() => setDeleteSeasonDialogOpen(true)}
-                disabled={String(selectedSeasonTab) === String(novelId)}
-                title={String(selectedSeasonTab) === String(novelId) ? "ไม่สามารถลบ Season หลักได้" : "ลบ Season นี้"}
-              >
-                <Trash2 className="w-4 h-4" />
-                ลบ Season
-              </Button>
-            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5 h-9 shrink-0 text-purple-700 border-purple-300 hover:bg-purple-50 dark:text-purple-400 dark:border-purple-800/40 dark:hover:bg-purple-950/20"
+              onClick={() => setSeasonSelectorOpen(true)}
+              title="เพิ่ม Season ใหม่"
+            >
+              <Layers className="w-4 h-4" />
+              เพิ่ม Season
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5 h-9 shrink-0 text-destructive border-destructive/30 hover:bg-destructive/10"
+              onClick={() => setDeleteSeasonDialogOpen(true)}
+              disabled={String(selectedSeasonTab) === String(novelId)}
+              title={String(selectedSeasonTab) === String(novelId) ? "ไม่สามารถลบ Season หลักได้" : "ลบ Season นี้"}
+            >
+              <Trash2 className="w-4 h-4" />
+              ลบ Season
+            </Button>
           </div>
         </div>
       </div>
