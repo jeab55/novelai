@@ -13,6 +13,7 @@ import { saveChapterContent } from "@/lib/saveChapterContent";
 import { saveVersion } from "@/lib/saveVersion";
 import { invokeAIStable } from "@/lib/aiInvoke";
 import { enforceWordRange, buildWordCountInstruction, getWordRange } from "@/lib/wordCountControl";
+import { buildChapterContext } from "@/lib/chapterContextBuilder";
 import AiProgressBar from "@/components/novel/AiProgressBar";
 
 const LOADING_LABELS = {
@@ -87,68 +88,26 @@ async function expandContentAutomatically(currentContent, targetWords, chapterTi
   return { content, wordCount: countThaiWords(content) };
 }
 
-// สร้าง system prompt สำหรับร่างตอน
-function buildDraftSystemPrompt(novel, characters, worldEntries, plotEvents, chapters, currentChapter, writerPrompt, linkedEvent) {
-  let ctx = `[บทบาท]\n${writerPrompt || DEFAULT_WRITER_PROMPT}\n\n`;
-
-  ctx += `[บริบทเรื่อง]\n`;
-  ctx += `ชื่อเรื่อง: ${novel.title}\n`;
-  if (novel.genre) ctx += `แนว: ${novel.genre}\n`;
-  if (novel.era) ctx += `ยุคสมัย/ฉากหลัง: ${novel.era}\n`;
-  if (novel.synopsis) ctx += `เรื่องย่อ: ${novel.synopsis}\n`;
-
-  if (characters.length > 0) {
-    ctx += `\n[ตัวละคร]\n`;
-    characters.forEach((c) => {
-      ctx += `• ${c.name} (${c.role || "ตัวประกอบ"})${c.age ? ` อายุ ${c.age}` : ""}`;
-      if (c.personality) ctx += ` — ${c.personality}`;
-      ctx += `\n`;
-      if (c.appearance)    ctx += `  ลักษณะ: ${c.appearance}\n`;
-      if (c.background)    ctx += `  ปูมหลัง: ${c.background}\n`;
-      if (c.desire)        ctx += `  Want: ${c.desire}\n`;
-      if (c.wound)         ctx += `  Wound: ${c.wound}\n`;
-      if (c.relationships) ctx += `  ความสัมพันธ์: ${c.relationships}\n`;
-    });
-  }
-
-  if (worldEntries.length > 0) {
-    ctx += `\n[โลกและฉาก]\n`;
-    worldEntries.forEach((w) => {
-      ctx += `• [${w.category || "อื่นๆ"}] ${w.title}${w.description ? `: ${w.description}` : ""}\n`;
-    });
-  }
-
-  if (plotEvents.length > 0) {
-    ctx += `\n[ไทม์ไลน์]\n`;
-    plotEvents.forEach((e) => {
-      ctx += `• #${e.order} ${e.title}${e.is_historical ? " [ประวัติศาสตร์]" : ""}${e.time_period ? ` (${e.time_period})` : ""}\n`;
-      if (e.description) ctx += `  ${e.description}\n`;
-    });
-  }
-
-  // ตอนก่อนหน้า (เอาล่าสุด 2 ตอน เพื่อรักษาความต่อเนื่อง)
-  const prevChapters = chapters
-    .filter((ch) => ch.id !== currentChapter.id && ch.content)
-    .slice(-2);
-  if (prevChapters.length > 0) {
-    ctx += `\n[ตอนก่อนหน้า — รักษาความต่อเนื่อง]\n`;
-    prevChapters.forEach((ch) => {
-      const preview = ch.content.substring(0, 1500);
-      ctx += `\n— ตอนที่ ${ch.order}: "${ch.title}" —\n${preview}${ch.content.length > 1500 ? "\n…(ต่อ)" : ""}\n`;
-    });
-  }
-
-  if (linkedEvent) {
-    ctx += `\n[เหตุการณ์หลักที่ตอนนี้ต้องบรรยาย — สำคัญมาก]\n`;
-    ctx += `ลำดับ ${linkedEvent.order}: ${linkedEvent.title}\n`;
-    if (linkedEvent.description) ctx += `รายละเอียด: ${linkedEvent.description}\n`;
-    if (linkedEvent.time_period) ctx += `ช่วงเวลา: ${linkedEvent.time_period}\n`;
-    if (linkedEvent.characters_involved) ctx += `ตัวละครที่เกี่ยวข้อง: ${linkedEvent.characters_involved}\n`;
-    ctx += `→ ตอนนี้ต้องเล่าเหตุการณ์นี้ให้ครบ ใช้เป็นแกนกลางของพล็อต\n`;
-  }
+// สร้าง system prompt สำหรับร่างตอน — ใช้ตัวประกอบ context กลาง (เต็มบริบทเท่าโหมดสร้างทั้งหมด)
+function buildDraftSystemPrompt(novel, characters, worldEntries, plotEvents, chapters, currentChapter, writerPrompt, linkedEvent, wordTarget) {
+  const currentOrder = currentChapter?.order;
+  // รวมตอนทั้งหมด (ยกเว้นตอนปัจจุบัน) เพื่อให้ helper หาตอนก่อน/ถัดไป และสรุปย่อสะสมได้
+  const allChapters = chapters.filter((ch) => ch.id !== currentChapter?.id && ch.content);
+  let ctx = buildChapterContext({
+    novel,
+    characters,
+    worldEntries,
+    plotEvents,
+    allChapters,
+    currentOrder,
+    linkedEvent,
+    writerPrompt,
+    wordTarget: wordTarget || 1500,
+  });
 
   ctx += `\n[คำสั่งสำคัญ]\n`;
   ctx += `- ร่างเนื้อหาตอนนี้ให้ครบตามความยาวที่กำหนด อย่าตัดจบกลางคัน\n`;
+  ctx += `- ให้เนื้อหาลึกและต่อเนื่องสอดคล้องกับโครง 3 องก์ ตัวละคร และตอนก่อนหน้า\n`;
   ctx += `- ผลลัพธ์: เฉพาะเนื้อหาตอน ไม่ต้องมีคำนำหรืออธิบาย\n`;
 
   return ctx;
@@ -269,7 +228,7 @@ export default function AiDraftDialog({ open, onClose, chapter, novel, novelId, 
   }, [open, chapter, plotEvents, prefillSummary]);
 
   const getSystemPrompt = () =>
-    buildDraftSystemPrompt(novel, characters, worldEntries, plotEvents, chapters, chapter, selectedWriter?.system_prompt, linkedEvent);
+    buildDraftSystemPrompt(novel, characters, worldEntries, plotEvents, chapters, chapter, selectedWriter?.system_prompt, linkedEvent, form.wordTarget);
 
   // บันทึกร่างเข้าตอนโดยอัตโนมัติ — เก็บ snapshot เวอร์ชันเดิมไว้ก่อนทับ
   const autoSaveDraft = async (content) => {

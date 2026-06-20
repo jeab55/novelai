@@ -9,89 +9,46 @@ import { toast } from "sonner";
 import { useBulkWrite } from "@/lib/BulkWriteContext";
 import { invokeAIStable } from "@/lib/aiInvoke";
 import { enforceWordRange, buildWordCountInstruction, getWordRange, countThaiWords as countWords } from "@/lib/wordCountControl";
+import { buildChapterContext } from "@/lib/chapterContextBuilder";
 
-const DEFAULT_WRITER_PROMPT = `คุณคือนักเขียนนิยายภาษาไทยมืออาชีพที่กำลังร่างตอนใหม่ให้ผู้เขียน
-คุณต้องร่างเนื้อหาตอนที่สมบูรณ์ตามโครงที่ได้รับ รักษาสำนวนและโทนของเรื่อง ใช้ภาษาไทยที่อ่านลื่น`;
+// บล็อกคำสั่งเฉพาะเรื่องสั้น (one-shot) — ส่งต่อให้ตัวประกอบ context กลาง
+function buildOneShotSection(novel) {
+  let ctx = `[รูปแบบ: เรื่องสั้นจบในตอนเดียว (One-shot)]\n`;
+  ctx += `1. เขียนเรื่องสั้นสมบูรณ์ในตัวเอง — มีเปิดเรื่อง ปมกลางเรื่อง และจุดพีคตอนจบ\n`;
+  ctx += `2. แก่นเดียว อารมณ์เดียว — ทุกฉากต้องรับใช้แก่นหลักของเรื่อง\n`;
+  ctx += `3. ตัวละครหลักไม่เกิน 3 คน — โฟกัสที่ความสัมพันธ์และปมหลัก\n`;
+  ctx += `4. เปิดเรื่องกลางสถานการณ์ทันที (in media res) — ไม่ต้องเกริ่นนำยาว\n`;
+  ctx += `5. โครง 3 องก์บีบอัด: เปิดปม 20% / บีบให้ตึง 60% / คลายด้วยจุดพีคเดียว 20%\n`;
+  if (novel.ending_type === "จบหักมุม (Twist)") {
+    ctx += `6. จบหักมุม — โปรยเบาะแสแฟร์ๆ ไว้ก่อนแล้วพลิกตอนท้าย ให้ผู้อ่านคาดไม่ถึงแต่สมเหตุสมผล\n`;
+  } else if (novel.ending_type === "จบสุข (HEA)") {
+    ctx += `6. จบสุข — ตัวละครได้สิ่งที่ต้องการหรือค้นพบสิ่งที่จำเป็นต่อหัวใจ\n`;
+  } else if (novel.ending_type === "จบเศร้า (HFE)") {
+    ctx += `6. จบเศร้า — ตัวละครสูญเสียหรือพ่ายแพ้ ทิ้งความรู้สึกสะเทือนใจ\n`;
+  } else if (novel.ending_type === "จบเปิด (Open Ending)") {
+    ctx += `6. จบเปิด — ไม่ฟันธงผลลัพธ์ ทิ้งให้ผู้อ่านตีความต่อ\n`;
+  }
+  ctx += `7. ประโยคสุดท้ายต้องคมและค้างใจ — ให้ผู้อ่านนึกถึงต่อหลังอ่านจบ\n`;
+  ctx += `8. ใช้ภาษากระชับ แต่ยังคงความสละสลวยและเห็นภาพ\n\n`;
+  return ctx;
+}
 
-function buildSystemPrompt(novel, characters, worldEntries, plotEvents, prevChapters, writerPrompt, previousSeasonLastChapter) {
+// ประกอบ system prompt เต็มบริบทผ่านตัวประกอบกลาง (เท่าโหมดสร้างทั้งหมด)
+function buildSystemPrompt(novel, characters, worldEntries, plotEvents, allChapters, currentOrder, linkedEvent, writerPrompt, previousSeasonLastChapter) {
   const isOneShot = novel.novel_type === "เรื่องสั้น";
-  let ctx = `[บทบาท]\n${writerPrompt || DEFAULT_WRITER_PROMPT}\n\n`;
-
-  if (isOneShot) {
-    ctx += `[รูปแบบ: เรื่องสั้นจบในตอนเดียว (One-shot)]\n`;
-    ctx += `1. เขียนเรื่องสั้นสมบูรณ์ในตัวเอง — มีเปิดเรื่อง ปมกลางเรื่อง และจุดพีคตอนจบ\n`;
-    ctx += `2. แก่นเดียว อารมณ์เดียว — ทุกฉากต้องรับใช้แก่นหลักของเรื่อง\n`;
-    ctx += `3. ตัวละครหลักไม่เกิน 3 คน — โฟกัสที่ความสัมพันธ์และปมหลัก\n`;
-    ctx += `4. เปิดเรื่องกลางสถานการณ์ทันที (in media res) — ไม่ต้องเกริ่นนำยาว\n`;
-    ctx += `5. โครง 3 องก์บีบอัด: เปิดปม 20% / บีบให้ตึง 60% / คลายด้วยจุดพีคเดียว 20%\n`;
-    if (novel.ending_type === "จบหักมุม (Twist)") {
-      ctx += `6. จบหักมุม — โปรยเบาะแสแฟร์ๆ ไว้ก่อนแล้วพลิกตอนท้าย ให้ผู้อ่านคาดไม่ถึงแต่สมเหตุสมผล\n`;
-    } else if (novel.ending_type === "จบสุข (HEA)") {
-      ctx += `6. จบสุข — ตัวละครได้สิ่งที่ต้องการหรือค้นพบสิ่งที่จำเป็นต่อหัวใจ\n`;
-    } else if (novel.ending_type === "จบเศร้า (HFE)") {
-      ctx += `6. จบเศร้า — ตัวละครสูญเสียหรือพ่ายแพ้ ทิ้งความรู้สึกสะเทือนใจ\n`;
-    } else if (novel.ending_type === "จบเปิด (Open Ending)") {
-      ctx += `6. จบเปิด — ไม่ฟันธงผลลัพธ์ ทิ้งให้ผู้อ่านตีความต่อ\n`;
-    }
-    ctx += `7. ประโยคสุดท้ายต้องคมและค้างใจ — ให้ผู้อ่านนึกถึงต่อหลังอ่านจบ\n`;
-    ctx += `8. ใช้ภาษากระชับ แต่ยังคงความสละสลวยและเห็นภาพ\n\n`;
-  }
-
-  ctx += `[บริบทเรื่อง]\n`;
-  ctx += `ชื่อเรื่อง: ${novel.title}\n`;
-  if (novel.genre) ctx += `แนว: ${novel.genre}\n`;
-  if (novel.era) ctx += `ยุคสมัย/ฉากหลัง: ${novel.era}\n`;
-  if (novel.synopsis) ctx += `เรื่องย่อ: ${novel.synopsis}\n`;
-  if (novel.plot_outline) ctx += `\nโครงเรื่อง:\n${novel.plot_outline}\n`;
-
-  if (characters.length > 0) {
-    ctx += `\n[ตัวละคร]\n`;
-    characters.forEach((c) => {
-      ctx += `• ${c.name} (${c.role || "ตัวประกอบ"})`;
-      if (c.personality) ctx += ` — ${c.personality}`;
-      ctx += `\n`;
-      if (c.appearance) ctx += `  ลักษณะ: ${c.appearance}\n`;
-      if (c.background) ctx += `  ปูมหลัง: ${c.background}\n`;
-      if (c.desire) ctx += `  Want: ${c.desire}\n`;
-      if (c.wound) ctx += `  Wound: ${c.wound}\n`;
-    });
-  }
-
-  if (worldEntries.length > 0) {
-    ctx += `\n[โลกและฉาก]\n`;
-    worldEntries.forEach((w) => {
-      ctx += `• [${w.category || "อื่นๆ"}] ${w.title}${w.description ? `: ${w.description}` : ""}\n`;
-    });
-  }
-
-  if (plotEvents.length > 0) {
-    ctx += `\n[ไทม์ไลน์เหตุการณ์]\n`;
-    plotEvents.forEach((e) => {
-      ctx += `• #${e.order} ${e.title}${e.is_historical ? " [ประวัติศาสตร์]" : ""}`;
-      if (e.time_period) ctx += ` (${e.time_period})`;
-      ctx += `\n`;
-      if (e.description) ctx += `  ${e.description}\n`;
-    });
-  }
-
-  // ★ สำคัญ: ถ้าเป็น Season ใหม่ (มี parent_novel_id) และเป็นตอนที่ 1 — ให้ใส่ตอนท้ายของ Season ก่อนหน้า
-  if (previousSeasonLastChapter && novel.parent_novel_id) {
-    ctx += `\n\n[ตอนสุดท้ายของ Season ก่อนหน้า — เชื่อมต่อเนื้อเรื่อง]\n`;
-    ctx += `— ${previousSeasonLastChapter.title} —\n`;
-    const preview = (previousSeasonLastChapter.content || "").substring(0, 2000);
-    ctx += `${preview}${(previousSeasonLastChapter.content || "").length > 2000 ? "\n…(ต่อ)" : ""}\n\n`;
-    ctx += `[คำสั่ง]\n`;
-    ctx += `- เขียนตอนที่ 1 ของ Season นี้โดยเชื่อมต่อจากตอนท้ายด้านบนทันที — ไม่ต้องเล่าเรื่องใหม่หรือสรุปย่อ\n`;
-    ctx += `- เริ่มจากฉากหรือเหตุการณ์ที่ต่อเนื่องกันเลย ให้ผู้อ่านรู้สึกว่าอ่านต่อจากตอนจบล่าสุด\n`;
-    ctx += `- รักษาโทน สไตล์ และตัวละครให้สอดคล้องกับ Season ก่อนหน้า\n\n`;
-  } else if (prevChapters.length > 0) {
-    ctx += `\n[ตอนก่อนหน้า — รักษาความต่อเนื่อง]\n`;
-    const recent = prevChapters.slice(-2);
-    recent.forEach((ch) => {
-      const preview = (ch.content || "").substring(0, 1500);
-      ctx += `\n— ตอนที่ ${ch.order}: "${ch.title}" —\n${preview}${(ch.content || "").length > 1500 ? "\n…(ต่อ)" : ""}\n`;
-    });
-  }
+  let ctx = buildChapterContext({
+    novel,
+    characters,
+    worldEntries,
+    plotEvents,
+    allChapters,
+    currentOrder,
+    linkedEvent,
+    writerPrompt,
+    wordTarget: novel.word_count_target || 1500,
+    previousSeasonLastChapter,
+    isOneShotSection: isOneShot ? buildOneShotSection(novel) : "",
+  });
 
   if (isOneShot) {
     ctx += `\n[คำสั่งสำคัญ]\n`;
@@ -102,6 +59,7 @@ function buildSystemPrompt(novel, characters, worldEntries, plotEvents, prevChap
   } else {
     ctx += `\n[คำสั่งสำคัญ]\n`;
     ctx += `- ร่างเนื้อหาตอนนี้ให้ครบตามความยาวที่กำหนด อย่าตัดจบกลางคัน\n`;
+    ctx += `- ให้เนื้อหาลึกและต่อเนื่องสอดคล้องกับโครง 3 องก์ ตัวละคร และตอนก่อนหน้า\n`;
     ctx += `- ผลลัพธ์: เฉพาะเนื้อหาตอน ไม่ต้องมีคำนำหรืออธิบาย\n`;
   }
   return ctx;
@@ -281,8 +239,8 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
   };
 
   // สร้างตอนเดียวพร้อม auto-retry (1-2 ครั้ง)
-  const generateSingleChapter = async ({ i, chapterTitle, linkedEvent, contextChapters, writerPrompt, existingChapter, allCharacters, allWorldEntries, allPlotEvents, previousSeasonLastChapter }) => {
-    const sysPrompt = buildSystemPrompt(novel, allCharacters, allWorldEntries, allPlotEvents, contextChapters, writerPrompt, previousSeasonLastChapter);
+  const generateSingleChapter = async ({ i, chapterTitle, linkedEvent, contextChapters, writerPrompt, existingChapter, allCharacters, allWorldEntries, allPlotEvents, previousSeasonLastChapter, allChaptersForContext }) => {
+    const sysPrompt = buildSystemPrompt(novel, allCharacters, allWorldEntries, allPlotEvents, allChaptersForContext || contextChapters, i, linkedEvent, writerPrompt, previousSeasonLastChapter);
     let taskPrompt = sysPrompt;
     taskPrompt += `\n\n[โจทย์ตอนที่ต้องร่าง — เขียนเนื้อหาเต็มตอน]\n`;
     taskPrompt += `ชื่อตอน: "${chapterTitle}"\n`;
@@ -506,14 +464,15 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
       setLog((l) => [...l, { order: i, title: chapterTitle, status: "generating" }]);
       setCurrentMsg(`✍️ กำลังร่างตอนที่ ${i}/${target}: "${chapterTitle}"...`);
 
-      // รวม freshChapters + writtenSoFar (ที่เพิ่งสร้างในรอบนี้) โดย de-duplicate ด้วย order
+      // รวมทุกตอน (freshChapters + writtenSoFar ที่เพิ่งสร้าง) โดย de-duplicate ด้วย order
+      // ส่งเข้า helper ทั้งหมด เพื่อให้หาโครงตอนก่อน/ปัจจุบัน/ถัดไป และสรุปย่อตอนก่อนหน้าได้ครบ
       const contextMap = new Map();
-      freshChapters.filter((c) => c.order < i && c.content && !c.is_deleted).forEach((c) => contextMap.set(c.order, c));
-      writtenSoFar.filter((c) => c.order < i && c.content).forEach((c) => contextMap.set(c.order, c));
-      const contextChapters = Array.from(contextMap.values()).sort((a, b) => a.order - b.order);
+      freshChapters.filter((c) => !c.is_deleted).forEach((c) => contextMap.set(c.order, c));
+      writtenSoFar.filter((c) => c.content).forEach((c) => contextMap.set(c.order, c));
+      const allChaptersForContext = Array.from(contextMap.values()).sort((a, b) => a.order - b.order);
 
       const result = await generateSingleChapter({
-        i, chapterTitle, linkedEvent, contextChapters, writerPrompt, existingChapter: existing,
+        i, chapterTitle, linkedEvent, allChaptersForContext, writerPrompt, existingChapter: existing,
         allCharacters: freshCharacters, allWorldEntries: freshWorldEntries, allPlotEvents: freshPlotEvents,
         previousSeasonLastChapter,
       });
@@ -619,12 +578,12 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
       setLog((l) => l.map((e) => e.order === failed.order ? { ...e, status: "generating" } : e));
       setCurrentMsg(`🔄 กำลังลองสร้างตอนที่ ${failed.order} "${failed.title}"...`);
       
-      const contextChapters = freshChapters.filter((c) => c.order < failed.order && c.content && !c.is_deleted);
+      const allChaptersForContext = freshChapters.filter((c) => !c.is_deleted).sort((a, b) => a.order - b.order);
       const result = await generateSingleChapter({
         i: failed.order,
         chapterTitle: failed.title,
         linkedEvent,
-        contextChapters,
+        allChaptersForContext,
         writerPrompt,
         existingChapter: existing,
         allCharacters: freshCharacters,

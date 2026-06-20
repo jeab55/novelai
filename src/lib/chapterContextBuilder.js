@@ -1,0 +1,159 @@
+// ตัวประกอบ context กลางสำหรับการเขียนตอน (Bulk / AI Draft)
+// เป้าหมาย: ทุกตอนที่เขียนทีละตอน ต้องได้ context ครบเท่ากับโหมดสร้างทั้งหมด
+// — โครง 3 องก์, โครงตอนก่อน/ปัจจุบัน/ถัดไป, ตัวละครครบ, โลก/ฉากที่เกี่ยวข้อง,
+//   บทสรุปย่อตอนก่อนหน้าที่เขียนแล้ว, สไตล์นักเขียน, จำนวนคำเป้าหมาย
+
+const DEFAULT_WRITER_PROMPT = `คุณคือนักเขียนนิยายภาษาไทยมืออาชีพที่กำลังร่างตอนใหม่ให้ผู้เขียน
+คุณต้องร่างเนื้อหาตอนที่สมบูรณ์ตามโครงที่ได้รับ รักษาสำนวนและโทนของเรื่อง ใช้ภาษาไทยที่อ่านลื่น`;
+
+// ตัดเนื้อหายาวเป็นบทสรุปย่อแบบ heuristic (ไม่เรียก AI เพิ่ม เพื่อความเร็ว)
+function summarizeContent(content, maxChars = 600) {
+  if (!content) return "";
+  const clean = content.replace(/\s+/g, " ").trim();
+  if (clean.length <= maxChars) return clean;
+  // เก็บต้นเรื่อง + ท้ายเรื่อง เพื่อรักษาทั้งจุดเริ่มและจุดจบของตอน
+  const head = clean.substring(0, Math.floor(maxChars * 0.6));
+  const tail = clean.substring(clean.length - Math.floor(maxChars * 0.35));
+  return `${head} … ${tail}`;
+}
+
+/**
+ * ประกอบ system prompt ที่ครบบริบทสำหรับการเขียน "ตอนหนึ่งตอน"
+ *
+ * @param {Object} args
+ * @param {Object} args.novel              นิยาย (มี plot_outline 3 องก์, synopsis, era, genre, ending_type, novel_type, word_count_target)
+ * @param {Array}  args.characters         ตัวละครทั้งหมด (นิสัย/ปม/ความสัมพันธ์)
+ * @param {Array}  args.worldEntries       WorldEntry ทั้งหมด (สถานที่/ขนบ/ระบบ)
+ * @param {Array}  args.plotEvents         ไทม์ไลน์ทั้งหมด (เรียง order)
+ * @param {Array}  args.allChapters        ตอนทั้งหมด (ที่มีเนื้อหา/โครง) เรียง order — ใช้หาตอนก่อน/ถัดไป
+ * @param {number} args.currentOrder       ลำดับตอนที่กำลังเขียน
+ * @param {Object} [args.linkedEvent]      เหตุการณ์ไทม์ไลน์หลักของตอนนี้
+ * @param {string} [args.writerPrompt]     สไตล์การเขียนของนักเขียน AI
+ * @param {number} [args.wordTarget]       จำนวนคำเป้าหมายต่อตอน
+ * @param {Object} [args.previousSeasonLastChapter] ตอนท้ายของ Season ก่อนหน้า (สำหรับ Season 2+)
+ * @param {string} [args.isOneShotSection] บล็อกคำสั่งเพิ่มเติม (กรณีเรื่องสั้น) — ส่งเป็น string ถ้ามี
+ */
+export function buildChapterContext({
+  novel,
+  characters = [],
+  worldEntries = [],
+  plotEvents = [],
+  allChapters = [],
+  currentOrder,
+  linkedEvent = null,
+  writerPrompt = "",
+  wordTarget = 1500,
+  previousSeasonLastChapter = null,
+  isOneShotSection = "",
+}) {
+  let ctx = `[บทบาท]\n${writerPrompt || DEFAULT_WRITER_PROMPT}\n\n`;
+
+  if (isOneShotSection) ctx += isOneShotSection;
+
+  // ── บริบทเรื่อง + โครง 3 องก์ทั้งหมด ──
+  ctx += `[บริบทเรื่อง]\n`;
+  ctx += `ชื่อเรื่อง: ${novel.title}\n`;
+  if (novel.genre) ctx += `แนว: ${novel.genre}\n`;
+  if (novel.era) ctx += `ยุคสมัย/ฉากหลัง: ${novel.era}\n`;
+  if (novel.synopsis) ctx += `เรื่องย่อ: ${novel.synopsis}\n`;
+  if (novel.plot_outline) ctx += `\n[โครงเรื่อง 3 องก์ของทั้งเรื่อง — ภาพรวมที่ตอนนี้ต้องสอดคล้อง]\n${novel.plot_outline}\n`;
+
+  // ── ตัวละครหลักทั้งหมด ──
+  if (characters.length > 0) {
+    ctx += `\n[ตัวละครทั้งหมด — รักษานิสัย ปม และความสัมพันธ์ให้คงเส้นคงวา]\n`;
+    characters.forEach((c) => {
+      ctx += `• ${c.name} (${c.role || "ตัวประกอบ"})${c.age ? ` อายุ ${c.age}` : ""}`;
+      if (c.personality) ctx += ` — ${c.personality}`;
+      ctx += `\n`;
+      if (c.appearance) ctx += `  ลักษณะ: ${c.appearance}\n`;
+      if (c.background) ctx += `  ปูมหลัง: ${c.background}\n`;
+      if (c.desire) ctx += `  สิ่งที่ต้องการ (Want): ${c.desire}\n`;
+      if (c.wound) ctx += `  ปมในใจ (Wound): ${c.wound}\n`;
+      if (c.relationships) ctx += `  ความสัมพันธ์: ${c.relationships}\n`;
+    });
+  }
+
+  // ── โลกและฉาก (เน้นที่เกี่ยวข้องกับตอนนี้ก่อน แล้วตามด้วยที่เหลือ) ──
+  if (worldEntries.length > 0) {
+    ctx += `\n[โลกและฉาก — ขนบธรรมเนียม สถานที่ ระบบ ที่ต้องใช้ให้ถูกต้อง]\n`;
+    worldEntries.forEach((w) => {
+      ctx += `• [${w.category || "อื่นๆ"}] ${w.title}${w.description ? `: ${w.description}` : ""}\n`;
+    });
+  }
+
+  // ── ไทม์ไลน์เหตุการณ์ทั้งหมด ──
+  if (plotEvents.length > 0) {
+    ctx += `\n[ไทม์ไลน์เหตุการณ์ทั้งเรื่อง]\n`;
+    plotEvents.forEach((e) => {
+      ctx += `• #${e.order} ${e.title}${e.is_historical ? " [ประวัติศาสตร์]" : ""}${e.time_period ? ` (${e.time_period})` : ""}\n`;
+      if (e.description) ctx += `  ${e.description}\n`;
+    });
+  }
+
+  // ── โครงของตอนก่อนหน้า / ตอนปัจจุบัน / ตอนถัดไป (เพื่อความต่อเนื่อง) ──
+  const sorted = [...allChapters].filter((c) => c && c.order != null).sort((a, b) => a.order - b.order);
+  const prevOutline = sorted.find((c) => c.order === currentOrder - 1);
+  const currentOutline = sorted.find((c) => c.order === currentOrder);
+  const nextOutline = sorted.find((c) => c.order === currentOrder + 1);
+
+  const outlineOf = (ch) => {
+    if (!ch) return "";
+    // ใช้ plot_event_description เป็นโครงถ้ามี ไม่งั้นใช้บทสรุปจากเนื้อหา
+    return ch.plot_event_description || summarizeContent(ch.content, 300) || "";
+  };
+
+  if (prevOutline || currentOutline || nextOutline) {
+    ctx += `\n[โครงตอนโดยรอบ — เพื่อให้ตอนนี้เชื่อมต่ออย่างลื่นไหล]\n`;
+    if (prevOutline) {
+      const o = outlineOf(prevOutline);
+      ctx += `• ตอนก่อนหน้า (#${prevOutline.order}) "${prevOutline.title}"${o ? `: ${o}` : ""}\n`;
+    }
+    if (currentOutline) {
+      const o = outlineOf(currentOutline);
+      ctx += `• ★ ตอนที่กำลังเขียน (#${currentOutline.order}) "${currentOutline.title}"${o ? `: ${o}` : ""}\n`;
+    }
+    if (nextOutline) {
+      const o = outlineOf(nextOutline);
+      ctx += `• ตอนถัดไป (#${nextOutline.order}) "${nextOutline.title}"${o ? `: ${o}` : ""}\n`;
+      ctx += `  → วางจังหวะให้ตอนนี้ส่งต่อไปยังตอนถัดไปได้อย่างเป็นธรรมชาติ\n`;
+    }
+  }
+
+  // ── บทสรุปย่อของตอนก่อนหน้าที่เขียนไปแล้ว (เนื้อหาจริง) ──
+  if (previousSeasonLastChapter && novel.parent_novel_id) {
+    ctx += `\n[ตอนสุดท้ายของ Season ก่อนหน้า — เชื่อมต่อเนื้อเรื่อง]\n`;
+    ctx += `— ${previousSeasonLastChapter.title} —\n`;
+    const preview = (previousSeasonLastChapter.content || "").substring(0, 2000);
+    ctx += `${preview}${(previousSeasonLastChapter.content || "").length > 2000 ? "\n…(ต่อ)" : ""}\n`;
+    ctx += `→ เขียนตอนนี้ต่อเนื่องจากตอนจบล่าสุด ไม่ต้องเล่าซ้ำ รักษาโทนและตัวละครให้สอดคล้อง\n`;
+  } else {
+    // บทสรุปย่อตอนก่อนหน้าทั้งหมด (กระชับ) + เนื้อหาเต็มของ 2 ตอนล่าสุด
+    const writtenBefore = sorted.filter((c) => c.order < currentOrder && c.content && c.content.trim().length > 100);
+    if (writtenBefore.length > 0) {
+      // บทสรุปย่อสะสมของทุกตอนก่อนหน้า — เพื่อ "ความจำเรื่อง" เท่ากับโหมดสร้างทั้งหมด
+      if (writtenBefore.length > 2) {
+        ctx += `\n[เรื่องย่อสะสมของตอนก่อนหน้า — สิ่งที่เกิดขึ้นมาแล้ว]\n`;
+        writtenBefore.slice(0, -2).forEach((ch) => {
+          ctx += `• ตอนที่ ${ch.order} "${ch.title}": ${summarizeContent(ch.content, 400)}\n`;
+        });
+      }
+      // เนื้อหาเต็ม (preview) ของ 2 ตอนล่าสุด — เพื่อรักษาสำนวนและความต่อเนื่องระดับฉาก
+      ctx += `\n[เนื้อหาตอนล่าสุด — รักษาสำนวนและความต่อเนื่องระดับฉาก]\n`;
+      writtenBefore.slice(-2).forEach((ch) => {
+        const preview = (ch.content || "").substring(0, 1500);
+        ctx += `\n— ตอนที่ ${ch.order}: "${ch.title}" —\n${preview}${(ch.content || "").length > 1500 ? "\n…(ต่อ)" : ""}\n`;
+      });
+    }
+  }
+
+  // ── เหตุการณ์หลักของตอนนี้ ──
+  if (linkedEvent) {
+    ctx += `\n[เหตุการณ์หลักที่ตอนนี้ต้องบรรยาย — แกนกลางของพล็อต]\n`;
+    ctx += `ลำดับ ${linkedEvent.order}: ${linkedEvent.title}\n`;
+    if (linkedEvent.description) ctx += `รายละเอียด: ${linkedEvent.description}\n`;
+    if (linkedEvent.time_period) ctx += `ช่วงเวลา: ${linkedEvent.time_period}\n`;
+    if (linkedEvent.characters_involved) ctx += `ตัวละครที่เกี่ยวข้อง: ${linkedEvent.characters_involved}\n`;
+  }
+
+  return ctx;
+}
