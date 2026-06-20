@@ -1,9 +1,8 @@
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Megaphone, MessagesSquare, Clapperboard } from "lucide-react";
+import { Megaphone, MessagesSquare } from "lucide-react";
 import PublishKitDialog from "@/components/novel/PublishKitDialog";
 import ChatModeDialog from "@/components/novel/ChatModeDialog";
-import StoryboardDialog from "@/components/novel/StoryboardDialog";
 
 const TOOLS = [
   {
@@ -20,13 +19,6 @@ const TOOLS = [
     desc: "แปลงตอนเป็นบทสนทนาแชต ปรับฝั่ง/สี/ชื่อ และบันทึกเวอร์ชันแชตลงตอน",
     color: "text-indigo-600 bg-indigo-100 dark:bg-indigo-950/30",
   },
-  {
-    key: "storyboard",
-    icon: Clapperboard,
-    title: "สตอรีบอร์ดวิดีโอ",
-    desc: "แบ่งฉาก เขียนสคริปต์ มุมกล้อง บทพากย์ และพรอมต์ภาพ AI พร้อม export",
-    color: "text-rose-600 bg-rose-100 dark:bg-rose-950/30",
-  },
 ];
 
 export default function PublishExportPanel({ novel }) {
@@ -38,7 +30,7 @@ export default function PublishExportPanel({ novel }) {
       <h2 className="font-heading font-bold text-xl mb-1">เผยแพร่ / ส่งออก</h2>
       <p className="text-sm text-muted-foreground mb-6">เครื่องมือสำหรับนำนิยายไปลงแพลตฟอร์มและสร้างคอนเทนต์</p>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {TOOLS.map(({ key, icon: Icon, title, desc, color }) => (
           <button
             key={key}
@@ -56,7 +48,6 @@ export default function PublishExportPanel({ novel }) {
 
       <PublishKitDialog open={openTool === "publishkit"} onClose={() => setOpenTool(null)} novels={novels} />
       <ChatModeDialog open={openTool === "chatmode"} onClose={() => setOpenTool(null)} novels={novels} />
-      <StoryboardDialog open={openTool === "storyboard"} onClose={() => setOpenTool(null)} novels={novels} />
     </div>
   );
 }
