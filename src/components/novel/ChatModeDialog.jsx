@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -8,6 +8,9 @@ import { MessagesSquare, Loader2, Sparkles, Download, Copy } from "lucide-react"
 import { toast } from "sonner";
 import { invokeAIStable } from "@/lib/aiInvoke";
 import { downloadFile } from "@/lib/storyboardExport";
+import ChatModeSettings, { BUBBLE_COLORS } from "@/components/novel/ChatModeSettings";
+
+const colorCls = (key) => BUBBLE_COLORS.find((c) => c.key === key)?.cls || BUBBLE_COLORS[0].cls;
 
 export default function ChatModeDialog({ open, onClose, novels = [] }) {
   const [novelId, setNovelId] = useState("");
@@ -15,6 +18,13 @@ export default function ChatModeDialog({ open, onClose, novels = [] }) {
   const [generating, setGenerating] = useState(false);
   const [lines, setLines] = useState([]);
   const [meta, setMeta] = useState(null);
+
+  // settings
+  const [rightSpeaker, setRightSpeaker] = useState("");
+  const [showNarration, setShowNarration] = useState(true);
+  const [rightColor, setRightColor] = useState("primary");
+  const [leftColor, setLeftColor] = useState("card");
+  const [nameMap, setNameMap] = useState({});
 
   const { data: chapters = [] } = useQuery({
     queryKey: ["chapters-for-chatmode", novelId],
@@ -28,21 +38,32 @@ export default function ChatModeDialog({ open, onClose, novels = [] }) {
   const selectedNovel = novels.find((n) => n.id === novelId);
   const selectedChapter = chapters.find((c) => c.id === chapterId);
 
+  // รายชื่อตัวละคร (ผู้พูดที่ไม่ใช่บรรยาย) เรียงตามความถี่
+  const speakers = useMemo(() => {
+    const counts = {};
+    lines.forEach((l) => { if (l.type !== "narration" && l.speaker) counts[l.speaker] = (counts[l.speaker] || 0) + 1; });
+    return Object.entries(counts).sort((a, b) => b[1] - a[1]).map(([s]) => s);
+  }, [lines]);
+
+  // ตั้งค่าเริ่มต้นเมื่อได้ผลลัพธ์ใหม่: ฝั่งขวา = ตัวละครที่พูดมากสุด
+  useEffect(() => {
+    if (speakers.length > 0) {
+      setRightSpeaker(speakers[0]);
+      setNameMap(Object.fromEntries(speakers.map((s) => [s, s])));
+    }
+  }, [speakers]);
+
+  const displayName = (s) => nameMap[s] || s;
+
   const reset = () => {
     setNovelId(""); setChapterId(""); setLines([]); setMeta(null);
+    setRightSpeaker(""); setShowNarration(true); setRightColor("primary"); setLeftColor("card"); setNameMap({});
   };
   const handleClose = () => {
     if (generating) return;
     reset();
     onClose();
   };
-
-  // กำหนดตัวละครหลัก = ผู้พูดที่ปรากฏมากสุด → จัดเป็นบับเบิลขวา
-  const mainSpeaker = (() => {
-    const counts = {};
-    lines.forEach((l) => { if (l.type !== "narration" && l.speaker) counts[l.speaker] = (counts[l.speaker] || 0) + 1; });
-    return Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] || "";
-  })();
 
   const handleGenerate = async () => {
     if (!novelId) { toast.error("กรุณาเลือกนิยาย"); return; }
@@ -101,16 +122,21 @@ ${text.slice(0, 14000)}
     }
   };
 
+  const visibleLines = lines.filter((l) => showNarration || l.type !== "narration");
+
+  // Export แบบจอยลดา: "ชื่อตัวละคร: ข้อความ" ทีละบรรทัด (บรรยายอยู่ในวงเล็บ ถ้าเปิดแสดง)
   const buildExport = () =>
-    lines.map((l) => l.type === "narration" ? `(${l.text})` : `${l.speaker}: ${l.text}`).join("\n");
+    visibleLines.map((l) =>
+      l.type === "narration" ? `(${l.text})` : `${displayName(l.speaker)}: ${l.text}`
+    ).join("\n");
 
   const exportText = () => {
-    downloadFile(buildExport(), `chat-${meta?.title || "chapter"}.txt`, "text/plain;charset=utf-8");
-    toast.success("ดาวน์โหลดข้อความแชตแล้ว");
+    downloadFile(buildExport(), `joylada-${meta?.title || "chapter"}.txt`, "text/plain;charset=utf-8");
+    toast.success("ดาวน์โหลดบทแชตสำหรับจอยลดาแล้ว");
   };
   const copyAll = () => {
     navigator.clipboard.writeText(buildExport());
-    toast.success("คัดลอกบทแชตทั้งหมดแล้ว");
+    toast.success("คัดลอกบทแชต (รูปแบบจอยลดา) แล้ว");
   };
 
   return (
@@ -143,41 +169,52 @@ ${text.slice(0, 14000)}
               </div>
             </div>
             <Button className="w-full gap-2 h-11" onClick={handleGenerate} disabled={generating || !novelId || !chapterId}>
-              {generating ? <><Loader2 className="w-4 h-4 animate-spin" />กำลังแปลงเป็นแชต...</> : <><Sparkles className="w-4 h-4" />แปลงเป็นแชต</>}
+              {generating ? <><Loader2 className="w-4 h-4 animate-spin" />กำลังแปลงเป็นแชต...</> : <><Sparkles className="w-4 h-4" />{lines.length > 0 ? "แปลงใหม่อีกครั้ง" : "แปลงเป็นแชต"}</>}
             </Button>
           </div>
 
           {lines.length > 0 && (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                <span className="text-sm font-semibold">{lines.length} ข้อความ · พรีวิวแบบจอยลดา</span>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs" onClick={copyAll}><Copy className="w-3.5 h-3.5" />คัดลอก</Button>
-                  <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs" onClick={exportText}><Download className="w-3.5 h-3.5" />Export</Button>
-                </div>
-              </div>
+            <>
+              <ChatModeSettings
+                speakers={speakers}
+                rightSpeaker={rightSpeaker} setRightSpeaker={setRightSpeaker}
+                showNarration={showNarration} setShowNarration={setShowNarration}
+                rightColor={rightColor} setRightColor={setRightColor}
+                leftColor={leftColor} setLeftColor={setLeftColor}
+                nameMap={nameMap} setName={(s, v) => setNameMap((m) => ({ ...m, [s]: v }))}
+              />
 
-              <div className="rounded-2xl border border-border/60 bg-gradient-to-b from-secondary/30 to-background p-4 space-y-2.5">
-                {lines.map((l, i) => {
-                  if (l.type === "narration") {
+              <div className="space-y-3">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <span className="text-sm font-semibold">{visibleLines.length} ข้อความ · พรีวิวแบบจอยลดา</span>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs" onClick={copyAll}><Copy className="w-3.5 h-3.5" />คัดลอก</Button>
+                    <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs" onClick={exportText}><Download className="w-3.5 h-3.5" />Export จอยลดา</Button>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-border/60 bg-gradient-to-b from-secondary/30 to-background p-4 space-y-2.5">
+                  {visibleLines.map((l, i) => {
+                    if (l.type === "narration") {
+                      return (
+                        <div key={i} className="text-center">
+                          <span className="inline-block text-xs text-muted-foreground bg-muted/60 rounded-full px-3 py-1 italic">{l.text}</span>
+                        </div>
+                      );
+                    }
+                    const isRight = l.speaker === rightSpeaker;
                     return (
-                      <div key={i} className="text-center">
-                        <span className="inline-block text-xs text-muted-foreground bg-muted/60 rounded-full px-3 py-1 italic">{l.text}</span>
+                      <div key={i} className={`flex flex-col ${isRight ? "items-end" : "items-start"}`}>
+                        <span className="text-[10px] text-muted-foreground mb-0.5 px-1">{displayName(l.speaker)}</span>
+                        <div className={`max-w-[78%] rounded-2xl px-3.5 py-2 text-sm leading-relaxed shadow-sm ${colorCls(isRight ? rightColor : leftColor)} ${isRight ? "rounded-br-md" : "rounded-bl-md"}`}>
+                          {l.text}
+                        </div>
                       </div>
                     );
-                  }
-                  const isRight = l.speaker === mainSpeaker;
-                  return (
-                    <div key={i} className={`flex flex-col ${isRight ? "items-end" : "items-start"}`}>
-                      <span className="text-[10px] text-muted-foreground mb-0.5 px-1">{l.speaker}</span>
-                      <div className={`max-w-[78%] rounded-2xl px-3.5 py-2 text-sm leading-relaxed shadow-sm ${isRight ? "bg-primary text-primary-foreground rounded-br-md" : "bg-card border border-border rounded-bl-md"}`}>
-                        {l.text}
-                      </div>
-                    </div>
-                  );
-                })}
+                  })}
+                </div>
               </div>
-            </div>
+            </>
           )}
         </div>
       </DialogContent>
