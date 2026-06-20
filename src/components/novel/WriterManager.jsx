@@ -112,21 +112,21 @@ export default function WriterManager() {
               key={w.id}
               className="rounded-2xl border border-border/50 bg-card/60 overflow-hidden"
             >
-              <div className="flex items-center gap-4 px-5 py-4">
+              <div className="flex items-center gap-3 sm:gap-4 px-4 sm:px-5 py-4">
                 <div className="w-10 h-10 rounded-xl bg-primary/8 flex items-center justify-center shrink-0">
                   <Bot className="w-5 h-5 text-primary" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <p className="font-semibold text-[15px]">{w.name}</p>
-                    <Badge variant="outline" className={`text-xs ${w.is_active !== false ? "border-emerald-200 text-emerald-700 bg-emerald-50" : "border-border text-muted-foreground"}`}>
+                    <p className="font-semibold text-[15px] truncate max-w-full">{w.name}</p>
+                    <Badge variant="outline" className={`text-xs whitespace-nowrap shrink-0 ${w.is_active !== false ? "border-emerald-200 text-emerald-700 bg-emerald-50" : "border-border text-muted-foreground"}`}>
                       {w.is_active !== false ? "เปิดใช้งาน" : "ปิดใช้งาน"}
                     </Badge>
                   </div>
                   {w.description && <p className="text-xs text-muted-foreground mt-0.5 truncate">{w.description}</p>}
                   {w.style && <p className="text-xs text-primary/60 mt-0.5 truncate">โทน: {w.style}</p>}
                 </div>
-                <div className="flex items-center gap-1 shrink-0">
+                <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
                   <Button
                     variant="ghost"
                     size="icon"
