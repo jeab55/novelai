@@ -10,71 +10,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Loader2, Sparkles, Globe, RefreshCw, ChevronDown, ChevronUp, AlertCircle, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
-import AiProgressBar from "@/components/novel/AiProgressBar";
+import { generateWorldCategory } from "@/lib/worldProgressive";
 
 const CATEGORIES = ["สถานที่", "ขนบธรรมเนียม", "ยุคสมัย", "สิ่งของ", "ระบบ", "อื่นๆ"];
 
-function stripCodeFence(text) {
-  if (typeof text !== "string") return text;
-  return text.replace(/^```[\w]*\n?/m, "").replace(/\n?```$/m, "").trim();
-}
-
-function buildWorldPrompt(novel, writer, characters, plotEvents) {
-  const writerCtx = writer?.system_prompt ? `สไตล์การเขียน: ${writer.system_prompt}\n\n` : "";
-  const charList = characters.map((c) => `${c.name} (${c.role || "ตัวละคร"})${c.background ? ` — ${c.background}` : ""}`).join("\n");
-  const eventList = plotEvents.map((e) => `#${e.order} ${e.title}${e.location ? ` @ ${e.location}` : ""}${e.description ? ` — ${e.description}` : ""}`).join("\n");
-
-  // Extract all mentioned locations from events
-  const locations = [...new Set(
-    plotEvents
-      .map((e) => e.location)
-      .filter(Boolean)
-      .map((l) => l.trim())
-  )];
-
-  return `${writerCtx}คุณคือผู้ช่วยสร้างโลกนิยายภาษาไทย ตอบเป็น JSON เท่านั้น ห้ามมีข้อความนอก JSON
-
-ข้อมูลนิยาย:
-- ชื่อเรื่อง: ${novel.title}
-- แนว: ${novel.genre || "ไม่ระบุ"}
-- ยุคสมัย/ฉากหลัง: ${novel.era || "ไม่ระบุ"}
-- เรื่องย่อ: ${novel.synopsis || "ไม่มี"}
-- โครงเรื่อง: ${novel.plot_outline || "ไม่มี"}
-
-ตัวละครหลัก:
-${charList || "(ยังไม่มี)"}
-
-ไทม์ไลน์เหตุการณ์:
-${eventList || "(ยังไม่มี)"}
-
-สถานที่ที่ปรากฏในไทม์ไลน์ (ต้องมีใน output ทุกแห่ง):
-${locations.length > 0 ? locations.map((l) => `- ${l}`).join("\n") : "(ไม่มี)"}
-
-สร้างรายการโลก/ฉากให้ครอบคลุม 6 หมวด:
-1. สถานที่ (สถานที่สำคัญในเรื่อง — ต้องรวมทุกสถานที่จากไทม์ไลน์ข้างต้น + เพิ่มที่น่าจะมี)
-2. ขนบธรรมเนียม (ประเพณี วัฒนธรรม ความเชื่อ)
-3. ยุคสมัย (บรรยากาศยุค เหตุการณ์ทางประวัติศาสตร์พื้นหลัง)
-4. สิ่งของ (อาวุธ สิ่งประดิษฐ์ สิ่งของสำคัญ)
-5. ระบบ (การปกครอง กฎหมาย ระบบสังคม เศรษฐกิจ)
-6. อื่นๆ (สิ่งที่ไม่เข้าหมวดอื่น)
-
-แต่ละรายการต้องมี:
-- title: ชื่อ
-- description: คำอธิบาย 2-4 ประโยค เชื่อมโยงกับเรื่อง
-- category: หมวดหมู่ (ต้องเป็นหนึ่งใน: สถานที่ ขนบธรรมเนียม ยุคสมัย สิ่งของ ระบบ อื่นๆ)
-
-ตอบด้วย JSON โครงสร้างนี้เท่านั้น:
-{"world_entries":[{"title":"ชื่อ","description":"คำอธิบาย","category":"หมวด"}]}
-
-สร้างอย่างน้อย 12-18 รายการ ให้สอดคล้องกับยุคสมัยและเนื้อเรื่อง ตอบเป็นภาษาไทย`;
-}
-
 export default function AiWorldBuilderDialog({ open, onClose, novel, novelId }) {
   const queryClient = useQueryClient();
-  const [step, setStep] = useState("idle"); // idle | generating | saving | done | review | error
+  const [step, setStep] = useState("idle"); // idle | generating | done | review
   const [entries, setEntries] = useState([]);
   const [error, setError] = useState("");
   const [savedCount, setSavedCount] = useState(0);
+  // ความคืบหน้าจริงต่อหมวด: pending | running | done | error
+  const [progress, setProgress] = useState({});
 
   const { data: writer } = useQuery({
     queryKey: ["writer", novel?.writer_id],
@@ -110,52 +57,43 @@ export default function AiWorldBuilderDialog({ open, onClose, novel, novelId }) 
     enabled: !!novelId,
   });
 
+  // บันทึกรายการ 1 ชิ้นลงฐานข้อมูล + ผูกสถานที่กับไทม์ไลน์ทันที (ใช้ตอน auto-save ทยอย)
+  const persistEntry = async (entry) => {
+    const created = await base44.entities.WorldEntry.create({
+      novel_id: novelId,
+      title: entry.title,
+      description: entry.description,
+      category: entry.category,
+    });
+    if (entry.category === "สถานที่") {
+      const match = plotEvents.find(
+        (ev) => !ev.world_entry_id && ev.location &&
+          ev.location.trim().toLowerCase() === entry.title.trim().toLowerCase()
+      );
+      if (match) {
+        await base44.entities.PlotEvent.update(match.id, { world_entry_id: created.id });
+      }
+    }
+    return created;
+  };
+
+  // บันทึกรายการที่เลือก (ใช้ตอนกดปุ่ม "บันทึก" ในโหมด review)
   const saveMutation = useMutation({
     mutationFn: async (toSave) => {
-      setStep("saving");
-      // Create selected entries
-      const created = await Promise.all(
-        toSave.map((e) =>
-          base44.entities.WorldEntry.create({
-            novel_id: novelId,
-            title: e.title,
-            description: e.description,
-            category: e.category,
-          })
-        )
-      );
-
-      // Auto-link PlotEvents whose location matches a new สถานที่ entry
-      const locationEntries = created.filter((_, i) => toSave[i].category === "สถานที่");
-      if (locationEntries.length > 0) {
-        const eventsToLink = plotEvents.filter(
-          (ev) => !ev.world_entry_id && ev.location
-        );
-        await Promise.all(
-          eventsToLink.map((ev) => {
-            const match = locationEntries.find(
-              (le) => le.title.trim().toLowerCase() === (ev.location || "").trim().toLowerCase()
-            );
-            if (match) {
-              return base44.entities.PlotEvent.update(ev.id, { world_entry_id: match.id });
-            }
-            return null;
-          }).filter(Boolean)
-        );
+      let count = 0;
+      for (const e of toSave) {
+        await persistEntry(e);
+        count++;
       }
-      return created.length;
+      return count;
     },
     onSuccess: (count) => {
       queryClient.invalidateQueries({ queryKey: ["worldEntries", novelId] });
       queryClient.invalidateQueries({ queryKey: ["plotEvents", novelId] });
-      setSavedCount(count);
-      setStep("done");
+      setSavedCount((c) => c + count);
       toast.success(`บันทึกแล้ว ${count} รายการ`);
-      setTimeout(() => handleClose(), 1500);
     },
     onError: (err) => {
-      setStep("review");
-      setError("");
       toast.error(`บันทึกไม่สำเร็จ: ${err?.message || "กรุณาลองใหม่"}`, {
         action: { label: "ลองใหม่", onClick: handleSave },
       });
@@ -166,59 +104,66 @@ export default function AiWorldBuilderDialog({ open, onClose, novel, novelId }) 
     if (step === "generating") return;
     setStep("generating");
     setError("");
+    setEntries([]);
+    setSavedCount(0);
+    setProgress(CATEGORIES.reduce((acc, c) => ({ ...acc, [c]: "pending" }), {}));
 
-    let raw;
-    try {
-      raw = await base44.integrations.Core.InvokeLLM({
-        prompt: buildWorldPrompt(novel, writer, characters, plotEvents),
-        model: "claude_sonnet_4_6",
-      });
-    } catch (err) {
-      setError(`เรียก AI ไม่สำเร็จ: ${err.message}`);
-      setStep("review");
-      return;
-    }
-
-    let parsed;
-    try {
-      const cleaned = typeof raw === "object" ? raw : JSON.parse(stripCodeFence(String(raw)));
-      const arr = cleaned.world_entries || cleaned.entries || cleaned.items || [];
-      if (!arr.length) throw new Error("ไม่พบรายการใน response");
-      parsed = arr;
-    } catch (err) {
-      setError(`แยกผลลัพธ์ไม่สำเร็จ: ${err.message} — กรุณากด "สร้างใหม่"`);
-      setStep("review");
-      setEntries([]);
-      return;
-    }
-
-    // Mark duplicates
     const existingKeys = new Set(
       existingEntries.map((e) => `${(e.title || "").toLowerCase().trim()}|${e.category}`)
     );
-    const mapped = parsed.map((e) => {
-      const key = `${(e.title || "").toLowerCase().trim()}|${e.category}`;
-      const alreadyExists = existingKeys.has(key);
-      return {
-        title: e.title || "",
-        description: e.description || "",
-        category: CATEGORIES.includes(e.category) ? e.category : "อื่นๆ",
-        checked: !alreadyExists,
-        expanded: false,
-        alreadyExists,
-      };
-    });
+    const seen = new Set();
+    let totalSaved = 0;
+    let anyError = false;
 
-    setEntries(mapped);
+    // ยิงทุกหมวดขนานกัน — แต่ละหมวดเสร็จก็ทยอยแสดง + auto-save ทันที
+    await Promise.all(
+      CATEGORIES.map(async (category) => {
+        setProgress((p) => ({ ...p, [category]: "running" }));
+        try {
+          const items = await generateWorldCategory({ novel, writer, characters, plotEvents, category });
+          const mapped = [];
+          for (const e of items) {
+            const key = `${(e.title || "").toLowerCase().trim()}|${category}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            const alreadyExists = existingKeys.has(key);
+            mapped.push({
+              title: e.title || "",
+              description: e.description || "",
+              category,
+              checked: !alreadyExists,
+              expanded: false,
+              alreadyExists,
+              saved: false,
+            });
+          }
+          // ทยอยแสดงทันทีที่หมวดนี้เสร็จ
+          setEntries((prev) => [...prev, ...mapped]);
 
-    // บันทึกอัตโนมัติทันที — เฉพาะรายการใหม่ที่ไม่ซ้ำ
-    const toSave = mapped.filter((e) => e.checked && e.title && !e.alreadyExists);
-    if (toSave.length > 0) {
-      saveMutation.mutate(toSave);
-    } else {
-      setStep("review");
-      toast.info("ไม่มีรายการใหม่ให้บันทึก (ทั้งหมดมีอยู่แล้ว)");
-    }
+          // auto-save เฉพาะรายการใหม่ของหมวดนี้
+          const toSave = mapped.filter((e) => !e.alreadyExists && e.title);
+          for (const e of toSave) {
+            await persistEntry(e);
+            totalSaved++;
+            setEntries((prev) => prev.map((x) =>
+              x.category === e.category && x.title === e.title ? { ...x, saved: true } : x
+            ));
+          }
+          setProgress((p) => ({ ...p, [category]: "done" }));
+        } catch (err) {
+          anyError = true;
+          setProgress((p) => ({ ...p, [category]: "error" }));
+        }
+      })
+    );
+
+    queryClient.invalidateQueries({ queryKey: ["worldEntries", novelId] });
+    queryClient.invalidateQueries({ queryKey: ["plotEvents", novelId] });
+    setSavedCount(totalSaved);
+    setStep("review");
+    if (totalSaved > 0) toast.success(`สร้างและบันทึกแล้ว ${totalSaved} รายการ`);
+    else if (anyError) setError("บางหมวดสร้างไม่สำเร็จ — กด \"สร้างใหม่\" เพื่อลองอีกครั้ง");
+    else toast.info("ไม่มีรายการใหม่ให้บันทึก (ทั้งหมดมีอยู่แล้ว)");
   };
 
   const updateEntry = (idx, field, value) => {
@@ -226,9 +171,15 @@ export default function AiWorldBuilderDialog({ open, onClose, novel, novelId }) 
   };
 
   const handleSave = () => {
-    const toSave = entries.filter((e) => e.checked && e.title);
+    const toSave = entries.filter((e) => e.checked && e.title && !e.saved && !e.alreadyExists);
     if (toSave.length === 0) return;
-    saveMutation.mutate(toSave);
+    saveMutation.mutate(toSave, {
+      onSuccess: () => {
+        setEntries((prev) => prev.map((e) =>
+          toSave.includes(e) ? { ...e, saved: true } : e
+        ));
+      },
+    });
   };
 
   const handleClose = () => {
@@ -237,7 +188,10 @@ export default function AiWorldBuilderDialog({ open, onClose, novel, novelId }) 
     setEntries([]);
     setError("");
     setSavedCount(0);
+    setProgress({});
   };
+
+  const doneCount = Object.values(progress).filter((s) => s === "done").length;
 
   const selectedCount = entries.filter((e) => e.checked).length;
 
@@ -277,29 +231,43 @@ export default function AiWorldBuilderDialog({ open, onClose, novel, novelId }) 
           )}
 
           {step === "generating" && (
-            <div className="py-12 flex flex-col items-center gap-4 px-8">
-              <Loader2 className="w-8 h-8 animate-spin text-primary" />
-              <div className="w-full max-w-sm">
-                <AiProgressBar active={true} label="กำลังสร้างโลก/ฉาก..." expectedMs={25000} />
+            <div className="py-4 space-y-4">
+              {/* checklist ความคืบหน้าจริงต่อหมวด */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between px-1">
+                  <p className="text-sm font-medium">กำลังสร้างทีละหมวด (ขนานกัน)</p>
+                  <span className="text-xs text-muted-foreground">{doneCount}/{CATEGORIES.length} เสร็จ</span>
+                </div>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {CATEGORIES.map((c) => {
+                    const s = progress[c] || "pending";
+                    return (
+                      <div key={c} className="flex items-center gap-2 text-xs px-2.5 py-1.5 rounded-md bg-muted/40 border border-border/40">
+                        {s === "done" ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                          : s === "running" ? <Loader2 className="w-3.5 h-3.5 animate-spin text-primary shrink-0" />
+                          : s === "error" ? <AlertCircle className="w-3.5 h-3.5 text-destructive shrink-0" />
+                          : <div className="w-3.5 h-3.5 rounded-full border border-muted-foreground/30 shrink-0" />}
+                        <span className={s === "pending" ? "text-muted-foreground/60" : ""}>{c}</span>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-              <p className="text-xs text-muted-foreground/60">อาจใช้เวลา 15-30 วินาที</p>
-            </div>
-          )}
 
-          {step === "saving" && (
-            <div className="py-12 flex flex-col items-center gap-4 px-8">
-              <Loader2 className="w-8 h-8 animate-spin text-primary" />
-              <div className="w-full max-w-sm">
-                <AiProgressBar active={true} label="กำลังบันทึกลงฐานข้อมูล..." expectedMs={8000} />
-              </div>
-            </div>
-          )}
-
-          {step === "done" && (
-            <div className="py-12 flex flex-col items-center gap-4">
-              <CheckCircle2 className="w-10 h-10 text-emerald-500" />
-              <p className="text-sm font-medium">บันทึกแล้ว {savedCount} รายการ</p>
-              <p className="text-xs text-muted-foreground/60">แก้ไขเพิ่มเติมได้ในรายการโลก/ฉาก</p>
+              {/* รายการที่ทยอยสร้างเสร็จแล้ว */}
+              {entries.length > 0 && (
+                <div className="space-y-1.5 pt-1">
+                  <p className="text-xs text-muted-foreground px-1">สร้างแล้ว {entries.length} รายการ (กำลังเพิ่มต่อ...)</p>
+                  {entries.map((entry, idx) => (
+                    <div key={idx} className="flex items-center gap-2 text-xs border border-border/50 bg-muted/20 rounded-lg px-3 py-2">
+                      {entry.saved ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                        : <Loader2 className="w-3 h-3 animate-spin text-muted-foreground shrink-0" />}
+                      <span className="font-medium truncate">{entry.title}</span>
+                      <Badge variant="outline" className="text-[10px] shrink-0 ml-auto">{entry.category}</Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -315,7 +283,9 @@ export default function AiWorldBuilderDialog({ open, onClose, novel, novelId }) 
               {entries.length > 0 && (
                 <>
                   <div className="flex items-center justify-between">
-                    <p className="text-sm text-muted-foreground">เลือก {selectedCount}/{entries.length} รายการ</p>
+                    <p className="text-sm text-muted-foreground">
+                      บันทึกอัตโนมัติแล้ว {savedCount} รายการ · เลือก {selectedCount}/{entries.length}
+                    </p>
                     <div className="flex gap-2">
                       <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setEntries((p) => p.map((e) => ({ ...e, checked: !e.alreadyExists })))}>
                         เลือกทั้งหมด
@@ -344,6 +314,9 @@ export default function AiWorldBuilderDialog({ open, onClose, novel, novelId }) 
                             <Badge variant="outline" className="text-xs shrink-0">{entry.category}</Badge>
                             {entry.alreadyExists && (
                               <Badge variant="outline" className="text-xs text-amber-700 border-amber-300 bg-amber-50 shrink-0">มีอยู่แล้ว</Badge>
+                            )}
+                            {entry.saved && (
+                              <Badge variant="outline" className="text-xs text-emerald-700 border-emerald-300 bg-emerald-50 shrink-0">บันทึกแล้ว</Badge>
                             )}
                           </label>
                           <Button
@@ -393,22 +366,25 @@ export default function AiWorldBuilderDialog({ open, onClose, novel, novelId }) 
         </div>
 
         {/* Footer actions */}
-        {step === "review" && (
-          <div className="flex gap-2 pt-3 border-t shrink-0">
-            <Button variant="outline" className="gap-2 flex-1" onClick={() => { setStep("idle"); setEntries([]); setError(""); }}>
-              <RefreshCw className="w-3.5 h-3.5" />
-              สร้างใหม่
-            </Button>
-            <Button
-              className="gap-2 flex-1"
-              onClick={handleSave}
-              disabled={saveMutation.isPending || selectedCount === 0}
-            >
-              {saveMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Globe className="w-4 h-4" />}
-              บันทึก {selectedCount} รายการ
-            </Button>
-          </div>
-        )}
+        {step === "review" && (() => {
+          const unsavedSelected = entries.filter((e) => e.checked && e.title && !e.saved && !e.alreadyExists).length;
+          return (
+            <div className="flex gap-2 pt-3 border-t shrink-0">
+              <Button variant="outline" className="gap-2 flex-1" onClick={() => { setStep("idle"); setEntries([]); setError(""); setSavedCount(0); }}>
+                <RefreshCw className="w-3.5 h-3.5" />
+                สร้างใหม่
+              </Button>
+              <Button
+                className="gap-2 flex-1"
+                onClick={handleSave}
+                disabled={saveMutation.isPending || unsavedSelected === 0}
+              >
+                {saveMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Globe className="w-4 h-4" />}
+                {unsavedSelected > 0 ? `บันทึกเพิ่ม ${unsavedSelected} รายการ` : "บันทึกครบแล้ว"}
+              </Button>
+            </div>
+          );
+        })()}
       </DialogContent>
     </Dialog>
   );
