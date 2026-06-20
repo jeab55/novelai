@@ -248,12 +248,12 @@ export default function WorldBible({ novelId, onNavigateToTimeline, novel }) {
        )}
 
       {/* Header */}
-      <div className="flex items-center justify-between mb-5">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
         <div>
           <h2 className="font-heading text-lg font-semibold">โลกและฉาก</h2>
           <p className="text-sm text-muted-foreground">{entries.length} รายการ</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
            <Button size="sm" variant="outline" className="gap-1.5 text-emerald-700 border-emerald-300 hover:bg-emerald-50"
              onClick={() => setWorldBuilderOpen(true)}>
              <Sparkles className="w-3.5 h-3.5" />

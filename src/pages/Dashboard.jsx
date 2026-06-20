@@ -67,7 +67,7 @@ export default function Dashboard() {
     queryFn: () => base44.entities.Series.list(),
   });
 
-  const { data: allNovels = [] } = useQuery({
+  const { data: allNovels = [], isLoading: isLoadingNovels } = useQuery({
     queryKey: ["novels-all", user?.id],
     queryFn: async () => {
       const all = await base44.entities.Novel.list("-created_date");
@@ -335,7 +335,26 @@ export default function Dashboard() {
             </p>
           </div>
 
-          {novels.length === 0 ? (
+          {isLoadingNovels ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="bg-card border border-border/60 rounded-3xl overflow-hidden h-56 flex flex-col">
+                  <div className="h-1.5 w-full bg-muted" />
+                  <div className="p-5 flex flex-col flex-1 gap-3 animate-pulse">
+                    <div className="h-5 w-20 bg-muted rounded-full" />
+                    <div className="h-6 w-3/4 bg-muted rounded" />
+                    <div className="h-3 w-1/2 bg-muted rounded" />
+                    <div className="h-3 w-full bg-muted rounded mt-1" />
+                    <div className="h-3 w-5/6 bg-muted rounded" />
+                    <div className="mt-auto pt-4 border-t border-border/40 flex justify-between">
+                      <div className="h-5 w-16 bg-muted rounded-full" />
+                      <div className="h-5 w-20 bg-muted rounded-full" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : novels.length === 0 ? (
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center py-24">
               <div className="w-28 h-28 rounded-[2rem] bg-gradient-to-br from-amber-200/70 to-orange-200/50 flex items-center justify-center mx-auto mb-6 shadow-inner text-6xl">
                 🐱

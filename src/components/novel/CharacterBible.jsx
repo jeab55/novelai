@@ -67,12 +67,12 @@ export default function CharacterBible({ novelId, novel }) {
           onRestored={() => queryClient.invalidateQueries({ queryKey: ["characters", novelId] })}
         />
       )}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div>
           <h2 className="font-heading text-lg font-semibold">คลังตัวละคร</h2>
           <p className="text-sm text-muted-foreground">{characters.length} ตัวละคร</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <CharacterRelationshipMap novelId={novelId} />
           <Dialog open={dialogOpen} onOpenChange={(v) => { setDialogOpen(v); if (!v) setEditing(null); }}>
             <DialogTrigger asChild>

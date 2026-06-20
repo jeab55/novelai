@@ -69,11 +69,11 @@ export default function SavedTranslationsLibrary({ enabled, novels = [] }) {
                 </div>
               </div>
             </div>
-            <div className="flex gap-2 mt-3">
-              <Button variant="outline" size="sm" className="flex-1 h-8 text-xs gap-1.5" onClick={() => setDetailProject(p)}>
+            <div className="flex flex-wrap gap-2 mt-3">
+              <Button variant="outline" size="sm" className="flex-1 min-w-[5rem] h-8 text-xs gap-1.5" onClick={() => setDetailProject(p)}>
                 <Eye className="w-3.5 h-3.5" />ดู
               </Button>
-              <Button variant="outline" size="sm" className="flex-1 h-8 text-xs gap-1.5" onClick={() => setCreateProject(p)}>
+              <Button variant="outline" size="sm" className="flex-1 min-w-[8rem] h-8 text-xs gap-1.5" onClick={() => setCreateProject(p)}>
                 <BookPlus className="w-3.5 h-3.5" />สร้างนิยายต่อ
               </Button>
               <Button
