@@ -132,31 +132,31 @@ export default function ReaderDialog({ chapters, initialIndex = 0, onClose, nove
       >
         {/* Top bar */}
         <div
-          className="flex items-center justify-between px-5 py-3 shrink-0 border-b"
+          className="flex items-center justify-between gap-2 px-3 sm:px-5 py-3 shrink-0 border-b"
           style={{ backgroundColor: theme.panel, borderColor: theme.border }}
         >
           {/* Prev / chapter info */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5 sm:gap-3 min-w-0 flex-1">
             <button
               onClick={goPrev}
               disabled={idx === 0}
-              className="p-1.5 rounded-lg transition-opacity disabled:opacity-30"
+              className="p-1.5 rounded-lg transition-opacity disabled:opacity-30 shrink-0"
               style={{ color: theme.text }}
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
-            <div>
+            <div className="min-w-0 flex-1">
               <p className="text-xs font-semibold leading-tight" style={{ color: theme.text }}>
                 ตอนที่ {chapter.order || idx + 1} / {chapters.length}
               </p>
-              <p className="text-xs opacity-60 truncate max-w-[180px]" style={{ color: theme.text }}>
+              <p className="text-xs opacity-60 truncate" style={{ color: theme.text }}>
                 {chapter.title}
               </p>
             </div>
             <button
               onClick={goNext}
               disabled={idx === chapters.length - 1}
-              className="p-1.5 rounded-lg transition-opacity disabled:opacity-30"
+              className="p-1.5 rounded-lg transition-opacity disabled:opacity-30 shrink-0"
               style={{ color: theme.text }}
             >
               <ChevronRight className="w-4 h-4" />
@@ -164,14 +164,14 @@ export default function ReaderDialog({ chapters, initialIndex = 0, onClose, nove
           </div>
 
           {/* Stats + controls */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
             {!isEditing ? (
               <>
-                <span className="flex items-center gap-1 text-xs opacity-60" style={{ color: theme.text }}>
+                <span className="hidden sm:flex items-center gap-1 text-xs opacity-60" style={{ color: theme.text }}>
                   <BookMarked className="w-3 h-3" />
                   {words.toLocaleString()} คำ
                 </span>
-                <span className="flex items-center gap-1 text-xs opacity-60" style={{ color: theme.text }}>
+                <span className="hidden sm:flex items-center gap-1 text-xs opacity-60" style={{ color: theme.text }}>
                   <Clock className="w-3 h-3" />
                   ~{minutes} นาที
                 </span>
