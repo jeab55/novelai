@@ -15,9 +15,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Loader2, Sparkles, Plus, Trash2, FileText, RefreshCw } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { invokeAIStable } from "@/lib/aiInvoke";
 import { toast } from "sonner";
-import AiProgressBar from "@/components/novel/AiProgressBar";
+import { generateChapterOutlineProgressive } from "@/lib/chapterOutlineProgressive";
 
 export default function AiChapterGeneratorDialog({ open, onClose, novel, novelId }) {
   const queryClient = useQueryClient();
@@ -25,6 +24,7 @@ export default function AiChapterGeneratorDialog({ open, onClose, novel, novelId
   const [chapters, setChapters] = useState([]);
   const [replaceConfirm, setReplaceConfirm] = useState(false);
   const [selectedPlotEvents, setSelectedPlotEvents] = useState([]);
+  const [genProgress, setGenProgress] = useState({ done: 0, total: 0 });
 
   const { data: writer } = useQuery({
     queryKey: ["writers-all"],
@@ -57,59 +57,54 @@ export default function AiChapterGeneratorDialog({ open, onClose, novel, novelId
       setStep("error");
       return;
     }
+    const targetChapters = novel.target_chapters || 10;
+    setChapters([]);
+    setGenProgress({ done: 0, total: targetChapters });
     setStep("generating");
 
-    const targetChapters = novel.target_chapters || 10;
-    const plotOutline = novel.plot_outline || "";
-    
-    const eventsContext = plotEvents.length > 0 
-      ? `เหตุการณ์ไทม์ไลน์ที่มี:\n${plotEvents.map((e, i) => `${i + 1}. ${e.title} - ${e.description || ""}`).join("\n")}`
-      : "ยังไม่มีเหตุการณ์ไทม์ไลน์";
-
-    const writerCtx = writer?.system_prompt ? `[สไตล์การเขียน]\n${writer.system_prompt}\n\n` : "";
-
-    const prompt = `${writerCtx}คุณคือผู้ช่วยแต่งนิยาย ช่วยสร้างโครงตอนย่อยจากโครงเรื่องหลัก
-
-ข้อมูลนิยาย:
-- ชื่อ: ${novel.title}
-- แนว: ${novel.genre}
-- เรื่องย่อ: ${novel.synopsis || "ไม่มี"}
-- จำนวนตอนที่ต้องการ: ${targetChapters} ตอน
-- โครงเรื่อง 3 องก์: ${plotOutline || "ไม่มี"}
-
-${eventsContext}
-
-จงสร้างโครงตอนย่อย ${targetChapters} ตอน โดยแต่ละตอนต้องมี:
-- order: ลำดับตอน (1-${targetChapters})
-- title: ชื่อตอน
-- content: โครงย่อของตอน (3-5 บรรทัด) ระบุว่าเกิดอะไรขึ้น ใครทำอะไร มีปมอะไร
-- plot_event_id: (ถ้ามี) ID ของเหตุการณ์ไทม์ไลน์ที่ตอนนี้อ้างอิง
-- plot_event_title: (ถ้ามี) ชื่อเหตุการณ์ไทม์ไลน์
-- act: องก์ที่สังกัด (1, 2, หรือ 3)
-
-ตอบด้วย JSON โครงสร้างนี้เท่านั้น:
-{"chapters":[{"order":1,"title":"ชื่อตอน","content":"โครงย่อ","act":1,"plot_event_id":"...","plot_event_title":"..."}]}
-
-ตอบเป็นภาษาไทย JSON ล้วนเท่านั้น`;
+    // ผูก plot_event_id กลับจากชื่อเหตุการณ์ (helper รับเฉพาะชื่อ)
+    const eventByTitle = new Map(plotEvents.map((e) => [e.title, e]));
 
     try {
-      const raw = await invokeAIStable(
-        { prompt, model: "claude_sonnet_4_6" },
+      await generateChapterOutlineProgressive(
+        { novel, writer, plotEvents, totalChapters: targetChapters, batchSize: 5 },
+        {
+          onBatch: (batch) => {
+            // ทยอยแสดงแต่ละ batch ทันทีที่เสร็จ + อัปเดต progress จริง
+            setChapters((prev) => {
+              const merged = [...prev];
+              batch.forEach((c) => {
+                const ev = c.plot_event_title ? eventByTitle.get(c.plot_event_title) : null;
+                merged.push({
+                  order: c.order,
+                  title: c.title,
+                  content: c.content,
+                  act: c.act,
+                  plot_event_id: ev?.id || null,
+                  plot_event_title: c.plot_event_title || null,
+                });
+              });
+              const deduped = Array.from(new Map(merged.map((c) => [c.order, c])).values())
+                .sort((a, b) => a.order - b.order);
+              setGenProgress({ done: deduped.length, total: targetChapters });
+              return deduped;
+            });
+          },
+          onError: (order, msg) => toast.error(`ช่วงตอนที่ ${order}+ สร้างไม่สำเร็จ: ${msg}`),
+        },
         { onRetry: ({ attempt, maxAttempts }) => toast.info(`AI ไม่ตอบสนอง กำลังลองใหม่ (${attempt}/${maxAttempts - 1})...`) }
       );
-      const parsed = JSON.parse(raw);
 
-      const chaptersRaw = parsed.chapters || parsed.items || [];
-      setChapters(chaptersRaw.map((c, i) => ({
-        order: c.order ?? i + 1,
-        title: c.title || `ตอนที่ ${i + 1}`,
-        content: c.content || c.description || "",
-        act: c.act || 1,
-        plot_event_id: c.plot_event_id || null,
-        plot_event_title: c.plot_event_title || null,
-      })));
-      setStep("review");
-      toast.success("สร้างโครงตอนสำเร็จแล้ว");
+      setChapters((prev) => {
+        if (prev.length === 0) {
+          setStep("error");
+          toast.error("สร้างโครงตอนไม่สำเร็จ");
+          return prev;
+        }
+        setStep("review");
+        toast.success(`สร้างโครงตอนสำเร็จ ${prev.length} ตอน`);
+        return prev;
+      });
     } catch (err) {
       console.error("Generate chapters error:", err);
       setStep("error");
@@ -234,12 +229,38 @@ ${eventsContext}
           )}
 
           {step === "generating" && (
-            <div className="py-12 flex flex-col items-center gap-4 px-8">
-              <Loader2 className="w-8 h-8 animate-spin text-primary" />
-              <div className="w-full max-w-sm">
-                <AiProgressBar active={true} label="AI กำลังสร้างโครงตอน..." expectedMs={35000} />
+            <div className="py-4 space-y-4">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="font-medium flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                    กำลังสร้างโครงตอน...
+                  </span>
+                  <span className="text-muted-foreground font-medium">{genProgress.done} / {genProgress.total} ตอน</span>
+                </div>
+                <div className="w-full bg-muted rounded-full h-2.5 overflow-hidden">
+                  <div
+                    className="bg-primary h-2.5 rounded-full transition-all duration-300"
+                    style={{ width: `${genProgress.total > 0 ? Math.round((genProgress.done / genProgress.total) * 100) : 0}%` }}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">ทยอยแสดงโครงแต่ละตอนทันทีที่สร้างเสร็จ</p>
               </div>
-              <p className="text-xs text-muted-foreground/60">อาจใช้เวลา 20-40 วินาที</p>
+
+              {chapters.length > 0 && (
+                <div className="space-y-2 max-h-[45vh] overflow-y-auto pr-1">
+                  {chapters.map((ch, idx) => (
+                    <div key={idx} className="border border-border/50 rounded-lg p-3 bg-muted/20 animate-in fade-in slide-in-from-bottom-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xs font-mono text-muted-foreground w-6 shrink-0">#{ch.order}</span>
+                        <span className="text-sm font-semibold flex-1">{ch.title}</span>
+                        <span className="text-[10px] text-muted-foreground shrink-0">{getActLabel(ch.act)}</span>
+                      </div>
+                      {ch.content && <p className="text-xs text-muted-foreground line-clamp-2 pl-8">{ch.content}</p>}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 

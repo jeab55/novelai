@@ -9,7 +9,6 @@ import { toast } from "sonner";
 import { useBulkWrite } from "@/lib/BulkWriteContext";
 import { invokeAIStable } from "@/lib/aiInvoke";
 import { enforceWordRange, buildWordCountInstruction, getWordRange, countThaiWords as countWords } from "@/lib/wordCountControl";
-import AiProgressBar from "@/components/novel/AiProgressBar";
 
 const DEFAULT_WRITER_PROMPT = `คุณคือนักเขียนนิยายภาษาไทยมืออาชีพที่กำลังร่างตอนใหม่ให้ผู้เขียน
 คุณต้องร่างเนื้อหาตอนที่สมบูรณ์ตามโครงที่ได้รับ รักษาสำนวนและโทนของเรื่อง ใช้ภาษาไทยที่อ่านลื่น`;
@@ -319,7 +318,10 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
           const half = Math.round(wordTarget / 2);
           setCurrentMsg(`✍️ ร่างครึ่งแรกของตอนที่ ${i} (~${half} คำ)...`);
           const firstHalf = await invokeLLMWithTimeout(`${taskPrompt}\n\n[หมายเหตุ] เขียน "ครึ่งแรก" ประมาณ ${half} คำ เปิดเรื่องและดำเนินไปจนถึงกลางตอน อย่าเพิ่งจบ`);
-          setCurrentMsg(`✍️ ร่างครึ่งหลังของตอนที่ ${i} (~${half} คำ)...`);
+          // อัปเดตจำนวนคำสะสมหลังครึ่งแรกเสร็จ — progress จริง
+          const firstWords = countThaiWords(firstHalf || "");
+          setLog((l) => l.map((e) => e.order === i ? { ...e, partialWords: firstWords } : e));
+          setCurrentMsg(`✍️ ตอนที่ ${i}: ครึ่งแรกเสร็จ (${firstWords.toLocaleString()} คำ) — ร่างครึ่งหลัง...`);
           const secondPrompt = `${sysPrompt}\n\n[โจทย์ — เขียนครึ่งหลังต่อจากครึ่งแรก]\nชื่อตอน: "${chapterTitle}"\n\n[ครึ่งแรกที่เขียนไปแล้ว]\n${(firstHalf || "").substring(0, 3000)}${(firstHalf || "").length > 3000 ? "\n…(ต่อ)" : ""}\n\nเขียน "ครึ่งหลัง" ต่อจากครึ่งแรกให้ลื่นไหล ประมาณ ${half} คำ พาเรื่องไปสู่จุดพีคและจบตอน อย่าเขียนซ้ำครึ่งแรก:`;
           const secondHalf = await invokeLLMWithTimeout(secondPrompt);
           text = `${firstHalf || ""}\n\n${secondHalf || ""}`.trim();
@@ -863,18 +865,13 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
                 </span>
                 <span>{progressPct}%</span>
               </div>
-              {currentMsg && (
-                <p className="text-xs text-muted-foreground leading-relaxed animate-pulse">{currentMsg}</p>
-              )}
-              {/* โปรเกรสบาร์ย่อยสำหรับตอนที่ AI กำลังร่างอยู่ตอนนี้ */}
+              {/* สถานะรายตอนแบบเรียลไทม์ (ของจริง — สะท้อนขั้นที่ AI กำลังทำอยู่จริง) */}
               {step === "running" && (
-                <div className="pt-1">
-                  <AiProgressBar
-                    key={progress.current}
-                    active={true}
-                    label={`AI กำลังร่างตอนที่ ${progress.current}/${progress.total}...`}
-                    expectedMs={wordTarget >= 3000 ? 90000 : 55000}
-                  />
+                <div className="pt-1 flex items-center gap-2 rounded-lg bg-primary/5 border border-primary/15 px-3 py-2">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-primary shrink-0" />
+                  <p className="text-xs text-primary/90 leading-relaxed flex-1">
+                    {currentMsg || `กำลังเขียนตอน ${progress.current}/${progress.total}...`}
+                  </p>
                 </div>
               )}
             </div>
@@ -930,7 +927,9 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
                           <span className="text-amber-600 dark:text-amber-400 font-medium">-{creditPerChapter} เครดิต</span>
                         </>
                       ) : entry.status === "skip" ? "มีแล้ว"
-                        : entry.status === "generating" ? "กำลังสร้าง..."
+                        : entry.status === "generating" ? (
+                          entry.partialWords ? `${entry.partialWords.toLocaleString()} คำ (กำลังเขียนต่อ...)` : "กำลังสร้าง..."
+                        )
                         : entry.status === "error" ? (
                           <span className="text-destructive">{entry.errorMsg || "ล้มเหลว"}</span>
                         ) : ""}
