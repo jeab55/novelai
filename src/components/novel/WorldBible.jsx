@@ -18,6 +18,8 @@ import {
 } from "lucide-react";
 import VersionHistoryDialog from "./VersionHistoryDialog";
 import { saveVersion } from "@/lib/saveVersion";
+import { useAutosave } from "@/lib/useAutosave";
+import AutosaveStatus from "./AutosaveStatus";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { ERA_TEMPLATES } from "./EraTemplates";
@@ -154,6 +156,17 @@ export default function WorldBible({ novelId, onNavigateToTimeline, novel }) {
     setForm({ title: entry.title, category: entry.category || "", description: entry.description || "" });
     setDialogOpen(true);
   };
+
+  // Autosave เฉพาะตอนแก้ไขข้อมูลโลก/ฉากที่มีอยู่ และต้องมีชื่อ
+  const autosave = useAutosave({
+    data: form,
+    enabled: dialogOpen && !!editing && !!form.title,
+    onSave: async (data) => {
+      if (!editing) return;
+      await base44.entities.WorldEntry.update(editing.id, data);
+      queryClient.invalidateQueries({ queryKey: ["worldEntries", novelId] });
+    },
+  });
 
   const filtered = entries
     .filter((e) => filterCat === "ทั้งหมด" || e.category === filterCat)
@@ -298,6 +311,11 @@ export default function WorldBible({ novelId, onNavigateToTimeline, novel }) {
                   <label className="text-sm font-medium mb-1.5 block">รายละเอียด</label>
                   <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={5} placeholder="อธิบายรายละเอียด..." />
                 </div>
+                {editing && (
+                  <div className="flex justify-end -mb-1">
+                    <AutosaveStatus status={autosave.status} lastSavedAt={autosave.lastSavedAt} onRetry={autosave.retry} />
+                  </div>
+                )}
                 <Button className="w-full" onClick={() => saveMutation.mutate(form)} disabled={!form.title || saveMutation.isPending}>
                   {saveMutation.isPending ? "กำลังบันทึก..." : editing ? "อัปเดต" : "เพิ่ม"}
                 </Button>

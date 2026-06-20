@@ -17,6 +17,8 @@ import StoryboardDialog from "@/components/novel/StoryboardDialog";
 import ShareNovelDialog from "@/components/novel/ShareNovelDialog";
 import BlurbPicker from "@/components/novel/BlurbPicker";
 import { useBlurbDrafter } from "@/hooks/useBlurbDrafter";
+import { useAutosave } from "@/lib/useAutosave";
+import AutosaveStatus from "@/components/novel/AutosaveStatus";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { useAuth } from "@/lib/AuthContext";
@@ -151,6 +153,16 @@ export default function Dashboard() {
     return activeWriters.find((w) => w.id === writerId)?.name || null;
   };
 
+  // Autosave ฟอร์มแก้ไขข้อมูลเรื่อง (เฉพาะตอนเปิด dialog และมีชื่อเรื่อง)
+  const editAutosave = useAutosave({
+    data: editForm,
+    enabled: editOpen && !!editingId && !!editForm.title?.trim(),
+    onSave: async (data) => {
+      await base44.entities.Novel.update(editingId, data);
+      queryClient.invalidateQueries({ queryKey: ["novels-all", user?.id] });
+    },
+  });
+
   return (
     <>
       <DeleteNovelDialog
@@ -266,7 +278,10 @@ export default function Dashboard() {
               </Select>
             </div>
           </div>
-          <div className="px-6 py-4 border-t border-border/40 shrink-0 bg-background">
+          <div className="px-6 py-4 border-t border-border/40 shrink-0 bg-background space-y-2">
+            <div className="flex justify-end">
+              <AutosaveStatus status={editAutosave.status} lastSavedAt={editAutosave.lastSavedAt} onRetry={editAutosave.retry} />
+            </div>
             <Button
               className="w-full"
               onClick={() => updateMutation.mutate({ id: editingId, data: editForm })}

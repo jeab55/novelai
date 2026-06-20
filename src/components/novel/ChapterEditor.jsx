@@ -21,10 +21,11 @@ import RewritePolishPanel from "./RewritePolishPanel";
 import PovSwitchPanel from "./PovSwitchPanel";
 import WritersBlockPanel from "./WritersBlockPanel";
 import { saveVersion } from "@/lib/saveVersion";
+import { useAutosave } from "@/lib/useAutosave";
+import AutosaveStatus from "./AutosaveStatus";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { debounce } from "lodash";
 import { downloadChapterTxt, downloadChapterMd, copyChapterToClipboard } from "@/utils/exportChapter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
@@ -81,8 +82,6 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
   const [editorReview, setEditorReview] = useState(safeChapter.editorReview);
   const [balanceOpen, setBalanceOpen] = useState(false);
   const [templateOpen, setTemplateOpen] = useState(false);
-  const [autoSaveStatus, setAutoSaveStatus] = useState("saved"); // "saving" | "saved"
-  const [lastSavedAt, setLastSavedAt] = useState(null);
   const [fontSize, setFontSize] = useState(19);
   const [contentWidth, setContentWidth] = useState(720);
   // inline diff state — set เมื่อ ReaderReviewRevisionPanel ได้รับผลจาก AI
@@ -158,8 +157,6 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
       queryClient.invalidateQueries({ queryKey: ["chapters", novelId] });
       toast.success("บันทึกแล้ว");
       setSaving(false);
-      setAutoSaveStatus("saved");
-      setLastSavedAt(new Date());
     },
     onError: () => setSaving(false),
   });
@@ -249,51 +246,42 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
     toast.success("ปลดการผูกแล้ว");
   };
 
-  // เก็บค่าล่าสุดไว้ใน ref เพื่อให้ debounce บันทึกค่าปัจจุบันเสมอ (กัน stale closure)
+  // เก็บค่าล่าสุดไว้ใน ref (ใช้โดยปุ่ม/พาเนล AI ที่อัปเดต content ตรงๆ)
   const latestRef = useRef({ title, content });
   useEffect(() => {
     latestRef.current = { title, content };
   }, [title, content]);
 
-  // debounce สร้างครั้งเดียว (ref-based) — กันการ recreate ทุก render และกันบันทึกซ้ำซ้อน
-  const debouncedAutoSave = useRef(
-    debounce(() => {
-      const id = latestRef.current.id;
-      if (!id) return;
-      const { title: t, content: c } = latestRef.current;
-      base44.entities.Chapter.update(id, {
+  // Autosave: ใช้ hook กลาง — บันทึกเฉพาะเมื่อมีการเปลี่ยนแปลงจริง, debounce 2.5 วิ,
+  // มีสถานะ error + ลองใหม่ + กันงานหายก่อนปิดหน้า
+  const autosave = useAutosave({
+    data: { title, content },
+    enabled: !!safeChapter.id && !inlineDiff,
+    delay: 2500,
+    onSave: async ({ title: t, content: c }) => {
+      if (!safeChapter.id) return;
+      await base44.entities.Chapter.update(safeChapter.id, {
         title: t,
         content: c,
         word_count: countWords(c),
-      }).then(() => {
-        setAutoSaveStatus("saved");
-        setLastSavedAt(new Date());
-      }).catch((err) => {
-        console.error("Auto-save failed:", err);
-        setAutoSaveStatus("saved");
       });
-    }, 2500)
-  ).current;
+    },
+  });
 
-  // sync id เข้า ref ด้วย
-  useEffect(() => {
-    latestRef.current.id = safeChapter.id;
-  }, [safeChapter.id]);
+  // คงชื่อเดิมไว้สำหรับปุ่ม/พาเนลที่เรียก triggerAutoSave() — เป็น no-op เพราะ hook
+  // ตรวจจับการเปลี่ยน data เองอยู่แล้ว
+  const triggerAutoSave = useCallback(() => {}, []);
 
-  // ยกเลิก debounce ที่ค้างเมื่อ unmount
-  useEffect(() => () => debouncedAutoSave.cancel(), [debouncedAutoSave]);
-
-  // เรียกเมื่อมีการแก้ไข — อัปเดตสถานะเป็น "กำลังบันทึก" แล้วหน่วงบันทึก
-  const triggerAutoSave = useCallback(() => {
-    if (!safeChapter.id) return;
-    setAutoSaveStatus("saving");
-    debouncedAutoSave();
-  }, [safeChapter.id, debouncedAutoSave]);
+  // flush งานค้างก่อนกดย้อนกลับ (กันงานหายเมื่อสลับตอน)
+  const handleBack = useCallback(async () => {
+    await autosave.flush();
+    onBack?.();
+  }, [autosave, onBack]);
 
   const toolbar = (
     <div className={`border-b border-border/60 px-3 sm:px-4 py-2.5 flex flex-wrap items-center gap-2 sm:gap-3 transition-all ${focusMode ? "bg-background/95 backdrop-blur-sm" : "bg-card/30"}`}>
       {!focusMode && (
-        <Button variant="ghost" size="icon" onClick={onBack} className="shrink-0">
+        <Button variant="ghost" size="icon" onClick={handleBack} className="shrink-0">
           <ArrowLeft className="w-4 h-4" />
         </Button>
       )}
@@ -315,20 +303,12 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
       </Button>
       <div className="flex flex-wrap items-center gap-2 ml-auto">
         {/* Autosave indicator */}
-        <span className={`text-xs flex items-center gap-1 tabular-nums transition-colors ${autoSaveStatus === "saving" ? "text-amber-500" : "text-emerald-600"}`}>
-          {autoSaveStatus === "saving"
-            ? <><Loader2 className="w-3 h-3 animate-spin" />กำลังบันทึก...</>
-            : <>
-                <CheckCircle2 className="w-3 h-3" />
-                บันทึกแล้ว
-                {lastSavedAt && (
-                  <span className="text-muted-foreground/70 ml-0.5">
-                    {lastSavedAt.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })} น.
-                  </span>
-                )}
-              </>
-          }
-        </span>
+        <AutosaveStatus
+          status={autosave.status}
+          lastSavedAt={autosave.lastSavedAt}
+          onRetry={autosave.retry}
+          className="tabular-nums"
+        />
         <span className="text-xs text-muted-foreground tabular-nums border-l border-border/50 pl-2">
           {wordCount.toLocaleString()} คำ
         </span>

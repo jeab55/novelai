@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { saveVersion } from "@/lib/saveVersion";
+import { useAutosave } from "@/lib/useAutosave";
+import AutosaveStatus from "./AutosaveStatus";
 import { Sparkles, Loader2, ChevronDown, ChevronUp } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 
@@ -51,6 +53,17 @@ export default function CharacterForm({ novelId, character, onDone, novelIdForVe
   });
 
   const set = (field, value) => setForm((p) => ({ ...p, [field]: value }));
+
+  // Autosave เฉพาะตอน "แก้ไข" ตัวละครที่มีอยู่แล้ว (ไม่ทำงานตอนสร้างใหม่)
+  const autosave = useAutosave({
+    data: form,
+    enabled: !!character,
+    onSave: async (data) => {
+      if (!character) return;
+      await base44.entities.Character.update(character.id, data);
+      queryClient.invalidateQueries({ queryKey: ["characters", novelId] });
+    },
+  });
 
   const handleAnalyze = async () => {
     if (!form.name) return;
@@ -179,6 +192,11 @@ ${charDesc}
           </div>
         )}
 
+        {character && (
+          <div className="flex justify-end -mb-1">
+            <AutosaveStatus status={autosave.status} lastSavedAt={autosave.lastSavedAt} onRetry={autosave.retry} />
+          </div>
+        )}
         <Button type="submit" className="w-full" disabled={!form.name || mutation.isPending}>
           {mutation.isPending ? "กำลังบันทึก..." : character ? "อัปเดต" : "เพิ่มตัวละคร"}
         </Button>

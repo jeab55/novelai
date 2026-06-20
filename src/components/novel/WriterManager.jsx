@@ -9,6 +9,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Switch } from "@/components/ui/switch";
 import { Plus, Pencil, Trash2, Loader2, Bot, ChevronDown, ChevronUp, Heart, Wand2 } from "lucide-react";
 import { toast } from "sonner";
+import { useAutosave } from "@/lib/useAutosave";
+import AutosaveStatus from "./AutosaveStatus";
 
 const EMPTY_FORM = { name: "", description: "", style: "", system_prompt: "", is_active: true };
 
@@ -78,6 +80,17 @@ export default function WriterManager() {
     setForm({ name: w.name, description: w.description || "", style: w.style || "", system_prompt: w.system_prompt || "", is_active: w.is_active !== false });
     setDialogOpen(true);
   };
+
+  // Autosave เฉพาะตอนแก้ไขนักเขียนที่มีอยู่ และต้องมีชื่อ
+  const autosave = useAutosave({
+    data: form,
+    enabled: dialogOpen && !!editing && !!form.name,
+    onSave: async (data) => {
+      if (!editing) return;
+      await base44.entities.Writer.update(editing.id, data);
+      queryClient.invalidateQueries({ queryKey: ["writers"] });
+    },
+  });
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-6">
@@ -224,8 +237,11 @@ export default function WriterManager() {
               <label className="text-sm">เปิดใช้งาน</label>
             </div>
           </div>
-          <div className="px-6 py-4 border-t border-border/60 shrink-0 flex justify-between gap-2">
-            <Button variant="ghost" onClick={() => setDialogOpen(false)}>ยกเลิก</Button>
+          <div className="px-6 py-4 border-t border-border/60 shrink-0 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-3">
+              <Button variant="ghost" onClick={() => setDialogOpen(false)}>ยกเลิก</Button>
+              {editing && <AutosaveStatus status={autosave.status} lastSavedAt={autosave.lastSavedAt} onRetry={autosave.retry} />}
+            </div>
             <Button onClick={() => upsert.mutate(form)} disabled={!form.name || upsert.isPending}>
               {upsert.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin mr-2" />}
               {editing ? "บันทึกการเปลี่ยนแปลง" : "เพิ่มนักเขียน"}
