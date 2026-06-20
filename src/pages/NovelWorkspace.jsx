@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Feather, PenTool, Users, Globe, Clock, Bot, Trash2, Share2, History, CheckCircle2, BookOpen, Brain, ShieldCheck, UserCog } from "lucide-react";
+import { ArrowLeft, Feather, PenTool, Users, Globe, Clock, Bot, Trash2, Share2, History, CheckCircle2, BookOpen, Brain, ShieldCheck, UserCog, Send } from "lucide-react";
 import VersionHistoryDialog from "@/components/novel/VersionHistoryDialog";
 import { saveVersion } from "@/lib/saveVersion";
 import { useNavigate } from "react-router-dom";
@@ -23,6 +23,7 @@ import ShortStoryWorkspace from "@/components/novel/ShortStoryWorkspace";
 import ContinuityAnalysisPanel from "@/components/novel/ContinuityAnalysisPanel";
 import ContinuityCheckPanel from "@/components/novel/ContinuityCheckPanel";
 import CharacterTimelinePanel from "@/components/novel/CharacterTimelinePanel";
+import PublishExportPanel from "@/components/novel/PublishExportPanel";
 
 export default function NovelWorkspace() {
   const novelId = window.location.pathname.split("/novel/")[1]?.split("/")[0];
@@ -300,6 +301,7 @@ export default function NovelWorkspace() {
                 { value: "analysis", icon: Brain, label: "วิเคราะห์พล็อต" },
                 { value: "continuity", icon: ShieldCheck, label: "ตรวจความต่อเนื่อง" },
                 { value: "writing", icon: PenTool, label: "ห้องเขียน" },
+                { value: "publish", icon: Send, label: "เผยแพร่/ส่งออก" },
               ].map(({ value, icon: Icon, label }) => (
                 <TabsTrigger
                   key={value}
@@ -347,6 +349,9 @@ export default function NovelWorkspace() {
           </TabsContent>
           <TabsContent value="char-timeline" className="m-0">
             <CharacterTimelinePanel novelId={activeNovelId} novel={novel} />
+          </TabsContent>
+          <TabsContent value="publish" className="m-0">
+            <PublishExportPanel novel={{ ...novel, id: activeNovelId }} />
           </TabsContent>
         </div>
       </Tabs>

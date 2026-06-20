@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { base44 } from "@/api/base44Client";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MessagesSquare, Loader2, Sparkles, Download, Copy } from "lucide-react";
+import { MessagesSquare, Loader2, Sparkles, Download, Copy, Save } from "lucide-react";
 import { toast } from "sonner";
 import { invokeAIStable } from "@/lib/aiInvoke";
 import { downloadFile } from "@/lib/storyboardExport";
@@ -16,8 +16,10 @@ export default function ChatModeDialog({ open, onClose, novels = [] }) {
   const [novelId, setNovelId] = useState("");
   const [chapterId, setChapterId] = useState("");
   const [generating, setGenerating] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [lines, setLines] = useState([]);
   const [meta, setMeta] = useState(null);
+  const queryClient = useQueryClient();
 
   // settings
   const [rightSpeaker, setRightSpeaker] = useState("");
@@ -38,6 +40,30 @@ export default function ChatModeDialog({ open, onClose, novels = [] }) {
   const selectedNovel = novels.find((n) => n.id === novelId);
   const selectedChapter = chapters.find((c) => c.id === chapterId);
 
+  // โหลดเวอร์ชันแชตที่บันทึกไว้ของตอนนี้ (ถ้ามี)
+  useEffect(() => {
+    if (!selectedChapter) { setLines([]); setMeta(null); return; }
+    if (selectedChapter.chat_version) {
+      try {
+        const saved = JSON.parse(selectedChapter.chat_version);
+        const list = Array.isArray(saved?.lines) ? saved.lines : [];
+        if (list.length > 0) {
+          setLines(list);
+          setMeta({ title: selectedChapter.title, novel: selectedNovel?.title });
+          if (saved.settings) {
+            setRightSpeaker(saved.settings.rightSpeaker || "");
+            setShowNarration(saved.settings.showNarration ?? true);
+            setRightColor(saved.settings.rightColor || "primary");
+            setLeftColor(saved.settings.leftColor || "card");
+            setNameMap(saved.settings.nameMap || {});
+          }
+          return;
+        }
+      } catch { /* ignore parse error */ }
+    }
+    setLines([]); setMeta(null);
+  }, [chapterId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // รายชื่อตัวละคร (ผู้พูดที่ไม่ใช่บรรยาย) เรียงตามความถี่
   const speakers = useMemo(() => {
     const counts = {};
@@ -45,13 +71,13 @@ export default function ChatModeDialog({ open, onClose, novels = [] }) {
     return Object.entries(counts).sort((a, b) => b[1] - a[1]).map(([s]) => s);
   }, [lines]);
 
-  // ตั้งค่าเริ่มต้นเมื่อได้ผลลัพธ์ใหม่: ฝั่งขวา = ตัวละครที่พูดมากสุด
+  // ตั้งค่าเริ่มต้นเมื่อได้ผลลัพธ์ใหม่: ฝั่งขวา = ตัวละครที่พูดมากสุด (เฉพาะเมื่อยังไม่ได้ตั้งค่า)
   useEffect(() => {
-    if (speakers.length > 0) {
+    if (speakers.length > 0 && !rightSpeaker) {
       setRightSpeaker(speakers[0]);
-      setNameMap(Object.fromEntries(speakers.map((s) => [s, s])));
+      setNameMap((m) => Object.keys(m).length ? m : Object.fromEntries(speakers.map((s) => [s, s])));
     }
-  }, [speakers]);
+  }, [speakers]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const displayName = (s) => nameMap[s] || s;
 
@@ -72,7 +98,7 @@ export default function ChatModeDialog({ open, onClose, novels = [] }) {
     if (!text) { toast.error("ตอนนี้ยังไม่มีเนื้อหา"); return; }
 
     setGenerating(true);
-    setLines([]);
+    setLines([]); setRightSpeaker(""); setNameMap({});
     try {
       const prompt = `คุณคือบรรณาธิการนิยายแชต (จอยลดา) จงแปลงเนื้อหาตอนนิยายต่อไปนี้ให้เป็น "รูปแบบบทสนทนาแชต" สำหรับลงจอยลดา
 
@@ -119,6 +145,25 @@ ${text.slice(0, 14000)}
       toast.error("แปลงไม่สำเร็จ: " + (e.message || ""));
     } finally {
       setGenerating(false);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!chapterId || lines.length === 0) return;
+    setSaving(true);
+    try {
+      const payload = {
+        lines,
+        settings: { rightSpeaker, showNarration, rightColor, leftColor, nameMap },
+        saved_at: new Date().toISOString(),
+      };
+      await base44.entities.Chapter.update(chapterId, { chat_version: JSON.stringify(payload) });
+      await queryClient.invalidateQueries({ queryKey: ["chapters-for-chatmode", novelId] });
+      toast.success("บันทึกเวอร์ชันแชตลงตอนแล้ว");
+    } catch (e) {
+      toast.error("บันทึกไม่สำเร็จ: " + (e.message || ""));
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -190,6 +235,9 @@ ${text.slice(0, 14000)}
                   <div className="flex gap-2">
                     <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs" onClick={copyAll}><Copy className="w-3.5 h-3.5" />คัดลอก</Button>
                     <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs" onClick={exportText}><Download className="w-3.5 h-3.5" />Export จอยลดา</Button>
+                    <Button size="sm" className="gap-1.5 h-8 text-xs" onClick={handleSave} disabled={saving}>
+                      {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}บันทึกลงตอน
+                    </Button>
                   </div>
                 </div>
 
