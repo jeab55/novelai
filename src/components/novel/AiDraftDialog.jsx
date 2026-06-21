@@ -316,6 +316,10 @@ export default function AiDraftDialog({ open, onClose, chapter, novel, novelId, 
           writerPrompt: selectedWriter?.system_prompt || "",
         });
         text = adjusted.content;
+        // ถ้า AI ไม่ตอบในขั้นเกลาจำนวนคำ — ใช้ร่างเดิม (ไม่ทิ้งงาน) แล้วแจ้งผู้ใช้
+        if (adjusted.skipped) {
+          toast.warning("ข้ามการเกลาจำนวนคำ เพราะ AI ไม่ตอบสนอง — ใช้ร่างที่ได้มาก่อนหน้าแทน");
+        }
       }
 
       setDraft(text);
@@ -576,7 +580,7 @@ export default function AiDraftDialog({ open, onClose, chapter, novel, novelId, 
                     <AiProgressBar
                       active={loading}
                       label={LOADING_LABELS[loadingType] || "กำลังประมวลผลด้วย AI..."}
-                      expectedMs={loadingType === "saving" ? 8000 : 50000}
+                      expectedMs={loadingType === "saving" ? 8000 : loadingType === "expanding" ? 70000 : 50000}
                     />
                   </div>
                   <p className="text-xs text-muted-foreground">อาจใช้เวลา 30-60 วินาที โปรดอย่าปิดหน้าต่างนี้</p>
@@ -599,7 +603,7 @@ export default function AiDraftDialog({ open, onClose, chapter, novel, novelId, 
             <AiProgressBar
               active={loading}
               label={LOADING_LABELS[loadingType] || "กำลังประมวลผลด้วย AI..."}
-              expectedMs={loadingType === "saving" ? 8000 : 50000}
+              expectedMs={loadingType === "saving" ? 8000 : loadingType === "expanding" ? 70000 : 50000}
             />
           </div>
         )}

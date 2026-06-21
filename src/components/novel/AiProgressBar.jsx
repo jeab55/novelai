@@ -17,14 +17,15 @@ export default function AiProgressBar({ active, label = "กำลังปร�
 
   useEffect(() => {
     if (active) {
+      // รีเซ็ตทุกครั้งที่เริ่ม/เปลี่ยนสเตป (label) — ไม่ให้ค้างนิ่งที่ 95% จากสเตปก่อน
       setPercent(2);
       startRef.current = Date.now();
       if (intervalRef.current) clearInterval(intervalRef.current);
       intervalRef.current = setInterval(() => {
         const elapsed = Date.now() - startRef.current;
-        // เส้นโค้งเข้าใกล้ 95% แบบ asymptotic — ไม่ถึง 100% จนกว่างานจะเสร็จจริง
+        // เส้นโค้งเข้าใกล้ 92% แบบ asymptotic — ไม่ถึง 100% จนกว่างานจะเสร็จจริง
         const ratio = 1 - Math.exp(-elapsed / expectedMs);
-        const next = Math.min(95, Math.round(ratio * 95));
+        const next = Math.min(92, Math.round(ratio * 92));
         setPercent((p) => (next > p ? next : p));
       }, 300);
     } else {
@@ -35,7 +36,7 @@ export default function AiProgressBar({ active, label = "กำลังปร�
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [active, expectedMs]);
+  }, [active, expectedMs, label]);
 
   if (!active && percent === 0) return null;
 

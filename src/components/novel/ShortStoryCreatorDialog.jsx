@@ -214,6 +214,9 @@ ${buildWordCountInstruction(form.word_count_target)}- เขียนเรื�
       });
       content = adjusted.content;
       wordCount = adjusted.wordCount;
+      if (adjusted.skipped) {
+        toast.warning("ข้ามการเกลาจำนวนคำ เพราะ AI ไม่ตอบสนอง — ใช้ร่างที่ได้มาก่อนหน้าแทน");
+      }
     }
 
     // ─── Step 4: บันทึก Chapter ───

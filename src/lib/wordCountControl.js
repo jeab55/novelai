@@ -3,6 +3,11 @@ import { invokeAIStable } from "@/lib/aiInvoke";
 // ความคลาดเคลื่อนที่ยอมรับได้ของจำนวนคำ (บวก/ลบ)
 export const WORD_TOLERANCE = 500;
 
+// timeout สั้นสำหรับขั้น "เกลาจำนวนคำ" (ปิดท้าย) — ถ้า AI ช้าเกินนี้ให้ข้าม ไม่รอ 180 วิ
+const POLISH_TIMEOUT_MS = 75000; // 75 วินาที ต่อครั้ง
+// retry น้อยลงในขั้นปิดท้าย เพื่อไม่ให้รอนานจนเหมือนแฮงค์
+const POLISH_INVOKE_OPTS = { timeoutMs: POLISH_TIMEOUT_MS };
+
 // นับคำภาษาไทยอย่างแม่นยำด้วย Intl.Segmenter
 export function countThaiWords(text) {
   if (!text || typeof text !== "string") return 0;
@@ -36,10 +41,13 @@ export function buildWordCountInstruction(target) {
 }
 
 // ขยายเนื้อหาเมื่อสั้นกว่าช่วง
+// คืน { text, skipped } — skipped=true เมื่อ AI ไม่ตอบ/timeout ในรอบแรก (ยังไม่ขยายได้เลย)
 async function expandToRange(content, target, { context = "", writerPrompt = "", onProgress } = {}) {
   const { min, max } = getWordRange(target);
   let text = content;
-  const maxAttempts = 3;
+  const maxAttempts = 2;
+  let expandedAny = false;
+  let failedFirst = false;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     const wc = countThaiWords(text);
@@ -60,22 +68,26 @@ async function expandToRange(content, target, { context = "", writerPrompt = "",
     prompt += `[เขียนต่อจากนี้ — ประมาณ ${needed.toLocaleString()} คำ]:\n`;
 
     try {
-      const expansion = await invokeAIStable({ prompt, model: "claude_sonnet_4_6" });
-      if (!expansion || expansion.length < 50) break;
+      const expansion = await invokeAIStable({ prompt, model: "claude_sonnet_4_6" }, POLISH_INVOKE_OPTS);
+      if (!expansion || expansion.length < 50) { if (!expandedAny) failedFirst = true; break; }
       text = text + "\n\n" + expansion;
+      expandedAny = true;
     } catch {
+      if (!expandedAny) failedFirst = true;
       break;
     }
   }
-  return text;
+  // skipped = ขั้นเกลาทำอะไรไม่ได้เลย (AI ไม่ตอบตั้งแต่รอบแรก) → ปลายทางจะใช้ร่างเดิม
+  return { text, skipped: failedFirst };
 }
 
 // ย่อเนื้อหาเมื่อยาวกว่าช่วง
+// คืน { text, skipped } — skipped=true เมื่อ AI ไม่ตอบ/timeout (ใช้ร่างเดิมแทน)
 async function shrinkToRange(content, target, { writerPrompt = "", onProgress } = {}) {
   const { min, max, target: t } = getWordRange(target);
   const wc = countThaiWords(content);
   if (onProgress) onProgress({ phase: "shrink", wordCount: wc, target });
-  if (wc <= max) return content;
+  if (wc <= max) return { text: content, skipped: false };
 
   let prompt = writerPrompt ? `[บทบาทและสไตล์การเขียน]\n${writerPrompt}\n\n` : "";
   prompt += `[ย่อ/กระชับเนื้อหา]\n`;
@@ -88,32 +100,38 @@ async function shrinkToRange(content, target, { writerPrompt = "", onProgress } 
   prompt += `[เนื้อหาเดิม]\n${content}\n\n[เนื้อหาที่ย่อแล้ว]:\n`;
 
   try {
-    const shrunk = await invokeAIStable({ prompt, model: "claude_sonnet_4_6" });
-    if (shrunk && shrunk.length > 100) return shrunk;
+    const shrunk = await invokeAIStable({ prompt, model: "claude_sonnet_4_6" }, POLISH_INVOKE_OPTS);
+    if (shrunk && shrunk.length > 100) return { text: shrunk, skipped: false };
   } catch {
     // ถ้าย่อไม่สำเร็จ คืนค่าเดิม
   }
-  return content;
+  // AI ไม่ตอบ/timeout → ใช้ร่างเดิม
+  return { text: content, skipped: true };
 }
 
 /**
  * บังคับให้เนื้อหาอยู่ในช่วงเป้าหมาย ±500 คำ:
  * - สั้นกว่าช่วง → ขยาย
  * - ยาวกว่าช่วง → ย่อ
- * คืน { content, wordCount }
+ * คืน { content, wordCount, skipped } — skipped=true เมื่อ AI ไม่ตอบในขั้นเกลา (ใช้ร่างเดิมแทน)
  */
 export async function enforceWordRange(content, target, options = {}) {
   const { min, max } = getWordRange(target);
   let text = content;
   let wc = countThaiWords(text);
+  let skipped = false;
 
   if (wc < min) {
-    text = await expandToRange(text, target, options);
+    const res = await expandToRange(text, target, options);
+    text = res.text;
+    if (res.skipped) skipped = true;
     wc = countThaiWords(text);
   }
   if (wc > max) {
-    text = await shrinkToRange(text, target, options);
+    const res = await shrinkToRange(text, target, options);
+    text = res.text;
+    if (res.skipped) skipped = true;
     wc = countThaiWords(text);
   }
-  return { content: text, wordCount: wc };
+  return { content: text, wordCount: wc, skipped };
 }

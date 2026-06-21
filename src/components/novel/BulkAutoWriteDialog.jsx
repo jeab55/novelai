@@ -307,6 +307,10 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
           });
           finalContent = adjusted.content;
           finalWordCount = adjusted.wordCount;
+          // AI ไม่ตอบในขั้นเกลา — ใช้ร่างเดิม (ไม่ทิ้งงาน) แล้วแจ้งเตือน
+          if (adjusted.skipped) {
+            setCurrentMsg(`⏭️ ตอนที่ ${i}: ข้ามการเกลาจำนวนคำ (AI ไม่ตอบ) — ใช้ร่างที่ได้แทน`);
+          }
         }
 
         // บันทึกทันทีหลัง generate เสร็จแต่ละตอน
