@@ -15,6 +15,41 @@ const PLATFORMS = ["เด็กดี (Dek-D)", "ธัญวลัย (Tunwala
 
 const emptyKit = { hook: "", synopsis_short: "", synopsis_medium: "", synopsis_long: "", tags: [] };
 
+// มองทะลุ wrapper (response/output/result/data) และรองรับ JSON string
+const unwrapResult = (raw) => {
+  let cur = raw;
+  for (let i = 0; i < 5; i++) {
+    if (typeof cur === "string") {
+      const s = cur.trim().replace(/^```[\w]*\n?/m, "").replace(/\n?```$/m, "").trim();
+      try { cur = JSON.parse(s); } catch { return s; }
+    }
+    if (cur && typeof cur === "object" && !Array.isArray(cur)) {
+      const wrapKey = ["response", "output", "result", "data"].find(
+        (k) => cur[k] !== undefined && Object.keys(cur).length === 1
+      );
+      if (wrapKey) { cur = cur[wrapKey]; continue; }
+    }
+    break;
+  }
+  return cur;
+};
+
+// บีบค่าให้เป็นข้อความอ่านง่ายเสมอ (รองรับ string / {text} / array)
+const toText = (v) => {
+  if (v == null) return "";
+  if (typeof v === "string") return v;
+  if (Array.isArray(v)) return v.map(toText).filter(Boolean).join("\n\n");
+  if (typeof v === "object") return v.text || v.value || v.content || v.blurb || "";
+  return String(v);
+};
+
+// บีบ tags ให้เป็น array ของ string เสมอ
+const toTags = (v) => {
+  if (Array.isArray(v)) return v.map((t) => (typeof t === "string" ? t : t?.name || t?.text || "")).map((s) => s.replace(/^#/, "").trim()).filter(Boolean);
+  if (typeof v === "string") return v.split(/[,\n]/).map((s) => s.replace(/^#/, "").trim()).filter(Boolean);
+  return [];
+};
+
 export default function PublishKitDialog({ open, onClose, novels = [] }) {
   const [novelId, setNovelId] = useState("");
   const [platform, setPlatform] = useState(PLATFORMS[0]);
@@ -121,10 +156,22 @@ ${sample || "(ยังไม่มีเนื้อหา ใช้ข้อ�
         },
       });
 
-      const parsed = typeof result === "string" ? JSON.parse(result) : result;
-      const data = parsed?.response ?? parsed?.output ?? parsed;
-      if (!data?.synopsis_short && !data?.hook) throw new Error("ไม่สามารถสร้างชุดข้อความได้");
-      setKit({ ...emptyKit, ...data, tags: Array.isArray(data.tags) ? data.tags : [] });
+      const data = unwrapResult(result);
+      const obj = data && typeof data === "object" && !Array.isArray(data) ? data : {};
+      const kitData = {
+        hook: toText(obj.hook),
+        synopsis_short: toText(obj.synopsis_short),
+        synopsis_medium: toText(obj.synopsis_medium),
+        synopsis_long: toText(obj.synopsis_long),
+        tags: toTags(obj.tags),
+      };
+      // ถ้า parse ไม่ติดเลย ให้แสดงข้อความดิบที่อ่านได้ลงช่องเรื่องย่อยาว แทนการโชว์ JSON
+      if (!kitData.hook && !kitData.synopsis_short && !kitData.synopsis_medium && !kitData.synopsis_long) {
+        const fallback = typeof data === "string" ? data : toText(data);
+        if (!fallback) throw new Error("ไม่สามารถสร้างชุดข้อความได้");
+        kitData.synopsis_long = fallback;
+      }
+      setKit({ ...emptyKit, ...kitData });
       toast.success("สร้างชุดประกาศสำเร็จ");
     } catch (e) {
       toast.error("สร้างไม่สำเร็จ: " + (e.message || ""));
