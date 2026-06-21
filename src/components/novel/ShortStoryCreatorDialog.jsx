@@ -10,6 +10,7 @@ import { Loader2, Sparkles, BookOpen, CheckCircle2, AlertTriangle, Bot } from "l
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { enforceWordRange, buildWordCountInstruction, getWordRange } from "@/lib/wordCountControl";
+import { SHARED_CRAFT_RULES } from "@/lib/chapterContextBuilder";
 
 const GENRES = ["โรแมนติก", "แฟนตาซี", "อิงประวัติศาสตร์", "จีนย้อนยุค", "วาย", "สยองขวัญ", "ลึกลับ", "แอ็คชั่น", "ดราม่า", "อื่นๆ"];
 const ENDING_TYPES = ["จบสุข (HEA)", "จบเศร้า (HFE)", "จบเปิด (Open Ending)", "จบตามจริง"];
@@ -165,7 +166,10 @@ export default function ShortStoryCreatorDialog({ open, onOpenChange }) {
       "จบตามจริง": "จบตามความสมจริงของเรื่อง ไม่บิดเบือน",
     }[form.ending_type] || "";
 
-    const writePrompt = `${writerStyle}
+    const writePrompt = `[สไตล์นักเขียนประจำเรื่อง — แกนหลักที่ต้องยึดอย่างเคร่งครัด ใช้สำนวน น้ำเสียง โทรป และมุมมองเฉพาะตัวนี้เป็นหลักในทุกประโยค]
+${writerStyle}
+
+${SHARED_CRAFT_RULES}
 
 เขียนเรื่องสั้นภาษาไทยให้สมบูรณ์ ตามข้อมูลต่อไปนี้:
 
