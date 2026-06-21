@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { invokeAIStable } from "@/lib/aiInvoke";
 import { downloadFile } from "@/lib/storyboardExport";
 import ChatModeSettings, { BUBBLE_COLORS } from "@/components/novel/ChatModeSettings";
+import AiProgressBar from "@/components/novel/AiProgressBar";
 
 const colorCls = (key) => BUBBLE_COLORS.find((c) => c.key === key)?.cls || BUBBLE_COLORS[0].cls;
 
@@ -216,6 +217,7 @@ ${text.slice(0, 14000)}
             <Button className="w-full gap-2 h-11" onClick={handleGenerate} disabled={generating || !novelId || !chapterId}>
               {generating ? <><Loader2 className="w-4 h-4 animate-spin" />กำลังแปลงเป็นแชต...</> : <><Sparkles className="w-4 h-4" />{lines.length > 0 ? "แปลงใหม่อีกครั้ง" : "แปลงเป็นแชต"}</>}
             </Button>
+            <AiProgressBar active={generating} label="กำลังแปลงเป็นแชตจอยลดา..." expectedMs={40000} />
           </div>
 
           {lines.length > 0 && (
