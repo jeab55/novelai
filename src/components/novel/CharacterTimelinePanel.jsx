@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -36,6 +36,41 @@ export default function CharacterTimelinePanel({ novelId, novel }) {
   // rows: [{ chapterTitle, order, appearances: [{character, location, action, development}] }]
   const [rows, setRows] = useState(null);
   const [filterChar, setFilterChar] = useState("all");
+  const queryClient = useQueryClient();
+
+  // โหลดไทม์ไลน์ที่บันทึกไว้ล่าสุด (ถ้ามี)
+  const { data: savedTimeline } = useQuery({
+    queryKey: ["character-timeline", novelId],
+    queryFn: async () => {
+      const list = await base44.entities.CharacterTimeline.filter({ novel_id: novelId });
+      return list[0] || null;
+    },
+    enabled: !!novelId,
+  });
+
+  // แสดงผลที่บันทึกไว้ตอนเปิดหน้า (ครั้งแรกที่ยังไม่มีผลใน state)
+  useEffect(() => {
+    if (rows === null && savedTimeline?.rows) {
+      try {
+        const parsed = JSON.parse(savedTimeline.rows);
+        if (Array.isArray(parsed)) setRows(parsed);
+      } catch { /* ข้ามถ้า parse ไม่ได้ */ }
+    }
+  }, [savedTimeline, rows]);
+
+  const persistRows = async (built) => {
+    const payload = {
+      novel_id: novelId,
+      rows: JSON.stringify(built),
+      generated_at: new Date().toISOString(),
+    };
+    if (savedTimeline?.id) {
+      await base44.entities.CharacterTimeline.update(savedTimeline.id, payload);
+    } else {
+      await base44.entities.CharacterTimeline.create(payload);
+    }
+    queryClient.invalidateQueries({ queryKey: ["character-timeline", novelId] });
+  };
 
   const { data: chapters = [] } = useQuery({
     queryKey: ["chapters-chartimeline", novelId],
@@ -99,7 +134,8 @@ ${(ch.content || "").slice(0, 9000)}
         setRows([...built]);
         setProgress({ done: i + 1, total: written.length, label: `วิเคราะห์แล้ว ${i + 1}/${written.length} ตอน` });
       }
-      toast.success("สร้างไทม์ไลน์ตัวละครสำเร็จ");
+      await persistRows(built);
+      toast.success("สร้างและบันทึกไทม์ไลน์ตัวละครสำเร็จ");
     } catch (e) {
       toast.error("สร้างไทม์ไลน์ไม่สำเร็จ: " + (e.message || ""));
     } finally {
