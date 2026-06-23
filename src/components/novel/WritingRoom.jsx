@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, FileText, Loader2, Trash2, Download, Copy, MoreHorizontal, Clock, Sparkles, Users, BookOpen, Layers, GripVertical, Layers2, Wand2, CheckCircle2, Image as ImageIcon, Edit3 } from "lucide-react";
+import { Plus, FileText, Loader2, Trash2, Download, Copy, MoreHorizontal, Clock, Sparkles, Users, BookOpen, Layers, GripVertical, Layers2, Wand2, CheckCircle2, Image as ImageIcon, Edit3, BookMarked } from "lucide-react";
 import ExportDialog from "./ExportDialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { motion, AnimatePresence } from "framer-motion";
@@ -32,7 +32,7 @@ const statusColors = {
   "เผยแพร่": "bg-sky-50 text-sky-700 border border-sky-200",
 };
 
-export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPendingOpenChapterConsumed }) {
+export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPendingOpenChapterConsumed, onOpenTOC }) {
   const [selectedChapter, setSelectedChapter] = useState(null);
   const [newChapterOpen, setNewChapterOpen] = useState(false);
   const [newTitle, setNewTitle] = useState("");
@@ -88,6 +88,42 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
     enabled: !!novel,
     staleTime: 30000, // 30 วินาที
     gcTime: 120000, // 2 นาที
+  });
+
+  // [Backward-compat] ดึงชื่อภาคเดิมที่เคยวางแผนไว้ในตาราง Season (legacy) ที่ยังไม่มีนิยายลูกตรงกัน
+  // เพื่อไม่ให้แผนภาคที่เคยตั้งไว้หายไปจากแถบเลือกซีซัน — อ่านอย่างเดียว ไม่เขียนเพิ่ม
+  const { data: plannedSeasons = [] } = useQuery({
+    queryKey: ["planned-seasons-legacy", novelId],
+    queryFn: async () => {
+      try {
+        const recs = await base44.entities.Season.filter({ novel_id: novelId });
+        return (recs || []).filter((s) => s && !s.is_deleted);
+      } catch {
+        return [];
+      }
+    },
+    enabled: !!novelId,
+    staleTime: 60000,
+    gcTime: 300000,
+  });
+
+  // รวมภาคที่วางแผนไว้ (legacy Season) ที่ยังไม่มีนิยายลูกในเลข season_number เดียวกัน
+  const existingSeasonNumbers = new Set(seasons.map((s) => s.season_number || 1));
+  const fallbackPlannedSeasons = plannedSeasons
+    .filter((s) => !existingSeasonNumbers.has(s.season_number))
+    .map((s) => ({
+      id: `planned-${s.id}`,
+      title: s.title,
+      season_number: s.season_number,
+      __planned: true, // ยังไม่มีเนื้อตอน — เปิดเขียนไม่ได้จนกว่าจะสร้างนิยายลูก
+    }));
+
+  // รายการภาคทั้งหมดที่แสดงในแถบ = นิยายลูกจริง + ภาคที่เคยวางแผนไว้ (fallback)
+  const displaySeasons = [...seasons, ...fallbackPlannedSeasons].sort((a, b) => {
+    const sa = a.season_number || 1;
+    const sb = b.season_number || 1;
+    if (sa !== sb) return sa - sb;
+    return 0;
   });
 
   // โหลดข้อมูล novel ของ Season ที่เลือก — เพื่อให้ได้ข้อมูลที่ถูกต้องของแต่ละ Season
@@ -343,29 +379,37 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
         {/* Season Tabs & Management */}
         <div className="mb-4">
           <div className="flex flex-wrap items-center gap-1.5 bg-secondary/50 p-1.5 rounded-xl">
-            {seasons.length > 1 ? (
-              seasons.map((season, idx) => {
+            {displaySeasons.length > 1 ? (
+              displaySeasons.map((season, idx) => {
                 const isActive = String(selectedSeasonTab) === String(season.id);
+                const isPlanned = season.__planned;
                 return (
                   <div
                     key={season.id}
                     className={`flex items-center gap-0.5 rounded-lg transition-all ${
-                      isActive ? "bg-primary shadow-sm" : "hover:bg-secondary"
+                      isActive ? "bg-primary shadow-sm" : isPlanned ? "opacity-70" : "hover:bg-secondary"
                     }`}
                   >
                     <button
-                      onClick={() => setSelectedSeasonTab(season.id)}
-                      className={`px-3 py-1.5 text-sm rounded-lg transition-all font-medium max-w-[140px] sm:max-w-[220px] truncate ${
-                        isActive ? "text-primary-foreground" : "text-muted-foreground"
+                      onClick={() => {
+                        if (isPlanned) {
+                          toast.info(`"${season.title}" เป็นภาคที่วางแผนไว้ — กด "เพิ่ม Season" เพื่อสร้างเนื้อตอนของภาคนี้`);
+                          return;
+                        }
+                        setSelectedSeasonTab(season.id);
+                      }}
+                      className={`px-3 py-1.5 text-sm rounded-lg transition-all font-medium max-w-[140px] sm:max-w-[220px] truncate flex items-center ${
+                        isActive ? "text-primary-foreground" : isPlanned ? "text-muted-foreground italic" : "text-muted-foreground"
                       }`}
-                      title={season.title}
+                      title={isPlanned ? `${season.title} (วางแผนไว้ ยังไม่มีเนื้อตอน)` : season.title}
                     >
                       <span className={`mr-1.5 ${isActive ? "text-primary-foreground/80" : "text-primary/70"}`}>
                         #{season.season_number || idx + 1}
                       </span>
                       {season.title}
+                      {isPlanned && <span className="ml-1.5 text-[10px] not-italic text-amber-600 dark:text-amber-400">(แผน)</span>}
                     </button>
-                    {String(season.id) !== String(novelId) && (
+                    {!isPlanned && String(season.id) !== String(novelId) && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -408,6 +452,18 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
               <Plus className="w-4 h-4" />
               ตอนใหม่
             </Button>
+            {onOpenTOC && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 h-9 shrink-0"
+                onClick={onOpenTOC}
+                title="ดูสารบัญรวมทั้งเรื่องทุกภาค"
+              >
+                <BookMarked className="w-4 h-4" />
+                สารบัญรวม
+              </Button>
+            )}
             <Button
               variant="outline"
               size="sm"

@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Feather, PenTool, Users, Globe, Clock, Bot, Trash2, Share2, History, CheckCircle2, BookOpen, Brain, ShieldCheck, UserCog, Send } from "lucide-react";
+import { ArrowLeft, Feather, PenTool, Users, Globe, Clock, Bot, Trash2, Share2, History, CheckCircle2, BookOpen, Brain, ShieldCheck, UserCog, Send, BookMarked } from "lucide-react";
 import VersionHistoryDialog from "@/components/novel/VersionHistoryDialog";
 import { saveVersion } from "@/lib/saveVersion";
 import { useNavigate } from "react-router-dom";
@@ -24,6 +24,7 @@ import ContinuityAnalysisPanel from "@/components/novel/ContinuityAnalysisPanel"
 import ContinuityCheckPanel from "@/components/novel/ContinuityCheckPanel";
 import CharacterTimelinePanel from "@/components/novel/CharacterTimelinePanel";
 import PublishExportPanel from "@/components/novel/PublishExportPanel";
+import FullTableOfContents from "@/components/novel/FullTableOfContents";
 
 export default function NovelWorkspace() {
   const novelId = window.location.pathname.split("/novel/")[1]?.split("/")[0];
@@ -50,22 +51,7 @@ export default function NovelWorkspace() {
     gcTime: 300000, // 5 นาที
   });
 
-  // โหลดทุก EP ในซีรีย์เดียวกัน (Novels ที่มี series_id เดียวกัน)
-  const { data: episodes = [] } = useQuery({
-    queryKey: ["episodes", novel?.series_id],
-    queryFn: async () => {
-      if (!novel?.series_id) return [novel].filter(Boolean);
-      const all = await base44.entities.Novel.list();
-      return all
-        .filter((n) => String(n.series_id) === String(novel.series_id) && !n.is_deleted)
-        .sort((a, b) => (a.created_date || "").localeCompare(b.created_date || ""));
-    },
-    enabled: !!novel,
-    staleTime: 60000, // 1 นาที
-    gcTime: 300000, // 5 นาที
-  });
-
-  // ถ้ามีหลาย EP ให้ใช้ selectedEpisodeId ถ้าไม่มีให้ใช้ novelId
+  // ภาค/ซีซันจัดการภายในห้องเขียน (อิง parent_novel_id + season_number) — ไม่ใช้ series_id อีกต่อไป
   const activeNovelId = selectedEpisodeId || novelId;
 
   // โหลดจำนวนตอนที่เขียนเสร็จ — ใช้ activeNovelId
@@ -190,22 +176,6 @@ export default function NovelWorkspace() {
               <Feather className="w-4 h-4 text-primary" />
             </div>
             <div className="min-w-0 flex-1">
-              {/* EP Selector Tabs */}
-              {episodes.length > 1 && (
-                <div className="flex items-center gap-1 mb-2 overflow-x-auto">
-                  {episodes.map((ep, idx) => (
-                    <Button
-                      key={ep.id}
-                      variant={String(ep.id) === String(activeNovelId) ? "default" : "outline"}
-                      size="sm"
-                      className="h-7 text-xs shrink-0"
-                      onClick={() => setSelectedEpisodeId(ep.id)}
-                    >
-                      EP{idx + 1}: {ep.title?.slice(0, 20)}{ep.title?.length > 20 ? "..." : ""}
-                    </Button>
-                  ))}
-                </div>
-              )}
               <div className="flex items-center gap-2">
                 <h1 className="font-heading font-semibold text-base truncate">{novel.title}</h1>
                 {(novel.auto_written || (jobs[activeNovelId]?.status === "done")) && (
@@ -293,6 +263,7 @@ export default function NovelWorkspace() {
           <div className="max-w-7xl mx-auto px-4 overflow-x-auto">
             <TabsList className="bg-transparent h-auto p-0 gap-0 flex-nowrap whitespace-nowrap">
               {[
+                { value: "toc", icon: BookMarked, label: "สารบัญรวม" },
                 { value: "characters", icon: Users, label: "ตัวละคร" },
                 { value: "timeline", icon: Clock, label: "ไทม์ไลน์" },
                 { value: "char-timeline", icon: UserCog, label: "ไทม์ไลน์ตัวละคร" },
@@ -317,8 +288,19 @@ export default function NovelWorkspace() {
         </div>
 
         <div className="flex-1">
+          <TabsContent value="toc" className="m-0">
+            <FullTableOfContents
+              novelId={novelId}
+              novel={novel}
+              onOpenChapter={(season, chapter) => {
+                setSelectedEpisodeId(season.id);
+                setPendingOpenChapter(chapter);
+                setActiveTab("writing");
+              }}
+            />
+          </TabsContent>
           <TabsContent value="writing" className="m-0 h-full">
-            <WritingRoom novelId={activeNovelId} novel={novel} pendingOpenChapter={pendingOpenChapter} onPendingOpenChapterConsumed={() => setPendingOpenChapter(null)} />
+            <WritingRoom novelId={activeNovelId} novel={novel} pendingOpenChapter={pendingOpenChapter} onPendingOpenChapterConsumed={() => setPendingOpenChapter(null)} onOpenTOC={() => setActiveTab("toc")} />
           </TabsContent>
           <TabsContent value="characters" className="m-0">
             <CharacterBible novelId={activeNovelId} novel={novel} />

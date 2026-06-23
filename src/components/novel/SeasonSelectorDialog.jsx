@@ -51,6 +51,22 @@ export default function SeasonSelectorDialog({ open, onClose, novel, onSeasonCha
     enabled: !!rootNovelId && open,
   });
 
+  // [Backward-compat] เลขภาคที่เคยวางแผนไว้ในตาราง Season (legacy) — ใช้กันเลขชนตอนสร้างนิยายลูกใหม่
+  const { data: plannedSeasonNumbers = [] } = useQuery({
+    queryKey: ["planned-season-numbers-legacy", rootNovelId],
+    queryFn: async () => {
+      if (!rootNovelId) return [];
+      try {
+        const recs = await base44.entities.Season.filter({ novel_id: rootNovelId });
+        return (recs || []).filter((s) => s && !s.is_deleted).map((s) => s.season_number || 1);
+      } catch {
+        return [];
+      }
+    },
+    enabled: !!rootNovelId && open,
+    staleTime: 60000,
+  });
+
   // ข้อมูลเรื่องหลัก (Season 1) — เพื่อใช้คำนวณเลข Season และ lock ค่าต่าง ๆ
   const { data: rootNovel } = useQuery({
     queryKey: ["root-novel", rootNovelId],
@@ -217,11 +233,13 @@ ${charSummary || "(ยังไม่มี)"}
       // หาเลข Season ถัดไป — นับรวมเรื่องหลัก (Season 1) + ทุกภาคที่มีอยู่ในซีรีส์
       // เรื่องหลัก (root) ถือเป็น Season 1 เสมอ และไม่เริ่มนับใหม่ที่ 1
       const mainSeasonNumber = rootNovel?.season_number || 1;
-      const maxSeasonNumber = seasons.reduce(
+      const maxFromNovels = seasons.reduce(
         (max, s) => Math.max(max, s.season_number || 1),
         mainSeasonNumber
       );
-      const newSeasonNumber = maxSeasonNumber + 1;
+      // นับรวมเลขภาคที่เคยวางแผนไว้ (legacy Season) เพื่อไม่ให้เลขชนกัน
+      const maxFromPlanned = plannedSeasonNumbers.reduce((max, n) => Math.max(max, n || 1), 0);
+      const newSeasonNumber = Math.max(maxFromNovels, maxFromPlanned) + 1;
 
       // สร้าง Season ใหม่ — lock writer_id จาก parent novel เสมอ
       const newSeason = await base44.entities.Novel.create({
