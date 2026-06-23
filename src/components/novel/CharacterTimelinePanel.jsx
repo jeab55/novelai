@@ -11,6 +11,7 @@ import {
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { invokeAIStable } from "@/lib/aiInvoke";
+import { analyzeTimelineCharacter } from "@/lib/analyzeTimelineCharacter";
 import { useStorySeasons } from "@/hooks/useStorySeasons";
 
 const TIMELINE_SCHEMA = {
@@ -117,14 +118,22 @@ export default function CharacterTimelinePanel({ novelId, novel, onDevelopCharac
 
   const written = chapters.filter((c) => (c.content || "").trim().length > 50);
 
-  // เพิ่มตัวละครที่ไทม์ไลน์ตรวจพบทั้งหมดลงคลังตัวละคร (เฉพาะตัวที่ยังไม่มี)
+  // เพิ่มตัวละครที่ไทม์ไลน์ตรวจพบทั้งหมดลงคลังตัวละคร (เฉพาะตัวที่ยังไม่มี) + วิเคราะห์รายละเอียดด้วย AI
   const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState({ done: 0, total: 0, label: "" });
+
+  const refreshCharacterQueries = () => {
+    queryClient.invalidateQueries({ queryKey: ["characters-bible", "story", rootNovelId] });
+    queryClient.invalidateQueries({ queryKey: ["characters-chartimeline", "story", rootNovelId] });
+  };
+
   const handleImportAll = async () => {
     if (!rows || rows.length === 0) return;
     setImporting(true);
+    setImportProgress({ done: 0, total: 0, label: "กำลังเตรียมข้อมูล..." });
     try {
       // รวมการปรากฏของแต่ละชื่อตัวละครจากทุกตอน
-      const map = new Map(); // key: ชื่อ (lower+trim) → { name, appearances: [{order, chapterTitle, location, action, development}] }
+      const map = new Map(); // key: ชื่อ (lower+trim) → { name, appearances: [...] }
       for (const row of rows) {
         for (const a of row.appearances || []) {
           const name = (a.character || "").trim();
@@ -151,11 +160,22 @@ export default function CharacterTimelinePanel({ novelId, novel, onDevelopCharac
           .map((c) => (c.name || "").trim().toLowerCase())
       );
 
-      const toCreate = [];
-      let skipped = 0;
-      for (const { name, appearances } of map.values()) {
-        if (existingNames.has(name.toLowerCase())) { skipped++; continue; }
-        // เติมสรุปจากไทม์ไลน์ลงช่องปูมหลัง
+      const targets = Array.from(map.values()).filter((t) => !existingNames.has(t.name.toLowerCase()));
+      const skipped = map.size - targets.length;
+
+      if (targets.length === 0) {
+        toast.info(`ตัวละครทั้งหมด (${skipped} ตัว) มีอยู่ในคลังแล้ว`);
+        return;
+      }
+
+      setImportProgress({ done: 0, total: targets.length, label: `วิเคราะห์แล้ว 0/${targets.length} ตัว` });
+      let created = 0;
+      let failed = 0;
+
+      // สร้าง+วิเคราะห์ทีละตัว บันทึกทันที (กันหลุดกลางคัน)
+      for (let i = 0; i < targets.length; i++) {
+        const { name, appearances } = targets[i];
+        // สรุปจากไทม์ไลน์ → ปูมหลังเบื้องต้น (เผื่อ AI ล้มเหลว record ก็ไม่ว่างเปล่า)
         const lines = appearances.map((ap) => {
           const parts = [];
           if (ap.location) parts.push(`อยู่ที่ ${ap.location}`);
@@ -163,23 +183,42 @@ export default function CharacterTimelinePanel({ novelId, novel, onDevelopCharac
           if (ap.development) parts.push(`พัฒนาการ: ${ap.development}`);
           return `• ตอน ${ap.order} (${ap.chapterTitle}): ${parts.join(" — ") || "ปรากฏตัว"}`;
         });
-        toCreate.push({
-          novel_id: rootNovelId,
-          name,
-          role: "ตัวประกอบ",
-          background: `สรุปจากไทม์ไลน์ตัวละคร:\n${lines.join("\n")}`,
-        });
+        const timelineSummary = `สรุปจากไทม์ไลน์ตัวละคร:\n${lines.join("\n")}`;
+
+        try {
+          // 1) สร้าง record ก่อน — บันทึกทันที
+          const record = await base44.entities.Character.create({
+            novel_id: rootNovelId,
+            name,
+            role: "ตัวประกอบ",
+            background: timelineSummary,
+          });
+          created++;
+          refreshCharacterQueries();
+
+          // 2) วิเคราะห์ด้วย AI แล้วเติมเฉพาะช่องที่ยังว่าง
+          const analysis = await analyzeTimelineCharacter({ name, appearances, chapters });
+          const update = {};
+          for (const f of ["role", "appearance", "personality", "desire", "wound", "relationships", "ai_analysis"]) {
+            if (analysis[f] && !record[f]) update[f] = analysis[f];
+          }
+          // background: ต่อท้ายผลวิเคราะห์เข้ากับสรุปไทม์ไลน์
+          if (analysis.background) update.background = `${timelineSummary}\n\n${analysis.background}`;
+          if (Object.keys(update).length > 0) {
+            await base44.entities.Character.update(record.id, update);
+            refreshCharacterQueries();
+          }
+        } catch (e) {
+          failed++;
+        }
+        setImportProgress({ done: i + 1, total: targets.length, label: `วิเคราะห์แล้ว ${i + 1}/${targets.length} ตัว` });
       }
 
-      if (toCreate.length === 0) {
-        toast.info(`ตัวละครทั้งหมด (${skipped} ตัว) มีอยู่ในคลังแล้ว`);
-        return;
-      }
-      await base44.entities.Character.bulkCreate(toCreate);
-      // รีเฟรชหน้าคลังตัวละคร + รายการในหน้านี้
-      queryClient.invalidateQueries({ queryKey: ["characters-bible", "story", rootNovelId] });
-      queryClient.invalidateQueries({ queryKey: ["characters-chartimeline", "story", rootNovelId] });
-      toast.success(`เพิ่ม ${toCreate.length} ตัวละครลงคลังแล้ว${skipped > 0 ? ` (ข้าม ${skipped} ตัวที่มีอยู่แล้ว)` : ""}`);
+      refreshCharacterQueries();
+      const parts = [`เพิ่มและวิเคราะห์ ${created} ตัวละครลงคลังแล้ว`];
+      if (skipped > 0) parts.push(`ข้าม ${skipped} ตัวที่มีอยู่แล้ว`);
+      if (failed > 0) parts.push(`วิเคราะห์ไม่สำเร็จ ${failed} ตัว (บันทึกข้อมูลเบื้องต้นไว้แล้ว)`);
+      toast.success(parts.join(" • "));
     } catch (e) {
       toast.error("เพิ่มตัวละครไม่สำเร็จ: " + (e.message || ""));
     } finally {
@@ -306,6 +345,26 @@ ${(ch.content || "").slice(0, 9000)}
                     : <><UserPlus className="w-3.5 h-3.5" />เพิ่มตัวละครทั้งหมดลงคลังตัวละคร</>}
                 </Button>
               )}
+            </div>
+          )}
+
+          {importing && (
+            <div className="space-y-2 rounded-lg border border-primary/20 bg-primary/5 p-3">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-primary font-medium flex items-center gap-1.5">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />{importProgress.label}
+                </span>
+                <span className="text-muted-foreground">
+                  {importProgress.total > 0 ? Math.round((importProgress.done / importProgress.total) * 100) : 0}%
+                </span>
+              </div>
+              <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+                <div
+                  className="h-2 rounded-full bg-primary transition-all duration-300"
+                  style={{ width: `${importProgress.total > 0 ? (importProgress.done / importProgress.total) * 100 : 0}%` }}
+                />
+              </div>
+              <p className="text-[11px] text-muted-foreground">บันทึกทีละตัวแบบเรียลไทม์ — ตัวที่เสร็จแล้วจะไม่หายแม้ปิดหน้า</p>
             </div>
           )}
 
