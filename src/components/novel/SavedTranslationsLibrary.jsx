@@ -3,15 +3,17 @@ import { base44 } from "@/api/base44Client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Archive, Eye, BookPlus, Trash2, Loader2, FileText } from "lucide-react";
+import { Archive, Eye, BookPlus, Trash2, Loader2, FileText, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import SavedTranslationDetailDialog from "@/components/novel/SavedTranslationDetailDialog";
 import CreateNovelFromTranslationDialog from "@/components/novel/CreateNovelFromTranslationDialog";
+import BuildNovelFromTranslationDialog from "@/components/novel/BuildNovelFromTranslationDialog";
 
 export default function SavedTranslationsLibrary({ enabled, novels = [] }) {
   const queryClient = useQueryClient();
   const [detailProject, setDetailProject] = useState(null);
   const [createProject, setCreateProject] = useState(null);
+  const [buildProject, setBuildProject] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
 
   const { data: projects = [], isLoading } = useQuery({
@@ -73,8 +75,11 @@ export default function SavedTranslationsLibrary({ enabled, novels = [] }) {
               <Button variant="outline" size="sm" className="flex-1 min-w-[5rem] h-8 text-xs gap-1.5" onClick={() => setDetailProject(p)}>
                 <Eye className="w-3.5 h-3.5" />ดู
               </Button>
-              <Button variant="outline" size="sm" className="flex-1 min-w-[8rem] h-8 text-xs gap-1.5" onClick={() => setCreateProject(p)}>
+              <Button variant="outline" size="sm" className="flex-1 min-w-[7rem] h-8 text-xs gap-1.5" onClick={() => setCreateProject(p)}>
                 <BookPlus className="w-3.5 h-3.5" />สร้างนิยายต่อ
+              </Button>
+              <Button size="sm" className="flex-1 min-w-[9rem] h-8 text-xs gap-1.5" onClick={() => setBuildProject(p)}>
+                <Wand2 className="w-3.5 h-3.5" />นำไปสร้างเป็นนิยาย
               </Button>
               <Button
                 variant="outline" size="sm"
@@ -100,6 +105,11 @@ export default function SavedTranslationsLibrary({ enabled, novels = [] }) {
         open={!!createProject}
         onClose={() => setCreateProject(null)}
         novels={novels}
+      />
+      <BuildNovelFromTranslationDialog
+        project={buildProject}
+        open={!!buildProject}
+        onClose={() => setBuildProject(null)}
       />
     </>
   );
