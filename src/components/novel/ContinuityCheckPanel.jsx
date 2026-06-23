@@ -157,6 +157,8 @@ export default function ContinuityCheckPanel({ novelId, novel }) {
       // เริ่มจากตอนแรกที่ยังไม่ถูกตรวจ (เลย progress และไม่อยู่ใน checkedIds)
       startIdx = savedProgress;
       while (startIdx < total && checkedIds.has(written[startIdx].id)) startIdx++;
+      // ย้อนกลับไปตรวจ "1 ตอนสุดท้ายที่ตรวจไปแล้ว" ซ้ำอีกครั้ง เพื่อเป็นบริบทเชื่อมต่อ
+      if (startIdx > 0) startIdx -= 1;
     }
     if (!resume) setIssues([]);
 
@@ -170,6 +172,7 @@ export default function ContinuityCheckPanel({ novelId, novel }) {
     }
 
     // เตรียมสรุปตอนก่อนหน้าที่ตรวจไปแล้ว เพื่อใช้เป็นฐานเทียบเมื่อตรวจต่อ
+    // (ตอนที่ index < startIdx คือตอนที่จะไม่ตรวจซ้ำ ใช้เป็นบริบทเท่านั้น)
     const priorSummaries = [];
     if (resume) {
       for (let j = 0; j < startIdx; j++) {
@@ -186,8 +189,8 @@ export default function ContinuityCheckPanel({ novelId, novel }) {
           return;
         }
         const ch = written[i];
-        // ข้ามตอนที่ตรวจไปแล้ว (กันตรวจซ้ำ/issues ซ้ำ)
-        if (checkedIds.has(ch.id)) {
+        // ข้ามตอนที่ตรวจไปแล้ว ยกเว้นตอนแรกของรอบนี้ (startIdx) ที่ตั้งใจย้อนตรวจซ้ำเพื่อความต่อเนื่อง
+        if (checkedIds.has(ch.id) && i !== startIdx) {
           setProgress({ done: i + 1, total, label: `ตรวจแล้ว ${i + 1}/${total} ตอน` });
           continue;
         }
@@ -236,7 +239,8 @@ ${(ch.content || "").slice(0, 9000)}
           detail: it.detail || "",
           suggestion: it.suggestion || "",
         }));
-        accIssues = [...accIssues, ...mapped];
+        // อัปเดตทับ: ลบรายการเดิมของตอนนี้ (อ้างอิงด้วย chapter_id) ก่อนเพิ่มผลใหม่ — กันรายการซ้ำ
+        accIssues = [...accIssues.filter((it) => it.chapter_id !== ch.id), ...mapped];
         checkedIds.add(ch.id);
 
         setIssues([...accIssues]);
