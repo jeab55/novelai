@@ -17,6 +17,7 @@ export default function ThaiSpellCheckerDialog({ content, novel, onApplyChanges,
   const [selectedChanges, setSelectedChanges] = useState([]);
   const [autoFixPreview, setAutoFixPreview] = useState(null); // { items: [{wrong, correct, category}], updatedContent }
   const [autoFixSaving, setAutoFixSaving] = useState(false);
+  const [fixingAll, setFixingAll] = useState(false);
 
   const handleCheck = async () => {
     setLoading(true);
@@ -96,6 +97,37 @@ export default function ThaiSpellCheckerDialog({ content, novel, onApplyChanges,
       });
     });
     return fixes;
+  };
+
+  // แก้คำผิดทั้งหมดในคลิกเดียว — แก้ทุกจุดเชิงกลไกทันที ไม่ต้องยืนยันทีละคำ + สำรอง previous_content
+  const handleFixAll = async () => {
+    const fixes = collectMechanicalFixes();
+    if (fixes.length === 0) {
+      toast.info("ไม่พบข้อผิดพลาดเชิงกลไกที่แก้อัตโนมัติได้");
+      return;
+    }
+    setFixingAll(true);
+    try {
+      // เรียงตำแหน่งมากไปน้อยเพื่อไม่ให้ตำแหน่งเลื่อนระหว่างแก้
+      const sorted = [...fixes].sort((a, b) => (b.globalPosition || 0) - (a.globalPosition || 0));
+      let updatedContent = content;
+      sorted.forEach((f) => {
+        const start = f.globalPosition !== undefined ? Math.max(0, f.globalPosition - 10) : 0;
+        const idx = updatedContent.indexOf(f.wrong, start);
+        const realIdx = idx !== -1 ? idx : updatedContent.indexOf(f.wrong);
+        if (realIdx !== -1) {
+          updatedContent = updatedContent.slice(0, realIdx) + f.correct + updatedContent.slice(realIdx + f.wrong.length);
+        }
+      });
+      await onAutoFixSave({ updatedContent, originalContent: content });
+      toast.success(`แก้คำผิดทั้งหมด ${fixes.length} จุดแล้ว — เนื้อหาเดิมถูกสำรองไว้ ย้อนกลับได้`);
+      onClose();
+    } catch (err) {
+      console.error("Fix-all save error:", err);
+      toast.error("บันทึกไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
+    } finally {
+      setFixingAll(false);
+    }
   };
 
   // สร้างตัวอย่าง "ก่อน → หลัง" ให้ผู้ใช้ตรวจก่อนยืนยัน
@@ -268,13 +300,24 @@ export default function ThaiSpellCheckerDialog({ content, novel, onApplyChanges,
                       แก้ไข {selectedChanges.length} คำที่เลือก
                     </Button>
                     {onAutoFixSave && (
-                      <Button
-                        onClick={handlePrepareAutoFix}
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5"
-                      >
-                        <Wand2 className="w-4 h-4" />
-                        แก้คำผิดอัตโนมัติ
-                      </Button>
+                      <>
+                        <Button
+                          onClick={handleFixAll}
+                          disabled={fixingAll}
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5"
+                        >
+                          {fixingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
+                          {fixingAll ? "กำลังแก้และสำรอง..." : "แก้คำผิดทั้งหมด"}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={handlePrepareAutoFix}
+                          disabled={fixingAll}
+                          className="gap-1.5 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                        >
+                          ดูรายการก่อนแก้
+                        </Button>
+                      </>
                     )}
                   </div>
                 </>
