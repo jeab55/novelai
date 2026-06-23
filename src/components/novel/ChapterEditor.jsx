@@ -640,6 +640,9 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
         setContent(newContent);
         latestRef.current.content = newContent;
         triggerAutoSave();
+        // เด้งแผงตรวจคำผิดทันที โดยใช้เนื้อหาที่เพิ่งสร้าง (อยู่ใน state แล้ว ไม่ต้องดึงจาก DB)
+        setDraftOpen(false);
+        setSpellCheckerOpen(true);
       }}
     />
 
