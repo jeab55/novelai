@@ -7,6 +7,10 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   ShieldCheck, Loader2, Sparkles, AlertTriangle, CheckCircle2, Users, Clock, Globe, Brain,
   ChevronDown, ChevronUp, ListTree, Save, Check, Square, RotateCcw, Play,
 } from "lucide-react";
@@ -64,6 +68,7 @@ export default function ContinuityCheckPanel({ novelId, novel }) {
   const [saveStatus, setSaveStatus] = useState("idle"); // idle | saving | saved
   const [record, setRecord] = useState(null);
   const [recordLoaded, setRecordLoaded] = useState(false);
+  const [confirmRescan, setConfirmRescan] = useState(false);
   const stopRef = useRef(false);
 
   const { data: chapters = [] } = useQuery({
@@ -143,8 +148,16 @@ export default function ContinuityCheckPanel({ novelId, novel }) {
     setExpanded({});
 
     const total = written.length;
-    const startIdx = resume && record?.status === "กำลังตรวจ" ? Math.min(record.progress || 0, total) : 0;
+    // กันซ้ำ: ตอนที่มี issues อยู่แล้ว + ตอนตามจำนวน progress ที่บันทึกไว้ ถือว่าตรวจแล้ว
     let accIssues = resume ? [...(issues || [])] : [];
+    const checkedIds = new Set(resume ? accIssues.map((it) => it.chapter_id).filter(Boolean) : []);
+    let startIdx = 0;
+    if (resume) {
+      const savedProgress = Math.min(record?.progress || 0, total);
+      // เริ่มจากตอนแรกที่ยังไม่ถูกตรวจ (เลย progress และไม่อยู่ใน checkedIds)
+      startIdx = savedProgress;
+      while (startIdx < total && checkedIds.has(written[startIdx].id)) startIdx++;
+    }
     if (!resume) setIssues([]);
 
     // สร้างเรคคอร์ดเริ่มต้น/ตั้งสถานะกำลังตรวจ
@@ -156,7 +169,14 @@ export default function ContinuityCheckPanel({ novelId, novel }) {
       return;
     }
 
+    // เตรียมสรุปตอนก่อนหน้าที่ตรวจไปแล้ว เพื่อใช้เป็นฐานเทียบเมื่อตรวจต่อ
     const priorSummaries = [];
+    if (resume) {
+      for (let j = 0; j < startIdx; j++) {
+        const pc = written[j];
+        priorSummaries.push(`[ตอน ${pc.order ? pc.order + ". " : ""}${pc.title}]\n${(pc.content || "").slice(0, 1500)}`);
+      }
+    }
     try {
       for (let i = startIdx; i < total; i++) {
         if (stopRef.current) {
@@ -166,6 +186,11 @@ export default function ContinuityCheckPanel({ novelId, novel }) {
           return;
         }
         const ch = written[i];
+        // ข้ามตอนที่ตรวจไปแล้ว (กันตรวจซ้ำ/issues ซ้ำ)
+        if (checkedIds.has(ch.id)) {
+          setProgress({ done: i + 1, total, label: `ตรวจแล้ว ${i + 1}/${total} ตอน` });
+          continue;
+        }
         const chLabel = `${ch.order ? ch.order + ". " : ""}${ch.title}`;
         setProgress({ done: i, total, label: `กำลังตรวจตอน "${chLabel}"...` });
 
@@ -212,6 +237,7 @@ ${(ch.content || "").slice(0, 9000)}
           suggestion: it.suggestion || "",
         }));
         accIssues = [...accIssues, ...mapped];
+        checkedIds.add(ch.id);
 
         setIssues([...accIssues]);
         setProgress({ done: i + 1, total, label: `ตรวจแล้ว ${i + 1}/${total} ตอน` });
@@ -237,7 +263,9 @@ ${(ch.content || "").slice(0, 9000)}
   const filtered = (issues || []).filter((i) => filterType === "all" || i.type === filterType);
   const pct = progress.total > 0 ? Math.round((progress.done / progress.total) * 100) : 0;
   const hasResult = Array.isArray(issues);
-  const canResume = !running && record?.status === "หยุดกลางคัน" && (record.progress || 0) < (record.total || 0);
+  const canResume = !running && !!record &&
+    (record.status === "หยุดกลางคัน" || record.status === "กำลังตรวจ") &&
+    (record.progress || 0) < (record.total || 0);
 
   return (
     <div className="max-w-5xl mx-auto p-4 space-y-4">
@@ -253,17 +281,23 @@ ${(ch.content || "").slice(0, 9000)}
                 <Button variant="outline" onClick={handleStop} className="gap-2">
                   <Square className="w-4 h-4" />หยุด
                 </Button>
-              ) : (
+              ) : canResume ? (
                 <>
-                  {canResume && (
-                    <Button variant="outline" onClick={() => runScan(true)} disabled={written.length < 2} className="gap-2">
-                      <Play className="w-4 h-4" />ตรวจต่อ
-                    </Button>
-                  )}
-                  <Button onClick={() => runScan(false)} disabled={written.length < 2} className="gap-2">
-                    {hasResult ? <><RotateCcw className="w-4 h-4" />ตรวจใหม่</> : <><Sparkles className="w-4 h-4" />สแกนทั้งเรื่อง</>}
+                  <Button variant="outline" onClick={() => setConfirmRescan(true)} disabled={written.length < 2} className="gap-2">
+                    <RotateCcw className="w-4 h-4" />ตรวจใหม่ทั้งหมด
+                  </Button>
+                  <Button onClick={() => runScan(true)} disabled={written.length < 2} className="gap-2">
+                    <Play className="w-4 h-4" />ตรวจต่อ
                   </Button>
                 </>
+              ) : (
+                <Button
+                  onClick={() => (hasResult && issues.length >= 0 && record ? setConfirmRescan(true) : runScan(false))}
+                  disabled={written.length < 2}
+                  className="gap-2"
+                >
+                  {record ? <><RotateCcw className="w-4 h-4" />ตรวจใหม่ทั้งหมด</> : <><Sparkles className="w-4 h-4" />สแกนทั้งเรื่อง</>}
+                </Button>
               )}
             </div>
           </div>
@@ -390,6 +424,23 @@ ${(ch.content || "").slice(0, 9000)}
           )}
         </CardContent>
       </Card>
+
+      <AlertDialog open={confirmRescan} onOpenChange={setConfirmRescan}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ตรวจใหม่ทั้งหมด?</AlertDialogTitle>
+            <AlertDialogDescription>
+              การตรวจใหม่จะลบผลตรวจเดิมทั้งหมดและเริ่มตรวจตั้งแต่ตอนแรก ยืนยันหรือไม่
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { setConfirmRescan(false); runScan(false); }}>
+              ยืนยัน ตรวจใหม่
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
