@@ -31,6 +31,7 @@ export default function NovelWorkspace() {
   const [activeTab, setActiveTab] = useState("characters");
   const [selectedEpisodeId, setSelectedEpisodeId] = useState(null);
   const [pendingOpenChapter, setPendingOpenChapter] = useState(null);
+  const [characterFocus, setCharacterFocus] = useState(null);
   const [deleteDialog, setDeleteDialog] = useState(false);
   const [shareDialog, setShareDialog] = useState(false);
   const [novelVersionOpen, setNovelVersionOpen] = useState(false);
@@ -303,7 +304,12 @@ export default function NovelWorkspace() {
             <WritingRoom novelId={activeNovelId} novel={novel} pendingOpenChapter={pendingOpenChapter} onPendingOpenChapterConsumed={() => setPendingOpenChapter(null)} onOpenTOC={() => setActiveTab("toc")} />
           </TabsContent>
           <TabsContent value="characters" className="m-0">
-            <CharacterBible novelId={activeNovelId} novel={novel} />
+            <CharacterBible
+              novelId={activeNovelId}
+              novel={novel}
+              focusCharacterName={characterFocus}
+              onFocusConsumed={() => setCharacterFocus(null)}
+            />
           </TabsContent>
           <TabsContent value="world" className="m-0">
             <WorldBible
@@ -330,7 +336,11 @@ export default function NovelWorkspace() {
             <ContinuityCheckPanel novelId={activeNovelId} novel={novel} />
           </TabsContent>
           <TabsContent value="char-timeline" className="m-0">
-            <CharacterTimelinePanel novelId={activeNovelId} novel={novel} />
+            <CharacterTimelinePanel
+              novelId={activeNovelId}
+              novel={novel}
+              onDevelopCharacter={(name) => { setCharacterFocus(name); setActiveTab("characters"); }}
+            />
           </TabsContent>
           <TabsContent value="publish" className="m-0">
             <PublishExportPanel novel={{ ...novel, id: activeNovelId }} />

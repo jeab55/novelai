@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  Users, Loader2, Sparkles, MapPin, Activity, TrendingUp, BookOpen, UserCircle,
+  Users, Loader2, Sparkles, MapPin, Activity, TrendingUp, BookOpen, UserCircle, UserCog,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
@@ -31,7 +31,7 @@ const TIMELINE_SCHEMA = {
   },
 };
 
-export default function CharacterTimelinePanel({ novelId, novel }) {
+export default function CharacterTimelinePanel({ novelId, novel, onDevelopCharacter }) {
   // เรื่องหลัก + ทุกภาค → วิเคราะห์/เรียงไทม์ไลน์ตัวละครต่อเนื่องข้ามทุกภาค
   const { rootNovelId, seasons, seasonIds } = useStorySeasons(novelId, novel);
   const seasonKey = seasonIds.join(",");
@@ -254,6 +254,18 @@ ${(ch.content || "").slice(0, 9000)}
                                 <UserCircle className="w-4 h-4 text-primary" />
                               </div>
                               <span className="font-medium text-sm">{a.character}</span>
+                              {a.character && onDevelopCharacter && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 ml-auto gap-1 text-xs text-primary hover:bg-primary/10 px-2 shrink-0"
+                                  onClick={() => onDevelopCharacter(a.character)}
+                                  title="ไปสร้าง/พัฒนาตัวละครนี้ที่หน้าตัวละคร"
+                                >
+                                  <UserCog className="w-3.5 h-3.5" />
+                                  <span className="hidden sm:inline">สร้าง/พัฒนาที่หน้าตัวละคร</span>
+                                </Button>
+                              )}
                             </div>
                             <div className="grid sm:grid-cols-3 gap-2 text-xs">
                               {a.location && (

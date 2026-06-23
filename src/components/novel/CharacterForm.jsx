@@ -13,9 +13,9 @@ import ReactMarkdown from "react-markdown";
 
 const ROLES = ["ตัวเอก", "ตัวรอง", "ตัวร้าย", "ตัวประกอบ"];
 
-export default function CharacterForm({ novelId, character, onDone, novelIdForVersion, writerSystemPrompt }) {
+export default function CharacterForm({ novelId, character, onDone, novelIdForVersion, writerSystemPrompt, initialName }) {
   const [form, setForm] = useState({
-    name: character?.name || "",
+    name: character?.name || initialName || "",
     role: character?.role || "",
     age: character?.age || "",
     appearance: character?.appearance || "",

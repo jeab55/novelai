@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -23,7 +23,7 @@ const roleColors = {
   "ตัวประกอบ": "bg-gray-100 text-gray-600",
 };
 
-export default function CharacterBible({ novelId, novel }) {
+export default function CharacterBible({ novelId, novel, focusCharacterName, onFocusConsumed }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
@@ -54,6 +54,36 @@ export default function CharacterBible({ novelId, novel }) {
 
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: ["characters", "story", rootNovelId, seasonIds.join(",")] });
+
+  // เมื่อถูกส่งชื่อตัวละครมาจากไทม์ไลน์ → มีอยู่แล้วเปิดแก้ไข, ไม่มีให้สร้างใหม่ (ผูก root) แล้วเปิดแก้ไขทันที
+  const [focusResolving, setFocusResolving] = useState(false);
+  useEffect(() => {
+    if (!focusCharacterName || !rootNovelId || isLoading || focusResolving) return;
+    const target = focusCharacterName.trim().toLowerCase();
+    const existing = rawCharacters.find(
+      (c) => (c.name || "").trim().toLowerCase() === target
+    );
+    if (existing) {
+      setEditing(existing);
+      setDialogOpen(true);
+      onFocusConsumed?.();
+      return;
+    }
+    // ไม่มี → สร้างใหม่ผูกกับเรื่องหลัก แล้วเปิดฟอร์มแก้ไขต่อ
+    setFocusResolving(true);
+    base44.entities.Character
+      .create({ name: focusCharacterName.trim(), novel_id: rootNovelId })
+      .then((created) => {
+        invalidate();
+        setEditing(created);
+        setDialogOpen(true);
+      })
+      .finally(() => {
+        setFocusResolving(false);
+        onFocusConsumed?.();
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusCharacterName, rootNovelId, isLoading]);
 
   const deleteMutation = useMutation({
     mutationFn: (id) => base44.entities.Character.update(id, { is_deleted: true }),
