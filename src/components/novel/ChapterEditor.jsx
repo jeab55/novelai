@@ -795,6 +795,25 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
           latestRef.current.content = updatedContent;
           triggerAutoSave();
         }}
+        onAutoFixSave={async ({ updatedContent, originalContent }) => {
+          if (!safeChapter.id) {
+            // ยังไม่มีตอนใน DB — แก้เฉพาะ state
+            setContent(updatedContent);
+            latestRef.current.content = updatedContent;
+            return;
+          }
+          // flush งานค้างก่อน เพื่อกันการเขียนทับ
+          await autosave.flush();
+          await base44.entities.Chapter.update(safeChapter.id, {
+            previous_content: originalContent,
+            content: updatedContent,
+            word_count: countWords(updatedContent),
+          });
+          setContent(updatedContent);
+          latestRef.current.content = updatedContent;
+          setPreviousContent(originalContent);
+          queryClient.invalidateQueries({ queryKey: ["chapters", novelId] });
+        }}
       />
       <div className="flex flex-1 overflow-hidden">
         {/* inline diff view — แทน textarea เมื่อมี diff */}

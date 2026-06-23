@@ -4,13 +4,19 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { CheckCircle2, XCircle, Loader2, Sparkles } from "lucide-react";
+import { CheckCircle2, XCircle, Loader2, Sparkles, Wand2, ArrowRight, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 
-export default function ThaiSpellCheckerDialog({ content, novel, onApplyChanges, open, onClose }) {
+// แก้เฉพาะข้อผิดพลาดเชิงกลไกเท่านั้น (ตัวสะกด/วรรคตอน/อักขระเพี้ยน)
+// ไม่รวม word_suggestions และ anachronistic_words ซึ่งเป็นเรื่องสำนวน/การเลือกใช้คำ
+const MECHANICAL_TYPES = ["spelling", "garant", "tone"];
+
+export default function ThaiSpellCheckerDialog({ content, novel, onApplyChanges, onAutoFixSave, open, onClose }) {
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState(null);
   const [selectedChanges, setSelectedChanges] = useState([]);
+  const [autoFixPreview, setAutoFixPreview] = useState(null); // { items: [{wrong, correct, category}], updatedContent }
+  const [autoFixSaving, setAutoFixSaving] = useState(false);
 
   const handleCheck = async () => {
     setLoading(true);
@@ -71,6 +77,65 @@ export default function ThaiSpellCheckerDialog({ content, novel, onApplyChanges,
     onClose();
   };
 
+  // รวมเฉพาะข้อผิดพลาดเชิงกลไกที่แก้ได้จริง (มีคู่ wrong→correct และพบ wrong ในเนื้อหา)
+  const collectMechanicalFixes = () => {
+    if (!results) return [];
+    const buckets = [
+      { arr: results.spelling_errors, category: "ตัวสะกดผิด" },
+      { arr: results.garant_issues, category: "การันต์" },
+      { arr: results.tone_issues, category: "สระ/วรรณยุกต์" },
+    ];
+    const fixes = [];
+    buckets.forEach(({ arr, category }) => {
+      (arr || []).forEach((e) => {
+        const wrong = e.wrong || e.word || e.original;
+        const correct = e.correct || e.suggested;
+        if (wrong && correct && wrong !== correct && content.includes(wrong)) {
+          fixes.push({ wrong, correct, category, globalPosition: e.globalPosition, context: e.context });
+        }
+      });
+    });
+    return fixes;
+  };
+
+  // สร้างตัวอย่าง "ก่อน → หลัง" ให้ผู้ใช้ตรวจก่อนยืนยัน
+  const handlePrepareAutoFix = () => {
+    const fixes = collectMechanicalFixes();
+    if (fixes.length === 0) {
+      toast.info("ไม่พบข้อผิดพลาดเชิงกลไกที่แก้อัตโนมัติได้");
+      return;
+    }
+    // เรียงตำแหน่งมากไปน้อยเพื่อไม่ให้ตำแหน่งเลื่อนระหว่างแก้
+    const sorted = [...fixes].sort((a, b) => (b.globalPosition || 0) - (a.globalPosition || 0));
+    let updatedContent = content;
+    sorted.forEach((f) => {
+      const start = f.globalPosition !== undefined ? Math.max(0, f.globalPosition - 10) : 0;
+      const idx = updatedContent.indexOf(f.wrong, start);
+      const realIdx = idx !== -1 ? idx : updatedContent.indexOf(f.wrong);
+      if (realIdx !== -1) {
+        updatedContent = updatedContent.slice(0, realIdx) + f.correct + updatedContent.slice(realIdx + f.wrong.length);
+      }
+    });
+    setAutoFixPreview({ items: fixes, updatedContent });
+  };
+
+  // ยืนยัน → สำรองเนื้อหาเดิม + บันทึก (ผ่าน onAutoFixSave ที่รู้จัก chapter)
+  const handleConfirmAutoFix = async () => {
+    if (!autoFixPreview) return;
+    setAutoFixSaving(true);
+    try {
+      await onAutoFixSave({ updatedContent: autoFixPreview.updatedContent, originalContent: content });
+      toast.success(`แก้คำผิดอัตโนมัติ ${autoFixPreview.items.length} จุด — เนื้อหาเดิมถูกสำรองไว้แล้ว ย้อนกลับได้`);
+      setAutoFixPreview(null);
+      onClose();
+    } catch (err) {
+      console.error("Auto-fix save error:", err);
+      toast.error("บันทึกไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
+    } finally {
+      setAutoFixSaving(false);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col">
@@ -82,7 +147,53 @@ export default function ThaiSpellCheckerDialog({ content, novel, onApplyChanges,
         </DialogHeader>
 
         <div className="flex flex-col gap-4 flex-1 overflow-hidden">
-          {!results && !loading && (
+          {autoFixPreview && (
+            <div className="flex flex-col gap-3 flex-1 overflow-hidden">
+              <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 flex items-start gap-2">
+                <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                <div className="text-sm text-emerald-800">
+                  <p className="font-semibold">ตรวจรายการก่อนแก้จริง — {autoFixPreview.items.length} จุด</p>
+                  <p className="text-xs text-emerald-700 mt-0.5">
+                    แก้เฉพาะตัวสะกด/วรรคตอน/อักขระเพี้ยนเท่านั้น ไม่แตะสำนวน เรียงประโยค หรือเนื้อหา • เนื้อหาเดิมจะถูกสำรองไว้ ย้อนกลับได้
+                  </p>
+                </div>
+              </div>
+
+              <ScrollArea className="flex-1 max-h-[55vh]">
+                <div className="space-y-2">
+                  {autoFixPreview.items.map((item, idx) => (
+                    <div key={`fix-${idx}`} className="p-3 rounded-lg border border-border bg-muted/30">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge variant="outline" className="text-[10px]">{item.category}</Badge>
+                        <span className="line-through text-destructive">{item.wrong}</span>
+                        <ArrowRight className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                        <span className="font-medium text-emerald-700">{item.correct}</span>
+                      </div>
+                      {item.context && (
+                        <p className="text-xs text-muted-foreground mt-1.5">{item.context}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+
+              <div className="flex gap-2 pt-1 border-t border-border/60">
+                <Button variant="outline" className="flex-1" onClick={() => setAutoFixPreview(null)} disabled={autoFixSaving}>
+                  ย้อนกลับไปดูผลตรวจ
+                </Button>
+                <Button
+                  className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5"
+                  onClick={handleConfirmAutoFix}
+                  disabled={autoFixSaving}
+                >
+                  {autoFixSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
+                  {autoFixSaving ? "กำลังแก้และสำรอง..." : `ยืนยันแก้ ${autoFixPreview.items.length} จุด`}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {!autoFixPreview && !results && !loading && (
             <div className="flex flex-col items-center justify-center py-12">
               <p className="text-muted-foreground mb-4">กดปุ่มด้านล่างเพื่อตรวจคำผิด</p>
               <Button onClick={handleCheck} size="lg">
@@ -91,14 +202,14 @@ export default function ThaiSpellCheckerDialog({ content, novel, onApplyChanges,
             </div>
           )}
 
-          {loading && (
+          {!autoFixPreview && loading && (
             <div className="flex flex-col items-center justify-center py-12">
               <Loader2 className="w-8 h-8 animate-spin text-primary mb-4" />
               <p className="text-muted-foreground">กำลังตรวจคำผิด...</p>
             </div>
           )}
 
-          {results && (
+          {!autoFixPreview && results && (
             <>
               {results.total_errors_found === 0 ? (
                 <div className="flex flex-col items-center justify-center py-8 text-center">
@@ -145,8 +256,8 @@ export default function ThaiSpellCheckerDialog({ content, novel, onApplyChanges,
                       เว้นวรรค: {results.spacing_issues?.reduce((sum, i) => sum + i.count, 0) || 0}
                     </Badge>
                   </div>
-                  <div className="flex gap-2 mb-3">
-                    <Button variant="outline" onClick={() => { setSelectedChanges([]); setResults(null); }}>
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    <Button variant="outline" onClick={() => { setSelectedChanges([]); setResults(null); setAutoFixPreview(null); }}>
                       ตรวจใหม่
                     </Button>
                     <Button 
@@ -156,6 +267,15 @@ export default function ThaiSpellCheckerDialog({ content, novel, onApplyChanges,
                     >
                       แก้ไข {selectedChanges.length} คำที่เลือก
                     </Button>
+                    {onAutoFixSave && (
+                      <Button
+                        onClick={handlePrepareAutoFix}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5"
+                      >
+                        <Wand2 className="w-4 h-4" />
+                        แก้คำผิดอัตโนมัติ
+                      </Button>
+                    )}
                   </div>
                 </>
               )}
