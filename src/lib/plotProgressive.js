@@ -1,4 +1,5 @@
 import { invokeAIStable } from "@/lib/aiInvoke";
+import { varietyInstruction } from "@/lib/creativeVariety";
 
 function stripFence(text) {
   if (typeof text !== "string") return text;
@@ -20,14 +21,29 @@ function safeParse(raw) {
   }
 }
 
-function buildNovelContext(novel, writer) {
+function buildNovelContext(novel, writer, options = {}) {
+  const { sourceMode = "anchored", writtenContext = "" } = options;
   const writerContext = writer?.system_prompt ? `\nสไตล์การเขียน: ${writer.system_prompt}\n` : "";
-  return `${writerContext}
+  const base = `${writerContext}
 ข้อมูลนิยาย:
 - ชื่อเรื่อง: ${novel.title}
 - แนว: ${novel.genre || "ไม่ระบุ"}
 - เรื่องย่อ: ${novel.synopsis || "ไม่มีเรื่องย่อ"}
 - ยุคสมัย/ฉากหลัง: ${novel.era || "ไม่ระบุ"}`;
+
+  if (sourceMode === "free") {
+    return `${base}
+
+[โหมดแตกแนวใหม่อิสระ]
+อย่าผูกกับพล็อตเดิมหรือเนื้อตอนที่เคยเขียนไว้ — เสนอทิศทางใหม่ที่สดและต่างออกไป โดยยังคงชื่อเรื่อง แนว และยุคสมัยไว้`;
+  }
+  if (sourceMode === "anchored" && writtenContext) {
+    return `${base}
+
+[โหมดอิงเนื้อตอนที่เขียนแล้ว — ต่อยอดให้สอดคล้อง]
+${writtenContext}`;
+  }
+  return base;
 }
 
 function buildCharsContext(characters) {
@@ -44,17 +60,23 @@ function buildCharsContext(characters) {
  * คงโมเดล claude_sonnet_4_6 ไว้เพื่อคุณภาพ
  */
 export async function generatePlotSkeleton({ novel, writer, characters }, options = {}) {
-  const ctx = buildNovelContext(novel, writer);
+  const { sourceMode = "anchored", writtenContext = "" } = options;
+  const ctx = buildNovelContext(novel, writer, { sourceMode, writtenContext });
   const { known, detailed } = buildCharsContext(characters);
+  const variety = varietyInstruction({ count: 1 });
 
   const prompt = `${ctx}
 
 ตัวละครที่มีอยู่แล้ว (ห้ามสร้างซ้ำชื่อ คงไว้): ${known}
 ${detailed ? `รายละเอียดตัวละครเดิม:\n${detailed}\n` : ""}
+${variety}
+
 คุณคือบรรณาธิการ วาง "โครงเรื่องแบบกระชับ" เพื่อให้เห็นภาพรวมเร็ว ตอบเป็น JSON ล้วนเท่านั้น ห้ามมีข้อความอื่น
 
 งาน:
-1) เขียน plot_outline สรุปโครง 3 องก์ แก่น/ธีม คำถามหลัก จุดหักเห (กระชับ 4-6 บรรทัด)
+1) เขียน plot_outline สรุปภาพรวมของเรื่องแบบกระชับ (4-6 บรรทัด) เล่าให้เห็นจุดเริ่ม ความขัดแย้งหลัก และทิศทางที่เรื่องจะเดินไป
+   - เลือกโครงสร้างการเล่าที่เหมาะกับเรื่องและแนวจริง (ไม่จำเป็นต้องเป็น 3 องก์; จะเป็นหลายเส้นเรื่อง เล่าไม่เรียงเวลา สืบสวน หรือ slice-of-life ก็ได้)
+   - เขียนด้วยภาษาเฉพาะของเรื่องนี้ ห้ามใส่ป้ายกำกับสำเร็จรูปหรือวลีแม่แบบซ้ำๆ (เช่น "จุดหักเหกลางเรื่อง", "แก่น/ธีม", "คำถามหลักของเรื่อง")
 2) สร้างตัวละครหลักที่จำเป็น (รวมตัวที่มีอยู่แล้วถ้ายังขาดรายละเอียด แต่ห้ามซ้ำชื่อที่ระบุไว้) แต่ละตัวมีฟิลด์: name, role, age, appearance, personality, background, desire, wound, relationships
 
 ตอบ JSON โครงสร้างนี้เท่านั้น (ไม่มี markdown):
@@ -92,24 +114,29 @@ ${detailed ? `รายละเอียดตัวละครเดิม:\n
  * Parallel กับรอบแรก: แตกไทม์ไลน์แบบกระชับ (title + 1 บรรทัด/ตอน) — output เล็ก ตอบไว
  */
 export async function generateTimelineOutline({ novel, writer, characters }, options = {}) {
-  const ctx = buildNovelContext(novel, writer);
+  const { sourceMode = "anchored", writtenContext = "" } = options;
+  const ctx = buildNovelContext(novel, writer, { sourceMode, writtenContext });
   const targetChapters = novel.target_chapters || 10;
   const { known } = buildCharsContext(characters);
+  const variety = varietyInstruction({ count: 1 });
 
   const prompt = `${ctx}
 ตัวละครที่มีอยู่: ${known}
+${variety}
 
-แบ่งโครงเรื่อง 3 องก์ออกเป็น ${targetChapters} ตอนเท่าๆ กัน แบบ "กระชับ" เพื่อเห็นภาพรวมเร็ว
+แตกเรื่องออกเป็น ${targetChapters} ตอน แบบ "กระชับ" เพื่อเห็นภาพรวมเร็ว
+- กระจายจังหวะเรื่องให้ลื่นไหลตลอด ${targetChapters} ตอน ตามโครงสร้างการเล่าที่เหมาะกับเรื่อง (ไม่ต้องบังคับแบ่งเป็น 3 องก์เท่าๆ กัน)
+- จุดพลิกผัน/จุดพีคจะอยู่ตรงไหนก็ได้ตามที่เหมาะกับเรื่องนี้จริงๆ ไม่ต้องตายตัว
 แต่ละตอนมีแค่:
 - order: เลขลำดับตอน (1-${targetChapters})
 - title: ชื่อตอน
 - description: สรุปสั้นๆ 1 บรรทัด (ไม่เกิน 1-2 ประโยค)
-- act: องก์ (1=ต้น, 2=กลาง, 3=Climax/บทสรุป)
+- act: ช่วงของเรื่องโดยคร่าว (1=ช่วงต้น, 2=ช่วงกลาง, 3=ช่วงท้าย/บทสรุป) ใช้เป็นการจัดกลุ่มหลวมๆ เท่านั้น
 
 ตอบ JSON ล้วนเท่านั้น ไม่มี markdown:
 {"events":[{"order":1,"title":"","description":"","act":1}]}
 
-ครบ ${targetChapters} ตอน ครอบคลุม 3 องก์ เหมาะกับแนว "${novel.genre || "ทั่วไป"}" ภาษาไทยทั้งหมด ตอบ JSON ล้วน`;
+ครบ ${targetChapters} ตอน เหมาะกับแนว "${novel.genre || "ทั่วไป"}" ภาษาไทยทั้งหมด ตอบ JSON ล้วน`;
 
   const schema = {
     type: "object",

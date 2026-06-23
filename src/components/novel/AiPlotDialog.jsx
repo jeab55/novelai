@@ -17,7 +17,7 @@ import {
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
   AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Loader2, Sparkles, Plus, Trash2, RefreshCw, FileText, CheckCircle2, AlertCircle, ChevronDown, ChevronUp, Users, Globe, Maximize2 } from "lucide-react";
+import { Loader2, Sparkles, Plus, Trash2, RefreshCw, FileText, CheckCircle2, AlertCircle, ChevronDown, ChevronUp, Users, Globe, Maximize2, Link2, Wand2, History, RotateCcw, Check } from "lucide-react";
 import AiWorldBuilderDialog from "./AiWorldBuilderDialog";
 import { invokeAIStable } from "@/lib/aiInvoke";
 import { generatePlotSkeleton, generateTimelineOutline, expandTimelineEvent } from "@/lib/plotProgressive";
@@ -225,6 +225,9 @@ export default function AiPlotDialog({ open, onClose, novel, novelId, onOpenChap
   const [progress, setProgress] = useState({ outline: false, timeline: false });
   // สถานะการขยายรายละเอียดต่อเหตุการณ์: map index -> "expanding" | ""
   const [expandStatus, setExpandStatus] = useState({});
+  const [sourceMode, setSourceMode] = useState("anchored"); // anchored | free
+  const [outlineOptions, setOutlineOptions] = useState([]); // ทิศทางพล็อตหลายแบบให้เลือก
+  const [outlineHistory, setOutlineHistory] = useState([]); // โครงเรื่องร่างก่อนหน้า
 
   const { data: writer } = useQuery({
     queryKey: ["writer", novel?.writer_id],
@@ -342,7 +345,15 @@ export default function AiPlotDialog({ open, onClose, novel, novelId, onOpenChap
     });
   };
 
-  // Progressive + parallel: ยิงโครง+ไทม์ไลน์พร้อมกัน ทยอยแสดงทันทีที่แต่ละสเตปเสร็จ
+  // สร้างบริบทจากตอนที่เขียนแล้ว (สำหรับโหมดอิงเนื้อตอน)
+  const buildWrittenContext = () => {
+    const written = existingChapters.filter((c) => (c.content || "").trim().length > 50).slice(0, 4);
+    if (written.length === 0) return "";
+    return `เนื้อหาตอนที่เขียนไปแล้ว (ใช้ต่อยอดให้สอดคล้อง):\n` +
+      written.map((c) => `— ตอน ${c.order ? c.order + ". " : ""}${c.title}\n${(c.content || "").slice(0, 800)}`).join("\n\n");
+  };
+
+  // Progressive: เสนอ "หลายทิศทาง" ของพล็อตให้เลือก + แตกไทม์ไลน์ของทิศทางแรกไว้ก่อน
   const generate = async () => {
     if (!novel || step === "generating") return;
     if (!writer) {
@@ -350,30 +361,39 @@ export default function AiPlotDialog({ open, onClose, novel, novelId, onOpenChap
       setStep("review");
       return;
     }
+    // ถ้ามีโครงเดิมอยู่แล้ว เก็บเข้าประวัติก่อนสร้างใหม่ (ไม่ทับถาวร)
+    if ((outline || "").trim()) {
+      setOutlineHistory((prev) => [{ id: Date.now(), text: outline }, ...prev].slice(0, 8));
+    }
     setStep("generating");
     setParseError("");
     setOutline("");
     setEvents([]);
     setAiCharacters([]);
+    setOutlineOptions([]);
     setProgress({ outline: false, timeline: false });
 
+    const writtenContext = sourceMode === "anchored" ? buildWrittenContext() : "";
+    const opts = { sourceMode, writtenContext };
     const ctx = { novel, writer, characters };
 
-    // สเตปที่ 1: โครงเรื่อง + ตัวละครหลัก (output เล็ก ตอบไว) — แสดงทันทีที่เสร็จ
-    const skeletonPromise = generatePlotSkeleton(ctx)
-      .then((res) => {
-        setOutline(res.outline);
-        setAiCharacters(mapAiChars(res.characters));
-        setProgress((p) => ({ ...p, outline: true }));
-        return true;
-      })
-      .catch((err) => {
-        toast.error(`วางโครงเรื่องไม่สำเร็จ: ${err.message}`);
-        return false;
-      });
+    // ยิงโครงเรื่อง 3 ทิศทางที่ต่างกัน (แต่ละครั้งมี seed สุ่มต่างกัน) แสดงเป็นตัวเลือก
+    const directionPromises = [0, 1, 2].map((n) =>
+      generatePlotSkeleton(ctx, opts)
+        .then((res) => {
+          setOutlineOptions((prev) => [...prev, { outline: res.outline, characters: res.characters }]);
+          // ทิศทางแรกที่เสร็จ ตั้งเป็นค่าเริ่มต้น + ตัวละคร
+          setOutline((cur) => cur || res.outline);
+          setAiCharacters((cur) => (cur.length ? cur : mapAiChars(res.characters)));
+          setProgress((p) => ({ ...p, outline: true }));
+          if (n === 0) setStep("review");
+          return true;
+        })
+        .catch(() => false)
+    );
 
-    // สเตปที่ 2 (ขนานกับสเตป 1): ไทม์ไลน์กระชับ — แสดงทันทีที่เสร็จ
-    const timelinePromise = generateTimelineOutline(ctx)
+    // ไทม์ไลน์กระชับ (ของทิศทางหลัก) — ขนานกัน
+    const timelinePromise = generateTimelineOutline(ctx, opts)
       .then((evs) => {
         setEvents(evs.map((e) => ({ order: e.order, title: e.title, description: e.description })));
         setProgress((p) => ({ ...p, timeline: true }));
@@ -384,14 +404,31 @@ export default function AiPlotDialog({ open, onClose, novel, novelId, onOpenChap
         return false;
       });
 
-    // ทันทีที่สเตปแรกเสร็จ ให้สลับไปหน้า review (ไม่ต้องรออีกสเตป)
-    Promise.race([skeletonPromise, timelinePromise]).then(() => setStep("review"));
+    Promise.race([...directionPromises, timelinePromise]).then(() => setStep("review"));
 
-    const [okOutline, okTimeline] = await Promise.all([skeletonPromise, timelinePromise]);
-    if (!okOutline && !okTimeline) {
-      setParseError('สร้างไม่สำเร็จทั้งโครงเรื่องและไทม์ไลน์ — กรุณากด "เขียนใหม่"');
+    const results = await Promise.all([...directionPromises, timelinePromise]);
+    if (results.every((r) => !r)) {
+      setParseError('สร้างไม่สำเร็จ — กรุณากด "สร้างอีกแบบ"');
     }
     setStep("review");
+  };
+
+  // เลือกทิศทางพล็อตจากการ์ด (เก็บของเดิมเข้าประวัติก่อน)
+  const pickOutlineDirection = (opt) => {
+    if ((outline || "").trim() && outline !== opt.outline) {
+      setOutlineHistory((prev) => [{ id: Date.now(), text: outline }, ...prev].slice(0, 8));
+    }
+    setOutline(opt.outline);
+    if (opt.characters?.length) setAiCharacters(mapAiChars(opt.characters));
+  };
+
+  const restoreOutline = (item) => {
+    if ((outline || "").trim() && outline !== item.text) {
+      setOutlineHistory((prev) => [{ id: Date.now(), text: outline }, ...prev.filter((h) => h.id !== item.id)].slice(0, 8));
+    } else {
+      setOutlineHistory((prev) => prev.filter((h) => h.id !== item.id));
+    }
+    setOutline(item.text);
   };
 
   // ขยายรายละเอียดเฉพาะเหตุการณ์ที่เลือก (on-demand)
@@ -536,6 +573,8 @@ export default function AiPlotDialog({ open, onClose, novel, novelId, onOpenChap
     setSavedSuccessfully(false);
     setProgress({ outline: false, timeline: false });
     setExpandStatus({});
+    setOutlineOptions([]);
+    setOutlineHistory([]);
   };
 
   const updateAiChar = (idx, field, value) => {
@@ -557,9 +596,30 @@ export default function AiPlotDialog({ open, onClose, novel, novelId, onOpenChap
             <div className="py-6 text-center space-y-4">
               <p className="text-sm text-muted-foreground leading-relaxed">
                 AI จะวิเคราะห์ข้อมูลนิยายและสไตล์ของนักเขียนประจำเรื่อง
-                <br />แล้ววางโครงเรื่อง 3 องก์ พร้อมไทม์ไลน์เหตุการณ์หลัก
-                <br /><span className="text-primary/80 font-medium">และสร้างตัวละครหลักของเรื่องให้ในครั้งเดียว</span>
+                <br />แล้วเสนอ <span className="text-primary/80 font-medium">ทิศทางพล็อตหลายแบบให้เลือก</span> พร้อมไทม์ไลน์และตัวละครหลัก
               </p>
+
+              {/* เลือกแหล่งอ้างอิงก่อนสร้าง */}
+              <div className="flex items-center justify-center gap-2 flex-wrap">
+                <span className="text-xs text-muted-foreground">แหล่งอ้างอิง:</span>
+                <Button
+                  type="button"
+                  variant={sourceMode === "anchored" ? "default" : "outline"}
+                  size="sm" className="h-7 text-xs gap-1.5"
+                  onClick={() => setSourceMode("anchored")}
+                >
+                  <Link2 className="w-3 h-3" /> อิงเนื้อตอนที่เขียนแล้ว
+                </Button>
+                <Button
+                  type="button"
+                  variant={sourceMode === "free" ? "default" : "outline"}
+                  size="sm" className="h-7 text-xs gap-1.5"
+                  onClick={() => setSourceMode("free")}
+                >
+                  <Wand2 className="w-3 h-3" /> แตกแนวใหม่อิสระ
+                </Button>
+              </div>
+
               {writer ? (
                 <Button
                   onClick={generate}
@@ -589,7 +649,7 @@ export default function AiPlotDialog({ open, onClose, novel, novelId, onOpenChap
                     <Loader2 className="w-4 h-4 animate-spin text-primary shrink-0" />
                   )}
                   <span className={progress.outline ? "text-green-700" : "text-muted-foreground"}>
-                    วางโครงเรื่อง 3 องก์ + ตัวละครหลัก
+                    เสนอทิศทางพล็อตหลายแบบ + ตัวละครหลัก
                   </span>
                 </div>
                 <div className="flex items-center gap-2 text-sm">
@@ -614,10 +674,38 @@ export default function AiPlotDialog({ open, onClose, novel, novelId, onOpenChap
                   ⚠️ {parseError}
                 </div>
               )}
+              {/* ทิศทางพล็อตหลายแบบให้เลือก */}
+              {outlineOptions.length > 1 && (
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-primary" /> เลือกทิศทางพล็อต ({outlineOptions.length} แบบ)
+                  </label>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {outlineOptions.map((opt, i) => {
+                      const active = opt.outline === outline;
+                      return (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => pickOutlineDirection(opt)}
+                          className={`text-left rounded-lg border p-3 transition-all ${active ? "border-primary bg-primary/5 ring-1 ring-primary/30" : "border-border/60 bg-muted/20 hover:border-primary/40"}`}
+                        >
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-xs font-semibold text-primary">แบบที่ {i + 1}</span>
+                            {active && <Check className="w-3.5 h-3.5 text-primary" />}
+                          </div>
+                          <p className="text-xs text-foreground/80 whitespace-pre-wrap leading-relaxed line-clamp-4">{opt.outline}</p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {/* Plot outline */}
               <div>
                 <label className="text-sm font-semibold mb-2 flex items-center gap-2 text-foreground">
-                  โครงเรื่อง (3 องก์)
+                  โครงเรื่อง (แก้ไขได้)
                   {step === "review" && !progress.outline && (
                     <span className="flex items-center gap-1 text-xs font-normal text-muted-foreground">
                       <Loader2 className="w-3 h-3 animate-spin" /> กำลังสร้าง...
@@ -631,6 +719,31 @@ export default function AiPlotDialog({ open, onClose, novel, novelId, onOpenChap
                   className="text-sm leading-relaxed"
                   placeholder={!progress.outline ? "AI กำลังวางโครงเรื่อง..." : ""}
                 />
+
+                {/* โครงเรื่องร่างก่อนหน้า */}
+                {outlineHistory.length > 0 && (
+                  <div className="mt-2 rounded-lg border border-border/60 bg-muted/20 p-2.5 space-y-2">
+                    <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                      <History className="w-3.5 h-3.5" /> โครงร่างก่อนหน้า ({outlineHistory.length})
+                    </div>
+                    {outlineHistory.map((item) => (
+                      <div key={item.id} className="flex items-start gap-2 rounded-md bg-background/60 border border-border/40 p-2">
+                        <p className="text-xs text-foreground/80 whitespace-pre-wrap leading-relaxed flex-1 line-clamp-2">{item.text}</p>
+                        <div className="flex flex-col gap-1 shrink-0">
+                          <Button variant="ghost" size="icon" className="h-6 w-6 text-primary" title="ใช้ร่างนี้" onClick={() => restoreOutline(item)}>
+                            <RotateCcw className="w-3.5 h-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-destructive" title="ลบ"
+                            onClick={() => setOutlineHistory((prev) => prev.filter((h) => h.id !== item.id))}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Events list */}
@@ -855,9 +968,9 @@ export default function AiPlotDialog({ open, onClose, novel, novelId, onOpenChap
                 </div>
               ) : (
                 <div className="flex gap-2 pt-2">
-                  <Button variant="outline" className="gap-2 flex-1" onClick={() => { setStep("idle"); setOutline(""); setEvents([]); setAiCharacters([]); }}>
+                  <Button variant="outline" className="gap-2 flex-1" onClick={generate} disabled={step === "generating"}>
                     <RefreshCw className="w-3.5 h-3.5" />
-                    เขียนใหม่
+                    สร้างอีกแบบ
                   </Button>
                   <Button
                     className="gap-2 flex-1"
