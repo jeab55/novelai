@@ -24,6 +24,7 @@ import { generatePlotSkeleton, generateTimelineOutline, expandTimelineEvent } fr
 import { enforceWordRange, buildWordCountInstruction, getWordRange } from "@/lib/wordCountControl";
 import AiProgressBar from "@/components/novel/AiProgressBar";
 import { toast } from "sonner";
+import { useStorySeasons, fetchAcrossSeasons } from "@/hooks/useStorySeasons";
 
 function stripCodeFence(text) {
   if (typeof text !== "string") return text;
@@ -211,6 +212,13 @@ async function generateChapterDraft({ novel, writer, characters, worldEntries, p
 
 export default function AiPlotDialog({ open, onClose, novel, novelId, onOpenChapter }) {
   const queryClient = useQueryClient();
+  // เรื่องหลัก + ทุกภาค → อ่านตัวละคร/เหตุการณ์ร่วมข้ามภาค, สร้างใหม่ผูกกับ root เสมอ
+  const { rootNovelId, seasonIds } = useStorySeasons(novelId, novel);
+  const seasonKey = seasonIds.join(",");
+  const invalidateStory = () => {
+    queryClient.invalidateQueries({ queryKey: ["plotEvents", "story", rootNovelId, seasonKey] });
+    queryClient.invalidateQueries({ queryKey: ["characters", "story", rootNovelId, seasonKey] });
+  };
   const [step, setStep] = useState("idle"); // idle | generating | review | error
   const [outline, setOutline] = useState("");
   const [events, setEvents] = useState([]);
@@ -237,21 +245,21 @@ export default function AiPlotDialog({ open, onClose, novel, novelId, onOpenChap
   });
 
   const { data: characters = [] } = useQuery({
-    queryKey: ["characters", novelId],
+    queryKey: ["characters", "story", rootNovelId, seasonKey],
     queryFn: async () => {
-      const all = await base44.entities.Character.filter({ novel_id: novelId });
+      const all = await fetchAcrossSeasons("Character", seasonIds);
       return all.filter((c) => !c.is_deleted);
     },
-    enabled: !!novelId,
+    enabled: seasonIds.length > 0,
   });
 
   const { data: worldEntries = [] } = useQuery({
-    queryKey: ["worldEntries", novelId],
+    queryKey: ["worldEntries", "story", rootNovelId, seasonKey],
     queryFn: async () => {
-      const all = await base44.entities.WorldEntry.filter({ novel_id: novelId });
+      const all = await fetchAcrossSeasons("WorldEntry", seasonIds);
       return all.filter((w) => !w.is_deleted);
     },
-    enabled: !!novelId,
+    enabled: seasonIds.length > 0,
   });
 
   const { data: existingChapters = [] } = useQuery({
@@ -265,12 +273,12 @@ export default function AiPlotDialog({ open, onClose, novel, novelId, onOpenChap
   });
 
   const { data: existingEvents = [] } = useQuery({
-    queryKey: ["plotEvents", novelId],
+    queryKey: ["plotEvents", "story", rootNovelId, seasonKey],
     queryFn: async () => {
-      const all = await base44.entities.PlotEvent.filter({ novel_id: novelId }, "order");
-      return all.filter((e) => !e.is_deleted);
+      const all = await fetchAcrossSeasons("PlotEvent", seasonIds, "order");
+      return all.filter((e) => !e.is_deleted).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
     },
-    enabled: !!novelId,
+    enabled: seasonIds.length > 0,
   });
 
   const saveMutation = useMutation({
@@ -286,7 +294,7 @@ export default function AiPlotDialog({ open, onClose, novel, novelId, onOpenChap
       await Promise.all(
         eventsToSave.map((ev) =>
           base44.entities.PlotEvent.create({
-            novel_id: novelId,
+            novel_id: rootNovelId,
             title: ev.title,
             description: ev.description,
             order: baseOrder + ev.order,
@@ -294,15 +302,15 @@ export default function AiPlotDialog({ open, onClose, novel, novelId, onOpenChap
         )
       );
 
-      // Save checked characters — skip any that already exist (by name, case-insensitive)
-      const currentChars = await base44.entities.Character.filter({ novel_id: novelId });
+      // Save checked characters — skip any that already exist (by name, case-insensitive) ข้ามทุกภาค
+      const currentChars = (await fetchAcrossSeasons("Character", seasonIds)).filter((c) => !c.is_deleted);
       const existingNameSet = new Set(currentChars.map((c) => c.name.toLowerCase().trim()));
       const charsToSave = aiCharacters.filter((c) => c.checked && c.name && !existingNameSet.has(c.name.toLowerCase().trim()));
       if (charsToSave.length > 0) {
         await Promise.all(
           charsToSave.map((c) =>
             base44.entities.Character.create({
-              novel_id: novelId,
+              novel_id: rootNovelId,
               name: c.name,
               role: c.role,
               age: c.age,
@@ -318,8 +326,7 @@ export default function AiPlotDialog({ open, onClose, novel, novelId, onOpenChap
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["plotEvents", novelId] });
-      queryClient.invalidateQueries({ queryKey: ["characters", novelId] });
+      invalidateStory();
       setSavedSuccessfully(true);
     },
   });

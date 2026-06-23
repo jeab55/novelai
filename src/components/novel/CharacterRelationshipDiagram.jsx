@@ -8,6 +8,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Users, Heart, Sword, Shield, HelpCircle, Network, Search } from "lucide-react";
 import { motion } from "framer-motion";
 import { Input } from "@/components/ui/input";
+import { useStorySeasons, fetchAcrossSeasons } from "@/hooks/useStorySeasons";
 
 const roleColors = {
   "ตัวเอก": "bg-amber-100 text-amber-700",
@@ -35,27 +36,31 @@ function getRelationshipType(description) {
   return "อื่นๆ";
 }
 
-export default function CharacterRelationshipDiagram({ novelId }) {
+export default function CharacterRelationshipDiagram({ novelId, novel }) {
   const [open, setOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedChar, setSelectedChar] = useState(null);
 
+  // เรื่องหลัก + ทุกภาค → อ่านตัวละคร/เหตุการณ์ร่วมข้ามภาค
+  const { rootNovelId, seasonIds } = useStorySeasons(novelId, novel);
+  const seasonKey = seasonIds.join(",");
+
   const { data: characters = [] } = useQuery({
-    queryKey: ["characters", novelId],
+    queryKey: ["characters", "story", rootNovelId, seasonKey],
     queryFn: async () => {
-      const all = await base44.entities.Character.filter({ novel_id: novelId });
+      const all = await fetchAcrossSeasons("Character", seasonIds);
       return all.filter((c) => !c.is_deleted);
     },
-    enabled: open,
+    enabled: open && seasonIds.length > 0,
   });
 
   const { data: events = [] } = useQuery({
-    queryKey: ["plotEvents", novelId],
+    queryKey: ["plotEvents", "story", rootNovelId, seasonKey],
     queryFn: async () => {
-      const all = await base44.entities.PlotEvent.filter({ novel_id: novelId }, "order");
-      return all.filter((e) => !e.is_deleted);
+      const all = await fetchAcrossSeasons("PlotEvent", seasonIds, "order");
+      return all.filter((e) => !e.is_deleted).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
     },
-    enabled: open,
+    enabled: open && seasonIds.length > 0,
   });
 
   // วิเคราะห์ความสัมพันธ์จากฟิลด์ relationships และเหตุการณ์

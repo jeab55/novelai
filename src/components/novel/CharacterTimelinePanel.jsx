@@ -11,6 +11,7 @@ import {
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { invokeAIStable } from "@/lib/aiInvoke";
+import { useStorySeasons } from "@/hooks/useStorySeasons";
 
 const TIMELINE_SCHEMA = {
   type: "object",
@@ -31,6 +32,9 @@ const TIMELINE_SCHEMA = {
 };
 
 export default function CharacterTimelinePanel({ novelId, novel }) {
+  // เรื่องหลัก + ทุกภาค → วิเคราะห์/เรียงไทม์ไลน์ตัวละครต่อเนื่องข้ามทุกภาค
+  const { rootNovelId, seasons, seasonIds } = useStorySeasons(novelId, novel);
+  const seasonKey = seasonIds.join(",");
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0, label: "" });
   // rows: [{ chapterTitle, order, appearances: [{character, location, action, development}] }]
@@ -38,14 +42,14 @@ export default function CharacterTimelinePanel({ novelId, novel }) {
   const [filterChar, setFilterChar] = useState("all");
   const queryClient = useQueryClient();
 
-  // โหลดไทม์ไลน์ที่บันทึกไว้ล่าสุด (ถ้ามี)
+  // โหลดไทม์ไลน์ที่บันทึกไว้ล่าสุด (ถ้ามี) — ผูกกับเรื่องหลัก (ครอบคลุมทุกภาค)
   const { data: savedTimeline } = useQuery({
-    queryKey: ["character-timeline", novelId],
+    queryKey: ["character-timeline", "story", rootNovelId],
     queryFn: async () => {
-      const list = await base44.entities.CharacterTimeline.filter({ novel_id: novelId });
+      const list = await base44.entities.CharacterTimeline.filter({ novel_id: rootNovelId });
       return list[0] || null;
     },
-    enabled: !!novelId,
+    enabled: !!rootNovelId,
   });
 
   // แสดงผลที่บันทึกไว้ตอนเปิดหน้า (ครั้งแรกที่ยังไม่มีผลใน state)
@@ -60,7 +64,7 @@ export default function CharacterTimelinePanel({ novelId, novel }) {
 
   const persistRows = async (built) => {
     const payload = {
-      novel_id: novelId,
+      novel_id: rootNovelId,
       rows: JSON.stringify(built),
       generated_at: new Date().toISOString(),
     };
@@ -69,25 +73,46 @@ export default function CharacterTimelinePanel({ novelId, novel }) {
     } else {
       await base44.entities.CharacterTimeline.create(payload);
     }
-    queryClient.invalidateQueries({ queryKey: ["character-timeline", novelId] });
+    queryClient.invalidateQueries({ queryKey: ["character-timeline", "story", rootNovelId] });
   };
 
+  // ดึงตอนจากทุกภาค แล้วเรียงต่อเนื่อง: ภาค 1 ก่อน → ภาค 2, 3... และตาม order ภายในภาค
   const { data: chapters = [] } = useQuery({
-    queryKey: ["chapters-chartimeline", novelId],
+    queryKey: ["chapters-chartimeline", "story", rootNovelId, seasonKey],
     queryFn: async () => {
-      const list = await base44.entities.Chapter.filter({ novel_id: novelId }, "order");
-      return list.filter((c) => !c.is_deleted).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+      const seasonOrder = new Map(
+        seasons.map((s, i) => [String(s.id), s.season_number ?? i + 1])
+      );
+      const perSeason = await Promise.all(
+        seasonIds.map(async (id) => {
+          const list = await base44.entities.Chapter.filter({ novel_id: id }, "order");
+          return list.filter((c) => !c.is_deleted).map((c) => ({
+            ...c,
+            _seasonNo: seasonOrder.get(String(id)) ?? 1,
+            _seasonTitle: seasons.find((s) => String(s.id) === String(id))?.title || "",
+          }));
+        })
+      );
+      return perSeason
+        .flat()
+        .sort((a, b) =>
+          a._seasonNo !== b._seasonNo
+            ? a._seasonNo - b._seasonNo
+            : (a.order ?? 0) - (b.order ?? 0)
+        );
     },
-    enabled: !!novelId,
+    enabled: seasonIds.length > 0,
   });
 
   const { data: characters = [] } = useQuery({
-    queryKey: ["characters-chartimeline", novelId],
+    queryKey: ["characters-chartimeline", "story", rootNovelId, seasonKey],
     queryFn: async () => {
-      const list = await base44.entities.Character.filter({ novel_id: novelId });
-      return list.filter((c) => !c.is_deleted);
+      const lists = await Promise.all(
+        seasonIds.map((id) => base44.entities.Character.filter({ novel_id: id }))
+      );
+      return lists.flat().filter((c) => !c.is_deleted);
     },
-    enabled: !!novelId,
+    enabled: seasonIds.length > 0,
   });
 
   const written = chapters.filter((c) => (c.content || "").trim().length > 50);
@@ -129,7 +154,13 @@ ${(ch.content || "").slice(0, 9000)}
         });
         const parsed = typeof result === "string" ? JSON.parse(result) : result;
         const apps = parsed?.appearances || parsed?.response?.appearances || parsed?.output?.appearances || [];
-        const row = { chapterTitle: ch.title, order: ch.order || i + 1, appearances: Array.isArray(apps) ? apps : [] };
+        const row = {
+          chapterTitle: ch.title,
+          order: ch.order || i + 1,
+          seasonNo: ch._seasonNo || 1,
+          seasonTitle: ch._seasonTitle || "",
+          appearances: Array.isArray(apps) ? apps : [],
+        };
         built.push(row);
         setRows([...built]);
         setProgress({ done: i + 1, total: written.length, label: `วิเคราะห์แล้ว ${i + 1}/${written.length} ตอน` });
@@ -205,9 +236,14 @@ ${(ch.content || "").slice(0, 9000)}
                   <motion.div key={ri} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: ri * 0.03 }}>
                     <Card className="border-l-4 border-l-primary/50">
                       <CardHeader className="py-3">
-                        <CardTitle className="text-base flex items-center gap-2">
+                        <CardTitle className="text-base flex items-center gap-2 flex-wrap">
                           <BookOpen className="w-4 h-4 text-primary shrink-0" />
-                          ตอน {row.order}: {row.chapterTitle}
+                          {seasons.length > 1 && (
+                            <Badge variant="outline" className="text-[10px] border-primary/30 text-primary shrink-0">
+                              ภาค {row.seasonNo || 1}
+                            </Badge>
+                          )}
+                          <span>ตอน {row.order}: {row.chapterTitle}</span>
                         </CardTitle>
                       </CardHeader>
                       <CardContent className="space-y-3 pt-0">

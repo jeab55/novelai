@@ -248,7 +248,7 @@ export default function Timeline({ novelId, novel, onOpenChapter, onNavigateToWo
         open={historicalSearchOpen}
         onClose={() => setHistoricalSearchOpen(false)}
         novelId={novelId}
-        onEventsAdded={() => queryClient.invalidateQueries({ queryKey: ["plotEvents", novelId] })}
+        onEventsAdded={invalidateEvents}
       />
 
       <AiPlotDialog
@@ -261,6 +261,7 @@ export default function Timeline({ novelId, novel, onOpenChapter, onNavigateToWo
 
       <CharacterRelationshipDiagram
         novelId={novelId}
+        novel={novel}
       />
       {versionEvent && (
         <VersionHistoryDialog
@@ -271,7 +272,7 @@ export default function Timeline({ novelId, novel, onOpenChapter, onNavigateToWo
           novelId={novelId}
           currentData={versionEvent}
           currentLabel={versionEvent.title}
-          onRestored={() => queryClient.invalidateQueries({ queryKey: ["plotEvents", novelId] })}
+          onRestored={invalidateEvents}
         />
       )}
 
