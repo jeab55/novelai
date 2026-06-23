@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  Users, Loader2, Sparkles, MapPin, Activity, TrendingUp, BookOpen, UserCircle, UserCog,
+  Users, Loader2, Sparkles, MapPin, Activity, TrendingUp, BookOpen, UserCircle, UserCog, UserPlus,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
@@ -117,6 +117,76 @@ export default function CharacterTimelinePanel({ novelId, novel, onDevelopCharac
 
   const written = chapters.filter((c) => (c.content || "").trim().length > 50);
 
+  // เพิ่มตัวละครที่ไทม์ไลน์ตรวจพบทั้งหมดลงคลังตัวละคร (เฉพาะตัวที่ยังไม่มี)
+  const [importing, setImporting] = useState(false);
+  const handleImportAll = async () => {
+    if (!rows || rows.length === 0) return;
+    setImporting(true);
+    try {
+      // รวมการปรากฏของแต่ละชื่อตัวละครจากทุกตอน
+      const map = new Map(); // key: ชื่อ (lower+trim) → { name, appearances: [{order, chapterTitle, location, action, development}] }
+      for (const row of rows) {
+        for (const a of row.appearances || []) {
+          const name = (a.character || "").trim();
+          if (!name) continue;
+          const key = name.toLowerCase();
+          if (!map.has(key)) map.set(key, { name, appearances: [] });
+          map.get(key).appearances.push({
+            order: row.order,
+            chapterTitle: row.chapterTitle,
+            location: a.location || "",
+            action: a.action || "",
+            development: a.development || "",
+          });
+        }
+      }
+
+      // ชื่อตัวละครที่มีอยู่แล้วของทั้งเรื่อง (root + ทุกภาค) เพื่อกันซ้ำ
+      const existingLists = await Promise.all(
+        seasonIds.map((id) => base44.entities.Character.filter({ novel_id: id }))
+      );
+      const existingNames = new Set(
+        existingLists.flat()
+          .filter((c) => !c.is_deleted)
+          .map((c) => (c.name || "").trim().toLowerCase())
+      );
+
+      const toCreate = [];
+      let skipped = 0;
+      for (const { name, appearances } of map.values()) {
+        if (existingNames.has(name.toLowerCase())) { skipped++; continue; }
+        // เติมสรุปจากไทม์ไลน์ลงช่องปูมหลัง
+        const lines = appearances.map((ap) => {
+          const parts = [];
+          if (ap.location) parts.push(`อยู่ที่ ${ap.location}`);
+          if (ap.action) parts.push(ap.action);
+          if (ap.development) parts.push(`พัฒนาการ: ${ap.development}`);
+          return `• ตอน ${ap.order} (${ap.chapterTitle}): ${parts.join(" — ") || "ปรากฏตัว"}`;
+        });
+        toCreate.push({
+          novel_id: rootNovelId,
+          name,
+          role: "ตัวประกอบ",
+          background: `สรุปจากไทม์ไลน์ตัวละคร:\n${lines.join("\n")}`,
+        });
+      }
+
+      if (toCreate.length === 0) {
+        toast.info(`ตัวละครทั้งหมด (${skipped} ตัว) มีอยู่ในคลังแล้ว`);
+        return;
+      }
+      await base44.entities.Character.bulkCreate(toCreate);
+      // รีเฟรชหน้าคลังตัวละคร + รายการในหน้านี้
+      queryClient.invalidateQueries({ queryKey: ["characters-bible", "story", rootNovelId] });
+      queryClient.invalidateQueries({ queryKey: ["characters-chartimeline", "story", rootNovelId] });
+      toast.success(`เพิ่ม ${toCreate.length} ตัวละครลงคลังแล้ว${skipped > 0 ? ` (ข้าม ${skipped} ตัวที่มีอยู่แล้ว)` : ""}`);
+    } catch (e) {
+      toast.error("เพิ่มตัวละครไม่สำเร็จ: " + (e.message || ""));
+    } finally {
+      setImporting(false);
+    }
+  };
+
   const handleBuild = async () => {
     if (written.length === 0) {
       toast.error("ยังไม่มีตอนที่เขียนแล้ว");
@@ -223,6 +293,19 @@ ${(ch.content || "").slice(0, 9000)}
                   {foundChars.map((name) => <SelectItem key={name} value={name}>{name}</SelectItem>)}
                 </SelectContent>
               </Select>
+              {foundChars.length > 0 && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 gap-1.5 text-xs border-primary/40 text-primary hover:bg-primary/10 ml-auto"
+                  onClick={handleImportAll}
+                  disabled={importing}
+                >
+                  {importing
+                    ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />กำลังเพิ่ม...</>
+                    : <><UserPlus className="w-3.5 h-3.5" />เพิ่มตัวละครทั้งหมดลงคลังตัวละคร</>}
+                </Button>
+              )}
             </div>
           )}
 
