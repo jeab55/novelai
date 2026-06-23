@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   ShieldCheck, Loader2, Sparkles, AlertTriangle, CheckCircle2, Users, Clock, Globe, Brain,
-  ChevronDown, ChevronUp, ListTree,
+  ChevronDown, ChevronUp, ListTree, Save, Check, Square, RotateCcw, Play,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -26,9 +26,10 @@ const SEVERITY = {
   low: { label: "เล็กน้อย", color: "bg-blue-100 text-blue-800 border-blue-300", bar: "border-l-blue-500" },
 };
 
-const ISSUE_SCHEMA = {
+const CHAPTER_ISSUE_SCHEMA = {
   type: "object",
   properties: {
+    summary: { type: "string", description: "สรุปข้อเท็จจริงสำคัญของตอนนี้แบบกระชับ (ตัวละคร ลักษณะ สถานที่ ช่วงเวลา ข้อมูลโลก ปมพล็อต)" },
     issues: {
       type: "array",
       items: {
@@ -37,8 +38,7 @@ const ISSUE_SCHEMA = {
           type: { type: "string", enum: ["character", "timeline", "world", "plot"] },
           severity: { type: "string", enum: ["high", "medium", "low"] },
           title: { type: "string" },
-          description: { type: "string" },
-          chapters: { type: "array", items: { type: "string" } },
+          detail: { type: "string", description: "อธิบายความขัดแย้งให้ชัดเจนว่าตอนก่อนหน้าพูดอย่างไร ตอนนี้พูดต่างออกไปอย่างไร" },
           suggestion: { type: "string" },
         },
       },
@@ -46,12 +46,25 @@ const ISSUE_SCHEMA = {
   },
 };
 
+function fmtTime(iso) {
+  if (!iso) return "";
+  try {
+    return new Date(iso).toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short" });
+  } catch {
+    return iso;
+  }
+}
+
 export default function ContinuityCheckPanel({ novelId, novel }) {
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0, label: "" });
   const [issues, setIssues] = useState(null);
   const [expanded, setExpanded] = useState({});
   const [filterType, setFilterType] = useState("all");
+  const [saveStatus, setSaveStatus] = useState("idle"); // idle | saving | saved
+  const [record, setRecord] = useState(null);
+  const [recordLoaded, setRecordLoaded] = useState(false);
+  const stopRef = useRef(false);
 
   const { data: chapters = [] } = useQuery({
     queryKey: ["chapters-continuity", novelId],
@@ -64,75 +77,167 @@ export default function ContinuityCheckPanel({ novelId, novel }) {
 
   const written = chapters.filter((c) => (c.content || "").trim().length > 50);
 
-  const handleScan = async () => {
+  // โหลดผลตรวจล่าสุดจาก ContinuityCheck (resume)
+  useEffect(() => {
+    if (!novelId) return;
+    let active = true;
+    (async () => {
+      try {
+        const found = await base44.entities.ContinuityCheck.filter({ novel_id: novelId });
+        if (!active) return;
+        const rec = found?.[0] || null;
+        if (rec) {
+          setRecord(rec);
+          let parsed = [];
+          try { parsed = JSON.parse(rec.issues || "[]"); } catch { parsed = []; }
+          setIssues(Array.isArray(parsed) ? parsed : []);
+          if (rec.status === "กำลังตรวจ" && rec.progress > 0 && rec.progress < (rec.total || 0)) {
+            setProgress({ done: rec.progress, total: rec.total, label: `ตรวจค้างไว้ ${rec.progress}/${rec.total} ตอน` });
+          }
+        }
+      } catch {
+        // ignore
+      } finally {
+        if (active) setRecordLoaded(true);
+      }
+    })();
+    return () => { active = false; };
+  }, [novelId]);
+
+  // upsert ผลตรวจลง ContinuityCheck (1 เรคคอร์ดต่อ 1 นิยาย)
+  const persist = async ({ issuesArr, done, total, status }) => {
+    setSaveStatus("saving");
+    const updated_at = new Date().toISOString();
+    const payload = {
+      novel_id: novelId,
+      issues: JSON.stringify(issuesArr),
+      progress: done,
+      total,
+      status,
+      updated_at,
+    };
+    try {
+      let rec = record;
+      if (rec?.id) {
+        await base44.entities.ContinuityCheck.update(rec.id, payload);
+        rec = { ...rec, ...payload };
+      } else {
+        rec = await base44.entities.ContinuityCheck.create(payload);
+      }
+      setRecord(rec);
+      setSaveStatus("saved");
+      return rec;
+    } catch (e) {
+      setSaveStatus("idle");
+      throw e;
+    }
+  };
+
+  const runScan = async (resume) => {
     if (written.length < 2) {
       toast.error("ต้องมีตอนที่เขียนแล้วอย่างน้อย 2 ตอนจึงจะตรวจความต่อเนื่องได้");
       return;
     }
+    stopRef.current = false;
     setRunning(true);
-    setIssues([]);
     setExpanded({});
+
+    const total = written.length;
+    const startIdx = resume && record?.status === "กำลังตรวจ" ? Math.min(record.progress || 0, total) : 0;
+    let accIssues = resume ? [...(issues || [])] : [];
+    if (!resume) setIssues([]);
+
+    // สร้างเรคคอร์ดเริ่มต้น/ตั้งสถานะกำลังตรวจ
     try {
-      // STEP 1: ทยอยสรุปแต่ละตอน (progress จริงตามจำนวนตอน)
-      setProgress({ done: 0, total: written.length + 1, label: "กำลังสรุปแต่ละตอน..." });
-      const summaries = [];
-      for (let i = 0; i < written.length; i++) {
-        const ch = written[i];
-        const sumPrompt = `สรุปข้อเท็จจริงสำคัญของตอนนี้แบบกระชับเพื่อใช้ตรวจความต่อเนื่อง ระบุ: ตัวละครที่ปรากฏพร้อมลักษณะที่บรรยาย (สีตา สีผม อายุ นิสัย), สถานที่/ฉาก, ช่วงเวลา/ลำดับเหตุการณ์, ข้อมูลโลกที่กล่าวถึง, และปมพล็อตที่เปิดหรือปิดในตอนนี้
-
-ตอน "${ch.order ? ch.order + ". " : ""}${ch.title}":
-"""
-${(ch.content || "").slice(0, 8000)}
-"""`;
-        const res = await invokeAIStable({ prompt: sumPrompt, model: "claude_sonnet_4_6" });
-        const inner = typeof res === "string" ? res : res?.response ?? res?.output ?? res;
-        summaries.push(`[ตอน ${ch.order ? ch.order + ". " : ""}${ch.title}]\n${typeof inner === "string" ? inner : JSON.stringify(inner)}`);
-        setProgress({ done: i + 1, total: written.length + 1, label: `สรุปแล้ว ${i + 1}/${written.length} ตอน` });
-      }
-
-      // STEP 2: เทียบหาความขัดแย้งข้ามตอน
-      setProgress({ done: written.length, total: written.length + 1, label: "กำลังเทียบหาความขัดแย้งข้ามตอน..." });
-      const checkPrompt = `คุณคือบรรณาธิการตรวจความต่อเนื่อง (continuity editor) มืออาชีพ จงเปรียบเทียบสรุปทุกตอนต่อไปนี้ของนิยายเรื่อง "${novel?.title || ""}" เพื่อหา "จุดขัดแย้ง/ไม่สอดคล้องกัน" ระหว่างตอน เช่น
-- character: ชื่อหรือลักษณะตัวละครที่บรรยายไม่ตรงกัน (สีตา สีผม อายุ นิสัย พฤติกรรม)
-- timeline: ลำดับเหตุการณ์หรือไทม์ไลน์ที่ขัดกัน วันเวลาที่ไม่สอดคล้อง
-- world: ข้อมูลโลก/สถานที่/ฉากที่เล่าไม่ตรงกัน
-- plot: ปมพล็อตที่เปิดไว้แต่ค้างไม่ได้สะสาง
-
-แต่ละปัญหาให้ระบุ:
-- type: หนึ่งใน character / timeline / world / plot
-- severity: high / medium / low
-- title: หัวข้อปัญหาสั้นๆ
-- description: อธิบายความขัดแย้งให้ชัดเจนว่าตอนไหนพูดอย่างไร ตอนไหนพูดต่างออกไป
-- chapters: รายชื่อตอนที่เกี่ยวข้อง (อ้างชื่อตอนตามที่ให้มา)
-- suggestion: ข้อเสนอแนะวิธีแก้ที่ทำได้จริง
-
-ถ้าไม่พบปัญหาให้คืน issues เป็น array ว่าง รายงานเฉพาะที่เป็นความขัดแย้งจริง อย่าเดา
-
-สรุปทุกตอน:
-"""
-${summaries.join("\n\n").slice(0, 24000)}
-"""`;
-
-      const result = await invokeAIStable({
-        prompt: checkPrompt,
-        model: "claude_sonnet_4_6",
-        response_json_schema: ISSUE_SCHEMA,
-      });
-      const parsed = typeof result === "string" ? JSON.parse(result) : result;
-      const list = parsed?.issues || parsed?.response?.issues || parsed?.output?.issues || [];
-      setProgress({ done: written.length + 1, total: written.length + 1, label: "เสร็จสิ้น" });
-      setIssues(Array.isArray(list) ? list : []);
-      toast.success(list.length === 0 ? "ไม่พบจุดขัดแย้ง 🎉" : `พบ ${list.length} จุดที่ควรตรวจสอบ`);
+      await persist({ issuesArr: accIssues, done: startIdx, total, status: "กำลังตรวจ" });
     } catch (e) {
-      toast.error("ตรวจความต่อเนื่องไม่สำเร็จ: " + (e.message || ""));
-      setIssues(null);
+      toast.error("บันทึกสถานะเริ่มต้นไม่สำเร็จ: " + (e.message || ""));
+      setRunning(false);
+      return;
+    }
+
+    const priorSummaries = [];
+    try {
+      for (let i = startIdx; i < total; i++) {
+        if (stopRef.current) {
+          await persist({ issuesArr: accIssues, done: i, total, status: "หยุดกลางคัน" });
+          toast.message("หยุดการตรวจแล้ว — ผลที่ตรวจมาถูกบันทึกไว้");
+          setRunning(false);
+          return;
+        }
+        const ch = written[i];
+        const chLabel = `${ch.order ? ch.order + ". " : ""}${ch.title}`;
+        setProgress({ done: i, total, label: `กำลังตรวจตอน "${chLabel}"...` });
+
+        const prompt = `คุณคือบรรณาธิการตรวจความต่อเนื่อง (continuity editor) มืออาชีพ กำลังตรวจนิยายเรื่อง "${novel?.title || ""}" ทีละตอน
+
+นี่คือสรุปข้อเท็จจริงของตอนก่อนหน้าทั้งหมด (ใช้เป็นฐานเทียบ):
+"""
+${priorSummaries.length ? priorSummaries.join("\n\n").slice(0, 18000) : "(นี่คือตอนแรกที่ตรวจ ยังไม่มีตอนก่อนหน้า)"}
+"""
+
+ตอนที่กำลังตรวจ "${chLabel}":
+"""
+${(ch.content || "").slice(0, 9000)}
+"""
+
+ให้ทำ 2 อย่าง:
+1) summary: สรุปข้อเท็จจริงสำคัญของ "ตอนนี้" แบบกระชับ (ตัวละครที่ปรากฏพร้อมลักษณะ เช่น สีตา สีผม อายุ นิสัย, สถานที่/ฉาก, ช่วงเวลา/ลำดับเหตุการณ์, ข้อมูลโลก, ปมพล็อตที่เปิด/ปิด)
+2) issues: หา "จุดขัดแย้ง/ไม่สอดคล้อง" ของตอนนี้เทียบกับตอนก่อนหน้า เช่น
+   - character: ลักษณะตัวละครบรรยายไม่ตรงกับตอนก่อน
+   - timeline: ลำดับ/วันเวลาเหตุการณ์ขัดกัน
+   - world: ข้อมูลโลก/สถานที่เล่าไม่ตรงกัน
+   - plot: ปมที่เปิดไว้ก่อนหน้าแต่ค้างไม่สะสาง หรือขัดกัน
+   ถ้าไม่พบให้คืน issues เป็น array ว่าง รายงานเฉพาะความขัดแย้งจริง อย่าเดา`;
+
+        const result = await invokeAIStable({
+          prompt,
+          model: "claude_sonnet_4_6",
+          response_json_schema: CHAPTER_ISSUE_SCHEMA,
+        });
+        const parsed = typeof result === "string" ? JSON.parse(result) : (result?.response ?? result?.output ?? result);
+        const summary = parsed?.summary || "";
+        const chIssues = Array.isArray(parsed?.issues) ? parsed.issues : [];
+
+        priorSummaries.push(`[ตอน ${chLabel}]\n${summary}`);
+
+        const mapped = chIssues.map((it) => ({
+          chapter_id: ch.id,
+          chapter_title: ch.title,
+          order: ch.order ?? null,
+          type: it.type || "plot",
+          severity: it.severity || "low",
+          title: it.title || "",
+          detail: it.detail || "",
+          suggestion: it.suggestion || "",
+        }));
+        accIssues = [...accIssues, ...mapped];
+
+        setIssues([...accIssues]);
+        setProgress({ done: i + 1, total, label: `ตรวจแล้ว ${i + 1}/${total} ตอน` });
+
+        // บันทึกเรียลไทม์ทันทีหลังตรวจตอนนี้เสร็จ
+        const status = i + 1 >= total ? "ตรวจเสร็จ" : "กำลังตรวจ";
+        await persist({ issuesArr: accIssues, done: i + 1, total, status });
+      }
+      toast.success(accIssues.length === 0 ? "ไม่พบจุดขัดแย้ง 🎉" : `พบ ${accIssues.length} จุดที่ควรตรวจสอบ`);
+    } catch (e) {
+      // เน็ตหลุด/error: บันทึกผลที่ได้มาแล้ว ไม่ทิ้ง
+      try {
+        await persist({ issuesArr: accIssues, done: progress.done, total, status: "หยุดกลางคัน" });
+      } catch { /* ignore */ }
+      toast.error("ตรวจไม่สำเร็จ — ผลที่ตรวจมาแล้วถูกบันทึกไว้: " + (e.message || ""));
     } finally {
       setRunning(false);
     }
   };
 
+  const handleStop = () => { stopRef.current = true; };
+
   const filtered = (issues || []).filter((i) => filterType === "all" || i.type === filterType);
   const pct = progress.total > 0 ? Math.round((progress.done / progress.total) * 100) : 0;
+  const hasResult = Array.isArray(issues);
+  const canResume = !running && record?.status === "หยุดกลางคัน" && (record.progress || 0) < (record.total || 0);
 
   return (
     <div className="max-w-5xl mx-auto p-4 space-y-4">
@@ -143,30 +248,61 @@ ${summaries.join("\n\n").slice(0, 24000)}
               <ShieldCheck className="w-5 h-5 text-primary" />
               ตรวจความต่อเนื่อง (Continuity Check)
             </CardTitle>
-            <Button onClick={handleScan} disabled={running || written.length < 2} className="gap-2">
-              {running ? <><Loader2 className="w-4 h-4 animate-spin" />กำลังสแกน...</> : <><Sparkles className="w-4 h-4" />สแกนทั้งเรื่อง</>}
-            </Button>
+            <div className="flex items-center gap-2 flex-wrap">
+              {running ? (
+                <Button variant="outline" onClick={handleStop} className="gap-2">
+                  <Square className="w-4 h-4" />หยุด
+                </Button>
+              ) : (
+                <>
+                  {canResume && (
+                    <Button variant="outline" onClick={() => runScan(true)} disabled={written.length < 2} className="gap-2">
+                      <Play className="w-4 h-4" />ตรวจต่อ
+                    </Button>
+                  )}
+                  <Button onClick={() => runScan(false)} disabled={written.length < 2} className="gap-2">
+                    {hasResult ? <><RotateCcw className="w-4 h-4" />ตรวจใหม่</> : <><Sparkles className="w-4 h-4" />สแกนทั้งเรื่อง</>}
+                  </Button>
+                </>
+              )}
+            </div>
           </div>
           <p className="text-sm text-muted-foreground">
-            AI จะสแกน {written.length} ตอนที่เขียนแล้ว เพื่อหาจุดขัดแย้งเรื่องตัวละคร ไทม์ไลน์ โลก/ฉาก และพล็อตที่ค้าง
+            AI จะตรวจ {written.length} ตอนที่เขียนแล้วทีละตอน เพื่อหาจุดขัดแย้งเรื่องตัวละคร ไทม์ไลน์ โลก/ฉาก และพล็อตที่ค้าง — บันทึกผลอัตโนมัติทุกตอน
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
-          {running && (
+          {/* ตัวบ่งชี้การบันทึก + ความคืบหน้า */}
+          {(running || (record && (saveStatus !== "idle" || record.updated_at))) && (
             <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center justify-between text-sm flex-wrap gap-2">
                 <span className="text-primary font-medium flex items-center gap-1.5">
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />{progress.label}
+                  {running ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                  {running ? progress.label : (record?.status || "")}
                 </span>
-                <span className="text-muted-foreground">{pct}%</span>
+                <span className="flex items-center gap-1.5 text-xs">
+                  {saveStatus === "saving" ? (
+                    <span className="text-amber-600 flex items-center gap-1"><Save className="w-3.5 h-3.5 animate-pulse" />กำลังบันทึก…</span>
+                  ) : (record?.updated_at ? (
+                    <span className="text-green-600 flex items-center gap-1"><Check className="w-3.5 h-3.5" />บันทึกแล้ว • {fmtTime(record.updated_at)}</span>
+                  ) : null)}
+                </span>
               </div>
-              <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
-                <div className="h-2 rounded-full bg-primary transition-all duration-300" style={{ width: `${pct}%` }} />
-              </div>
+              {(running || (progress.total > 0)) && (
+                <>
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span>ตรวจแล้ว {progress.done}/{progress.total} ตอน</span>
+                    <span>{pct}%</span>
+                  </div>
+                  <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+                    <div className="h-2 rounded-full bg-primary transition-all duration-300" style={{ width: `${pct}%` }} />
+                  </div>
+                </>
+              )}
             </div>
           )}
 
-          {issues && !running && issues.length === 0 && (
+          {hasResult && !running && issues.length === 0 && (
             <Alert className="border-green-500 bg-green-50 dark:bg-green-900/10">
               <AlertDescription className="flex items-center gap-3">
                 <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0" />
@@ -175,7 +311,7 @@ ${summaries.join("\n\n").slice(0, 24000)}
             </Alert>
           )}
 
-          {issues && !running && issues.length > 0 && (
+          {hasResult && issues.length > 0 && (
             <>
               <div className="flex items-center gap-2 flex-wrap">
                 <Badge variant="outline" className="gap-1"><AlertTriangle className="w-3 h-3" />{issues.length} จุด</Badge>
@@ -198,7 +334,7 @@ ${summaries.join("\n\n").slice(0, 24000)}
                   const Icon = tm.icon;
                   const open = expanded[idx];
                   return (
-                    <motion.div key={idx} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.04 }}>
+                    <motion.div key={idx} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.03 }}>
                       <Card className={`border-l-4 ${sv.bar}`}>
                         <CardHeader className="py-3">
                           <div className="flex items-start justify-between gap-3">
@@ -210,8 +346,10 @@ ${summaries.join("\n\n").slice(0, 24000)}
                                   <Badge variant="outline">{tm.label}</Badge>
                                 </div>
                                 <CardTitle className="text-base">{issue.title}</CardTitle>
-                                {issue.chapters?.length > 0 && (
-                                  <p className="text-xs text-muted-foreground mt-1">ตอนที่เกี่ยวข้อง: {issue.chapters.join(", ")}</p>
+                                {issue.chapter_title && (
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    ตอน: {issue.order ? issue.order + ". " : ""}{issue.chapter_title}
+                                  </p>
                                 )}
                               </div>
                             </div>
@@ -224,7 +362,7 @@ ${summaries.join("\n\n").slice(0, 24000)}
                           <CardContent className="space-y-3 pt-0">
                             <div>
                               <p className="text-sm font-medium mb-1">รายละเอียดความขัดแย้ง</p>
-                              <p className="text-sm text-muted-foreground whitespace-pre-line">{issue.description}</p>
+                              <p className="text-sm text-muted-foreground whitespace-pre-line">{issue.detail}</p>
                             </div>
                             {issue.suggestion && (
                               <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
@@ -242,7 +380,7 @@ ${summaries.join("\n\n").slice(0, 24000)}
             </>
           )}
 
-          {!issues && !running && (
+          {recordLoaded && !hasResult && !running && (
             <div className="text-center py-10">
               <ListTree className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
               <p className="text-muted-foreground text-sm">
