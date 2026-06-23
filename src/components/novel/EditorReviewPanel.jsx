@@ -99,13 +99,21 @@ export default function EditorReviewPanel({ chapter, novel, novelId, onContentUp
 
   const selectedWriter = novelWriter;
 
+  // บันทึกรีวิวใหม่ลง EditorReview เป็นแหล่งมาตรฐานเดียว (เลิกเขียนลงตาราง Review)
   const addMutation = useMutation({
-    mutationFn: (data) => base44.entities.Review.create(data),
+    mutationFn: (data) =>
+      base44.entities.EditorReview.create({
+        novel_id: novelId,
+        chapter_id: chapter.id,
+        chapter_title: chapter.title,
+        overall_summary: `[${data.reviewer_type}] ${data.reviewer_name}: ${data.content}`,
+        issues: "[]",
+      }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["reviews", chapter.id] });
+      queryClient.invalidateQueries({ queryKey: ["editorReviews", chapter.id] });
       setForm({ reviewer_name: "", reviewer_type: "บรรณาธิการ AI", content: "" });
       setShowForm(false);
-      toast.success("เพิ่มรีวิวแล้ว");
+      toast.success("บันทึกรีวิวแล้ว (รวมในแผงบันทึกบรรณาธิการ)");
     },
   });
 

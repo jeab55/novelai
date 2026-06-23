@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowLeft, Save, Loader2, Download, Copy, MoreHorizontal, Maximize2, Minimize2, Sparkles, Clock, X, RefreshCw, History, PieChart, FileText, CheckCircle2, Type, AlignJustify, ShieldCheck, Image, Wand2, Users2, Lightbulb } from "lucide-react";
 import AiDraftDialog from "./AiDraftDialog";
 import EditorReviewPanel from "./EditorReviewPanel";
+import UnifiedChapterReviewPanel from "./UnifiedChapterReviewPanel";
 import VersionHistoryDialog from "./VersionHistoryDialog";
 import ChapterBalanceMeter from "./ChapterBalanceMeter";
 import SceneTemplateDialog from "./SceneTemplateDialog";
@@ -702,6 +703,10 @@ export default function ChapterEditor({ chapter, novelId, novel, onBack }) {
         />
       )}
       
+      <UnifiedChapterReviewPanel
+        chapter={{ ...safeChapter, title }}
+        novelId={novelId}
+      />
       <EditorReviewPanel
         chapter={{ ...safeChapter, content, editor_review: editorReview, previous_content: previousContent, plot_event_id: plotEventId, plot_event_title: plotEventTitle, plot_event_description: plotEventDescription, plot_event_order: plotEventOrder }}
         novel={novel || { title: "" }}
