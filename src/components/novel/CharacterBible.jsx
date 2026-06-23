@@ -13,6 +13,8 @@ import VersionHistoryDialog from "./VersionHistoryDialog";
 import { motion, AnimatePresence } from "framer-motion";
 import CharacterForm from "./CharacterForm";
 import CharacterRelationshipMap from "./CharacterRelationshipMap";
+import { useStorySeasons, fetchAcrossSeasons, dedupeByName } from "@/hooks/useStorySeasons";
+import { Layers } from "lucide-react";
 
 const roleColors = {
   "ตัวเอก": "bg-amber-100 text-amber-700",
@@ -28,6 +30,9 @@ export default function CharacterBible({ novelId, novel }) {
   const [versionChar, setVersionChar] = useState(null);
   const queryClient = useQueryClient();
 
+  // เรื่องหลัก + ทุกภาค → อ่านตัวละครร่วมข้ามภาค, สร้างใหม่ผูกกับ root เสมอ
+  const { rootNovelId, seasonIds } = useStorySeasons(novelId, novel);
+
   const { data: novelWriter } = useQuery({
     queryKey: ["writer", novel?.writer_id],
     queryFn: () => base44.entities.Writer.filter({ id: novel.writer_id }),
@@ -35,17 +40,24 @@ export default function CharacterBible({ novelId, novel }) {
     select: (d) => d[0],
   });
 
-  const { data: characters = [], isLoading } = useQuery({
-    queryKey: ["characters", novelId],
+  const { data: rawCharacters = [], isLoading } = useQuery({
+    queryKey: ["characters", "story", rootNovelId, seasonIds.join(",")],
     queryFn: async () => {
-      const all = await base44.entities.Character.filter({ novel_id: novelId });
+      const all = await fetchAcrossSeasons("Character", seasonIds);
       return all.filter((c) => !c.is_deleted);
     },
+    enabled: seasonIds.length > 0,
   });
+
+  // รวมรายการชื่อซ้ำข้ามภาคเป็นรายการเดียว (มีป้ายบอกว่าซ้ำ)
+  const characters = dedupeByName(rawCharacters, "name");
+
+  const invalidate = () =>
+    queryClient.invalidateQueries({ queryKey: ["characters", "story", rootNovelId, seasonIds.join(",")] });
 
   const deleteMutation = useMutation({
     mutationFn: (id) => base44.entities.Character.update(id, { is_deleted: true }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["characters", novelId] }),
+    onSuccess: invalidate,
   });
 
   const handleOpenEdit = (char) => {
@@ -64,7 +76,7 @@ export default function CharacterBible({ novelId, novel }) {
           novelId={novelId}
           currentData={versionChar}
           currentLabel={versionChar.name}
-          onRestored={() => queryClient.invalidateQueries({ queryKey: ["characters", novelId] })}
+          onRestored={invalidate}
         />
       )}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
@@ -73,7 +85,7 @@ export default function CharacterBible({ novelId, novel }) {
           <p className="text-sm text-muted-foreground">{characters.length} ตัวละคร</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <CharacterRelationshipMap novelId={novelId} />
+          <CharacterRelationshipMap novelId={rootNovelId} seasonIds={seasonIds} />
           <Dialog open={dialogOpen} onOpenChange={(v) => { setDialogOpen(v); if (!v) setEditing(null); }}>
             <DialogTrigger asChild>
               <Button size="sm" className="gap-1.5">
@@ -86,11 +98,11 @@ export default function CharacterBible({ novelId, novel }) {
                 <DialogTitle className="font-heading">{editing ? "แก้ไขตัวละคร" : "เพิ่มตัวละครใหม่"}</DialogTitle>
               </DialogHeader>
               <CharacterForm
-                novelId={novelId}
+                novelId={rootNovelId}
                 character={editing}
-                novelIdForVersion={novelId}
+                novelIdForVersion={rootNovelId}
                 writerSystemPrompt={novelWriter?.system_prompt}
-                onDone={() => { setDialogOpen(false); setEditing(null); }}
+                onDone={() => { setDialogOpen(false); setEditing(null); invalidate(); }}
               />
             </DialogContent>
           </Dialog>
@@ -177,6 +189,12 @@ export default function CharacterBible({ novelId, novel }) {
                       <Badge className={`${roleColors[char.role] || roleColors["ตัวประกอบ"]} text-xs`}>
                         {char.role || "ตัวประกอบ"}
                       </Badge>
+                      {char._isDuplicated && (
+                        <Badge variant="outline" className="text-[10px] border-orange-300 text-orange-600 bg-orange-50 gap-1">
+                          <Layers className="w-2.5 h-2.5" />
+                          ซ้ำ {char._duplicates.length + 1} ภาค
+                        </Badge>
+                      )}
                       {char.dialect && char.dialect !== "กลาง" && (
                         <Badge variant="outline" className="text-[10px] border-primary/30 text-primary">
                           {char.dialect}

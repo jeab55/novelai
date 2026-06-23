@@ -25,6 +25,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ERA_TEMPLATES } from "./EraTemplates";
 import WorldCategoryManager, { getColorClasses } from "./WorldCategoryManager";
 import AiWorldBuilderDialog from "./AiWorldBuilderDialog";
+import { useStorySeasons, fetchAcrossSeasons } from "@/hooks/useStorySeasons";
+import { Layers } from "lucide-react";
 
 // Built-in fallback categories
 const DEFAULT_CATEGORIES = [
@@ -53,28 +55,39 @@ export default function WorldBible({ novelId, onNavigateToTimeline, novel }) {
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
   const queryClient = useQueryClient();
 
+  // เรื่องหลัก + ทุกภาค → อ่านโลก/ฉากร่วมข้ามภาค, สร้างใหม่ผูกกับ root เสมอ
+  const { rootNovelId, seasonIds } = useStorySeasons(novelId, novel);
+  const seasonKey = seasonIds.join(",");
+
   const { data: entries = [], isLoading } = useQuery({
-    queryKey: ["worldEntries", novelId],
+    queryKey: ["worldEntries", "story", rootNovelId, seasonKey],
     queryFn: async () => {
-      const all = await base44.entities.WorldEntry.filter({ novel_id: novelId });
+      const all = await fetchAcrossSeasons("WorldEntry", seasonIds);
       return all.filter((e) => !e.is_deleted);
     },
+    enabled: seasonIds.length > 0,
   });
 
   const { data: customCategories = [] } = useQuery({
-    queryKey: ["worldCategories", novelId],
-    queryFn: () =>
-      base44.entities.WorldCategory.filter({ novel_id: novelId }),
+    queryKey: ["worldCategories", "story", rootNovelId, seasonKey],
+    queryFn: () => fetchAcrossSeasons("WorldCategory", seasonIds),
+    enabled: seasonIds.length > 0,
   });
 
-  // PlotEvents for linking (กรองเฉพาะที่ไม่ถูกลบ)
+  // PlotEvents for linking (กรองเฉพาะที่ไม่ถูกลบ) — ข้ามทุกภาค
   const { data: plotEvents = [] } = useQuery({
-    queryKey: ["plotEvents", novelId],
+    queryKey: ["plotEvents", "story", rootNovelId, seasonKey],
     queryFn: async () => {
-      const all = await base44.entities.PlotEvent.filter({ novel_id: novelId }, "order");
+      const all = await fetchAcrossSeasons("PlotEvent", seasonIds, "order");
       return all.filter((e) => !e.is_deleted);
     },
+    enabled: seasonIds.length > 0,
   });
+
+  const invalidateEntries = () =>
+    queryClient.invalidateQueries({ queryKey: ["worldEntries", "story", rootNovelId, seasonKey] });
+  const invalidateCats = () =>
+    queryClient.invalidateQueries({ queryKey: ["worldCategories", "story", rootNovelId, seasonKey] });
 
   // Map world_entry_id -> plotEvents[]
   const eventsByWorldEntry = plotEvents.reduce((acc, ev) => {
@@ -101,11 +114,11 @@ export default function WorldBible({ novelId, onNavigateToTimeline, novel }) {
         });
         return base44.entities.WorldEntry.update(editing.id, data);
       } else {
-        return base44.entities.WorldEntry.create({ ...data, novel_id: novelId });
+        return base44.entities.WorldEntry.create({ ...data, novel_id: rootNovelId });
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["worldEntries", novelId] });
+      invalidateEntries();
       toast.success("บันทึกแล้ว");
       setDialogOpen(false);
       setEditing(null);
@@ -121,7 +134,7 @@ export default function WorldBible({ novelId, onNavigateToTimeline, novel }) {
   const deleteMutation = useMutation({
     mutationFn: (id) => base44.entities.WorldEntry.update(id, { is_deleted: true }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["worldEntries", novelId] });
+      invalidateEntries();
       toast.success("ลบแล้ว");
     },
     onError: (err) => toast.error(`ลบไม่สำเร็จ: ${err?.message || "กรุณาลองใหม่"}`),
@@ -129,20 +142,20 @@ export default function WorldBible({ novelId, onNavigateToTimeline, novel }) {
 
   const clearAllMutation = useMutation({
     mutationFn: async () => {
-      // ดึงเฉพาะของนิยายเรื่องนี้เท่านั้น (กรองด้วย novel_id)
+      // ดึงของทุกภาคในเรื่องเดียวกัน (ตามที่แสดงร่วมบนหน้าจอ)
       const [allEntries, allCats] = await Promise.all([
-        base44.entities.WorldEntry.filter({ novel_id: novelId }),
-        base44.entities.WorldCategory.filter({ novel_id: novelId }),
+        fetchAcrossSeasons("WorldEntry", seasonIds),
+        fetchAcrossSeasons("WorldCategory", seasonIds),
       ]);
-      const liveEntries = allEntries.filter((e) => !e.is_deleted && e.novel_id === novelId);
-      const liveCats = allCats.filter((c) => c.novel_id === novelId);
+      const liveEntries = allEntries.filter((e) => !e.is_deleted);
+      const liveCats = allCats;
       await Promise.all(liveEntries.map((e) => base44.entities.WorldEntry.delete(e.id)));
       await Promise.all(liveCats.map((c) => base44.entities.WorldCategory.delete(c.id)));
       return liveEntries.length + liveCats.length;
     },
     onSuccess: (count) => {
-      queryClient.invalidateQueries({ queryKey: ["worldEntries", novelId] });
-      queryClient.invalidateQueries({ queryKey: ["worldCategories", novelId] });
+      invalidateEntries();
+      invalidateCats();
       setClearConfirmOpen(false);
       toast.success(`ล้างโลก/ฉากทั้งหมดแล้ว ${count} รายการ`);
     },
@@ -164,7 +177,7 @@ export default function WorldBible({ novelId, onNavigateToTimeline, novel }) {
     onSave: async (data) => {
       if (!editing) return;
       await base44.entities.WorldEntry.update(editing.id, data);
-      queryClient.invalidateQueries({ queryKey: ["worldEntries", novelId] });
+      invalidateEntries();
     },
   });
 
@@ -183,9 +196,9 @@ export default function WorldBible({ novelId, onNavigateToTimeline, novel }) {
     try {
       if (era) {
         await Promise.all(era.entries.map((entry) =>
-          base44.entities.WorldEntry.create({ ...entry, novel_id: novelId })
+          base44.entities.WorldEntry.create({ ...entry, novel_id: rootNovelId })
         ));
-        queryClient.invalidateQueries({ queryKey: ["worldEntries", novelId] });
+        invalidateEntries();
         toast.success(`บันทึกแล้ว ${era.entries.length} รายการ`);
       }
       setImportingEra(false);
@@ -203,6 +216,14 @@ export default function WorldBible({ novelId, onNavigateToTimeline, novel }) {
     }
   };
 
+  // หาชื่อที่ซ้ำกันข้ามภาค (เพื่อแปะป้าย "ซ้ำ" ให้ผู้ใช้เลือกรวมเองภายหลัง)
+  const titleCounts = entries.reduce((acc, e) => {
+    const k = (e.title || "").trim().toLowerCase();
+    if (k) acc[k] = (acc[k] || 0) + 1;
+    return acc;
+  }, {});
+  const isDup = (e) => (titleCounts[(e.title || "").trim().toLowerCase()] || 0) > 1;
+
   // Group by category for grouped view
   const grouped = categoryNames
     .map((name) => ({ name, items: filtered.filter((e) => e.category === name) }))
@@ -214,9 +235,9 @@ export default function WorldBible({ novelId, onNavigateToTimeline, novel }) {
     <div className="max-w-4xl mx-auto px-4 py-6">
       <AiWorldBuilderDialog
         open={worldBuilderOpen}
-        onClose={() => setWorldBuilderOpen(false)}
+        onClose={() => { setWorldBuilderOpen(false); invalidateEntries(); }}
         novel={novel}
-        novelId={novelId}
+        novelId={rootNovelId}
       />
 
       <AlertDialog open={clearConfirmOpen} onOpenChange={setClearConfirmOpen}>
@@ -397,9 +418,9 @@ export default function WorldBible({ novelId, onNavigateToTimeline, novel }) {
           >
             <div className="border border-border/60 rounded-xl p-4 bg-card/60">
               <WorldCategoryManager
-                novelId={novelId}
+                novelId={rootNovelId}
                 categories={customCategories}
-                onClose={() => setCatManagerOpen(false)}
+                onClose={() => { setCatManagerOpen(false); invalidateCats(); }}
               />
             </div>
           </motion.div>
@@ -473,6 +494,7 @@ export default function WorldBible({ novelId, onNavigateToTimeline, novel }) {
                        onHistory={() => setVersionEntry(entry)}
                        linkedEvents={eventsByWorldEntry[entry.id] || []}
                        onNavigateToTimeline={onNavigateToTimeline}
+                       isDuplicated={isDup(entry)}
                       />
                     ))}
                   </AnimatePresence>
@@ -502,6 +524,7 @@ export default function WorldBible({ novelId, onNavigateToTimeline, novel }) {
                   search={search}
                   linkedEvents={eventsByWorldEntry[entry.id] || []}
                   onNavigateToTimeline={onNavigateToTimeline}
+                  isDuplicated={isDup(entry)}
                 />
               );
             })}
@@ -521,7 +544,7 @@ function highlightText(text, query) {
   );
 }
 
-function WorldEntryCard({ entry, index, colors, expanded, onToggle, onEdit, onDelete, onHistory, search, linkedEvents = [], onNavigateToTimeline }) {
+function WorldEntryCard({ entry, index, colors, expanded, onToggle, onEdit, onDelete, onHistory, search, linkedEvents = [], onNavigateToTimeline, isDuplicated }) {
   const isLong = entry.description && entry.description.length > 120;
   const isLocation = entry.category === "สถานที่";
 
@@ -541,6 +564,11 @@ function WorldEntryCard({ entry, index, colors, expanded, onToggle, onEdit, onDe
             <p className="font-semibold text-sm leading-snug flex-1">
               {search ? highlightText(entry.title, search) : entry.title}
             </p>
+            {isDuplicated && (
+              <Badge variant="outline" className="text-[10px] border-orange-300 text-orange-600 bg-orange-50 gap-1 shrink-0">
+                <Layers className="w-2.5 h-2.5" />ซ้ำ
+              </Badge>
+            )}
             {entry.category && (
               <Badge className={`${colors.bg} ${colors.text} border-0 text-xs shrink-0`}>{entry.category}</Badge>
             )}

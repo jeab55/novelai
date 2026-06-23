@@ -18,8 +18,12 @@ import AiWorldBuilderDialog from "./AiWorldBuilderDialog";
 import CharacterRelationshipDiagram from "./CharacterRelationshipDiagram";
 import TimelineCalendarView from "./TimelineCalendarView";
 import HistoricalEventSearchDialog from "./HistoricalEventSearchDialog";
+import { useStorySeasons, fetchAcrossSeasons } from "@/hooks/useStorySeasons";
 
 export default function Timeline({ novelId, novel, onOpenChapter, onNavigateToWorldBible }) {
+  // เรื่องหลัก + ทุกภาค → อ่านไทม์ไลน์/สถานที่ร่วมข้ามภาค, สร้างใหม่ผูกกับ root เสมอ
+  const { rootNovelId, seasonIds } = useStorySeasons(novelId, novel);
+  const seasonKey = seasonIds.join(",");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [aiDialogOpen, setAiDialogOpen] = useState(false);
   const [worldBuilderOpen, setWorldBuilderOpen] = useState(false);
@@ -31,12 +35,16 @@ export default function Timeline({ novelId, novel, onOpenChapter, onNavigateToWo
   const queryClient = useQueryClient();
 
   const { data: events = [], isLoading } = useQuery({
-    queryKey: ["plotEvents", novelId],
+    queryKey: ["plotEvents", "story", rootNovelId, seasonKey],
     queryFn: async () => {
-      const all = await base44.entities.PlotEvent.filter({ novel_id: novelId }, "order");
-      return all.filter((e) => !e.is_deleted);
+      const all = await fetchAcrossSeasons("PlotEvent", seasonIds, "order");
+      return all.filter((e) => !e.is_deleted).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
     },
+    enabled: seasonIds.length > 0,
   });
+
+  const invalidateEvents = () =>
+    queryClient.invalidateQueries({ queryKey: ["plotEvents", "story", rootNovelId, seasonKey] });
 
   const { data: chapters = [] } = useQuery({
     queryKey: ["chapters", novelId],
@@ -46,13 +54,14 @@ export default function Timeline({ novelId, novel, onOpenChapter, onNavigateToWo
     },
   });
 
-  // World entries for location linking (หมวดสถานที่)
+  // World entries for location linking (หมวดสถานที่) — ข้ามทุกภาค
   const { data: worldEntries = [] } = useQuery({
-    queryKey: ["worldEntries", novelId],
+    queryKey: ["worldEntries", "story", rootNovelId, seasonKey],
     queryFn: async () => {
-      const all = await base44.entities.WorldEntry.filter({ novel_id: novelId });
+      const all = await fetchAcrossSeasons("WorldEntry", seasonIds);
       return all.filter((e) => !e.is_deleted && e.category === "สถานที่");
     },
+    enabled: seasonIds.length > 0,
   });
 
   // Map world_entry_id -> entry for quick lookup
@@ -79,18 +88,18 @@ export default function Timeline({ novelId, novel, onOpenChapter, onNavigateToWo
         });
         return base44.entities.PlotEvent.update(editing.id, data);
       } else {
-        return base44.entities.PlotEvent.create({ ...data, novel_id: novelId });
+        return base44.entities.PlotEvent.create({ ...data, novel_id: rootNovelId });
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["plotEvents", novelId] });
+      invalidateEvents();
       closeDialog();
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id) => base44.entities.PlotEvent.update(id, { is_deleted: true }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["plotEvents", novelId] }),
+    onSuccess: invalidateEvents,
   });
 
   const closeDialog = () => {

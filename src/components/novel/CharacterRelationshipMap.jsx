@@ -14,23 +14,25 @@ const roleColors = {
   "ตัวประกอบ": "bg-gray-100 text-gray-600",
 };
 
-export default function CharacterRelationshipMap({ open, onClose, novelId }) {
+export default function CharacterRelationshipMap({ open, onClose, novelId, seasonIds }) {
+  const ids = (seasonIds && seasonIds.length > 0) ? seasonIds : [novelId].filter(Boolean);
+
   const { data: characters = [] } = useQuery({
-    queryKey: ["characters", novelId],
+    queryKey: ["characters", "story-map", ids.join(",")],
     queryFn: async () => {
-      const all = await base44.entities.Character.filter({ novel_id: novelId });
+      const all = (await Promise.all(ids.map((id) => base44.entities.Character.filter({ novel_id: id })))).flat();
       return all.filter((c) => !c.is_deleted);
     },
-    enabled: open,
+    enabled: open && ids.length > 0,
   });
 
   const { data: events = [] } = useQuery({
-    queryKey: ["plotEvents", novelId],
+    queryKey: ["plotEvents", "story-map", ids.join(",")],
     queryFn: async () => {
-      const all = await base44.entities.PlotEvent.filter({ novel_id: novelId }, "order");
+      const all = (await Promise.all(ids.map((id) => base44.entities.PlotEvent.filter({ novel_id: id }, "order")))).flat();
       return all.filter((e) => !e.is_deleted);
     },
-    enabled: open,
+    enabled: open && ids.length > 0,
   });
 
   // สร้าง mapping ของตัวละครในแต่ละเหตุการณ์
