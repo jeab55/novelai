@@ -13,7 +13,7 @@ import VersionHistoryDialog from "./VersionHistoryDialog";
 import { motion, AnimatePresence } from "framer-motion";
 import CharacterForm from "./CharacterForm";
 import CharacterRelationshipMap from "./CharacterRelationshipMap";
-import { useStorySeasons, fetchAcrossSeasons, dedupeByName } from "@/hooks/useStorySeasons";
+import { useStorySeasons, dedupeByName } from "@/hooks/useStorySeasons";
 import { Layers } from "lucide-react";
 
 const roleColors = {
@@ -40,20 +40,24 @@ export default function CharacterBible({ novelId, novel, focusCharacterName, onF
     select: (d) => d[0],
   });
 
+  const seasonKey = seasonIds.join(",");
   const { data: rawCharacters = [], isLoading } = useQuery({
-    queryKey: ["characters", "story", rootNovelId, seasonIds.join(",")],
+    queryKey: ["characters-bible", "story", rootNovelId, seasonKey],
     queryFn: async () => {
-      const all = await fetchAcrossSeasons("Character", seasonIds);
-      return all.filter((c) => !c.is_deleted);
+      const lists = await Promise.all(
+        seasonIds.map((id) => base44.entities.Character.filter({ novel_id: id }))
+      );
+      return lists.flat().filter((c) => !c.is_deleted);
     },
     enabled: seasonIds.length > 0,
+    staleTime: 0,
   });
 
   // รวมรายการชื่อซ้ำข้ามภาคเป็นรายการเดียว (มีป้ายบอกว่าซ้ำ)
   const characters = dedupeByName(rawCharacters, "name");
 
   const invalidate = () =>
-    queryClient.invalidateQueries({ queryKey: ["characters", "story", rootNovelId, seasonIds.join(",")] });
+    queryClient.invalidateQueries({ queryKey: ["characters-bible", "story", rootNovelId, seasonKey] });
 
   // เมื่อถูกส่งชื่อตัวละครมาจากไทม์ไลน์ → มีอยู่แล้วเปิดแก้ไข, ไม่มีให้สร้างใหม่ (ผูก root) แล้วเปิดแก้ไขทันที
   const [focusResolving, setFocusResolving] = useState(false);
