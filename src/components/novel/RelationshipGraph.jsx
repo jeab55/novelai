@@ -57,6 +57,8 @@ export default function RelationshipGraph({ characters, edges }) {
           const active = isEdgeActive(e);
           const mx = (a.x + b.x) / 2;
           const my = (a.y + b.y) / 2;
+          const labelText = e.label || style.label;
+          const boxW = Math.max(40, labelText.length * 6.6 + 14);
           return (
             <g key={idx} opacity={active ? 1 : 0.12} style={{ transition: "opacity 0.2s" }}>
               <line
@@ -65,11 +67,11 @@ export default function RelationshipGraph({ characters, edges }) {
                 strokeWidth={hoverId && active ? 2.5 : 1.6}
                 strokeDasharray={e.source === "event" ? "5 4" : undefined}
               />
-              {hoverId && active && (
+              {active && (
                 <>
-                  <rect x={mx - 26} y={my - 10} width={52} height={18} rx={6} fill="white" stroke={style.stroke} strokeWidth={0.8} />
+                  <rect x={mx - boxW / 2} y={my - 10} width={boxW} height={19} rx={6} fill="white" stroke={style.stroke} strokeWidth={0.8} opacity={0.95} />
                   <text x={mx} y={my + 3} textAnchor="middle" fontSize={10} fill={style.stroke} fontWeight={600}>
-                    {style.label}
+                    {labelText}
                   </text>
                 </>
               )}

@@ -23,6 +23,14 @@ const matchChar = (characters, raw) =>
     c.name.split(" ")[0].includes(raw.split(" ")[0])
   );
 
+// สรุปคำอธิบายความสัมพันธ์ให้สั้นลงเพื่อแสดงบนเส้นเชื่อม
+function cleanLabel(text = "") {
+  // ตัดส่วนขยายหลังเครื่องหมาย — หรือ - ออก เหลือเฉพาะนิยามความสัมพันธ์
+  let s = text.split(/[—–-]/)[0].trim();
+  if (!s) s = text.trim();
+  return s.length > 28 ? s.slice(0, 28) + "…" : s;
+}
+
 // หาตัวละครอื่นที่ถูกเอ่ยถึงในข้อความความสัมพันธ์ (จับชื่อ/ชื่อต้นที่ปรากฏในประโยค)
 const findMentioned = (characters, self, text) =>
   characters.filter((c) => {
@@ -69,12 +77,12 @@ export default function CharacterRelationships() {
   const edges = useMemo(() => {
     const seen = new Set();
     const result = [];
-    const addEdge = (from, to, type, source) => {
+    const addEdge = (from, to, type, source, label) => {
       if (from === to) return;
       const key = [from, to].sort().join("|");
       if (seen.has(key)) return;
       seen.add(key);
-      result.push({ from, to, type, source });
+      result.push({ from, to, type, source, label: label || "" });
     };
 
     // จากฟิลด์ relationships — จับทุกตัวละครที่ถูกเอ่ยถึงในแต่ละบรรทัด
@@ -82,7 +90,7 @@ export default function CharacterRelationships() {
       if (!char.relationships) return;
       char.relationships.split("/").map((r) => r.trim()).filter(Boolean).forEach((rel) => {
         const targets = findMentioned(characters, char, rel);
-        targets.forEach((target) => addEdge(char.id, target.id, getRelationshipType(rel), "field"));
+        targets.forEach((target) => addEdge(char.id, target.id, getRelationshipType(rel), "field", cleanLabel(rel)));
       });
     });
 
@@ -93,7 +101,7 @@ export default function CharacterRelationships() {
         .map((name) => matchChar(characters, name)).filter(Boolean);
       for (let i = 0; i < involved.length; i++) {
         for (let j = i + 1; j < involved.length; j++) {
-          addEdge(involved[i].id, involved[j].id, "อื่นๆ", "event");
+          addEdge(involved[i].id, involved[j].id, "อื่นๆ", "event", `ร่วมเหตุการณ์: ${ev.title}`);
         }
       }
     });
