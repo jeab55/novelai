@@ -9,7 +9,8 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, Clock, Trash2, Edit2, BookOpen, Landmark, Loader2, Sparkles, History, Calendar, List, MapPin, ExternalLink, Globe } from "lucide-react";
+import { Plus, Clock, Trash2, Edit2, BookOpen, Landmark, Loader2, Sparkles, History, Calendar, List, MapPin, ExternalLink, Globe, Network } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import VersionHistoryDialog from "./VersionHistoryDialog";
 import { saveVersion } from "@/lib/saveVersion";
 import { motion } from "framer-motion";
@@ -33,6 +34,7 @@ export default function Timeline({ novelId, novel, onOpenChapter, onNavigateToWo
   const [viewMode, setViewMode] = useState("list"); // list | calendar
   const [historicalSearchOpen, setHistoricalSearchOpen] = useState(false);
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const { data: events = [], isLoading } = useQuery({
     queryKey: ["plotEvents", "story", rootNovelId, seasonKey],
@@ -171,6 +173,15 @@ export default function Timeline({ novelId, novel, onOpenChapter, onNavigateToWo
           >
             <Sparkles className="w-3.5 h-3.5" />
             ให้ AI ช่วยวางพล็อต
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5"
+            onClick={() => navigate(`/novel/${novelId}/relationships`)}
+          >
+            <Network className="w-3.5 h-3.5" />
+            หน้าแผนผังความสัมพันธ์
           </Button>
 
           <Dialog open={dialogOpen} onOpenChange={(v) => { if (!v) closeDialog(); else setDialogOpen(true); }}>

@@ -13,6 +13,7 @@ import ForgotPassword from '@/pages/ForgotPassword';
 import ResetPassword from '@/pages/ResetPassword';
 import Dashboard from '@/pages/Dashboard';
 import NovelWorkspace from '@/pages/NovelWorkspace';
+import CharacterRelationships from '@/pages/CharacterRelationships';
 import Trash from '@/pages/Trash';
 import PublicNovelView from '@/pages/PublicNovelView';
 import Settings from '@/pages/Settings';
@@ -50,6 +51,7 @@ const AuthenticatedApp = () => {
       <Route element={<ProtectedRoute unauthenticatedElement={<Navigate to="/login" replace />} />}>
         <Route path="/" element={<Dashboard />} />
         <Route path="/novel/:id" element={<NovelWorkspace />} />
+        <Route path="/novel/:id/relationships" element={<CharacterRelationships />} />
         <Route path="/trash" element={<Trash />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/series" element={<SeriesDashboard />} />
