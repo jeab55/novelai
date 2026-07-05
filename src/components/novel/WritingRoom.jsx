@@ -25,6 +25,7 @@ import SeasonSelectorDialog from "./SeasonSelectorDialog";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import NovelSpellCheckSummary from "./NovelSpellCheckSummary";
 import ErrorBoundary from "../ErrorBoundary";
+import { getNextChapterOrder } from "@/lib/chapterOrder";
 
 const statusColors = {
   "ร่าง": "bg-amber-50 text-amber-700 border border-amber-200",
@@ -610,7 +611,7 @@ export default function WritingRoom({ novelId, novel, pendingOpenChapter, onPend
                 createChapter.mutate({
                   novel_id: selectedSeasonTab,
                   title: newTitle,
-                  order: chapters.length + 1,
+                  order: getNextChapterOrder(chapters),
                   status: "ร่าง",
                   content: "",
                   word_count: 0,
