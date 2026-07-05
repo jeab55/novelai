@@ -12,11 +12,13 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   ShieldCheck, Loader2, Sparkles, AlertTriangle, CheckCircle2, Users, Clock, Globe, Brain,
-  ChevronDown, ChevronUp, ListTree, Save, Check, Square, RotateCcw, Play,
+  ChevronDown, ChevronUp, ListTree, Save, Check, Square, RotateCcw, Play, Pencil,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { invokeAIStable } from "@/lib/aiInvoke";
+import { useQueryClient } from "@tanstack/react-query";
+import ContinuityFixDialog from "@/components/novel/ContinuityFixDialog";
 
 const TYPE_META = {
   character: { icon: Users, label: "ตัวละคร", color: "bg-rose-100 text-rose-800 border-rose-300" },
@@ -69,7 +71,9 @@ export default function ContinuityCheckPanel({ novelId, novel }) {
   const [record, setRecord] = useState(null);
   const [recordLoaded, setRecordLoaded] = useState(false);
   const [confirmRescan, setConfirmRescan] = useState(false);
+  const [fixIssue, setFixIssue] = useState(null);
   const stopRef = useRef(false);
+  const queryClient = useQueryClient();
 
   const { data: chapters = [] } = useQuery({
     queryKey: ["chapters-continuity", novelId],
@@ -408,6 +412,13 @@ ${(ch.content || "").slice(0, 9000)}
                                 <p className="text-sm text-blue-700 dark:text-blue-400 whitespace-pre-line">{issue.suggestion}</p>
                               </div>
                             )}
+                            {issue.chapter_id && (
+                              <div className="flex justify-end">
+                                <Button size="sm" onClick={() => setFixIssue(issue)} className="gap-2">
+                                  <Pencil className="w-4 h-4" />แก้ไขเนื้อหาตอนนี้
+                                </Button>
+                              </div>
+                            )}
                           </CardContent>
                         )}
                       </Card>
@@ -445,6 +456,17 @@ ${(ch.content || "").slice(0, 9000)}
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <ContinuityFixDialog
+        open={!!fixIssue}
+        onOpenChange={(o) => { if (!o) setFixIssue(null); }}
+        issue={fixIssue}
+        novelId={novelId}
+        onSaved={() => {
+          queryClient.invalidateQueries({ queryKey: ["chapters-continuity", novelId] });
+          queryClient.invalidateQueries({ queryKey: ["chapters", novelId] });
+        }}
+      />
     </div>
   );
 }
