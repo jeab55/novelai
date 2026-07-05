@@ -268,6 +268,22 @@ ${(ch.content || "").slice(0, 9000)}
 
   const handleStop = () => { stopRef.current = true; };
 
+  // ทำเครื่องหมายว่าจุดนี้แก้ไขแล้ว + บันทึกสถานะลง ContinuityCheck
+  const markIssueFixed = async (target) => {
+    const updated = (issues || []).map((it) =>
+      it === target ? { ...it, fixed: true, fixed_at: new Date().toISOString() } : it
+    );
+    setIssues(updated);
+    try {
+      await persist({
+        issuesArr: updated,
+        done: record?.progress ?? written.length,
+        total: record?.total ?? written.length,
+        status: record?.status || "ตรวจเสร็จ",
+      });
+    } catch { /* ignore */ }
+  };
+
   const filtered = (issues || []).filter((i) => filterType === "all" || i.type === filterType);
   const pct = progress.total > 0 ? Math.round((progress.done / progress.total) * 100) : 0;
   const hasResult = Array.isArray(issues);
@@ -386,6 +402,11 @@ ${(ch.content || "").slice(0, 9000)}
                                 <div className="flex items-center gap-2 mb-1 flex-wrap">
                                   <Badge className={sv.color}>{sv.label}</Badge>
                                   <Badge variant="outline">{tm.label}</Badge>
+                                  {issue.fixed && (
+                                    <Badge className="bg-green-100 text-green-800 border-green-300 gap-1">
+                                      <Check className="w-3 h-3" />แก้ไขแล้ว
+                                    </Badge>
+                                  )}
                                 </div>
                                 <CardTitle className="text-base">{issue.title}</CardTitle>
                                 {issue.chapter_title && (
@@ -413,9 +434,19 @@ ${(ch.content || "").slice(0, 9000)}
                               </div>
                             )}
                             {issue.chapter_id && (
-                              <div className="flex justify-end">
-                                <Button size="sm" onClick={() => setFixIssue(issue)} className="gap-2">
-                                  <Pencil className="w-4 h-4" />แก้ไขเนื้อหาตอนนี้
+                              <div className="flex items-center justify-end gap-2">
+                                {issue.fixed && (
+                                  <span className="text-xs text-green-600 flex items-center gap-1">
+                                    <Check className="w-3.5 h-3.5" />แก้ไขเมื่อ {fmtTime(issue.fixed_at)}
+                                  </span>
+                                )}
+                                <Button
+                                  size="sm"
+                                  variant={issue.fixed ? "outline" : "default"}
+                                  onClick={() => setFixIssue(issue)}
+                                  className="gap-2"
+                                >
+                                  <Pencil className="w-4 h-4" />{issue.fixed ? "แก้ไขอีกครั้ง" : "แก้ไขเนื้อหาตอนนี้"}
                                 </Button>
                               </div>
                             )}
@@ -463,6 +494,7 @@ ${(ch.content || "").slice(0, 9000)}
         issue={fixIssue}
         novelId={novelId}
         onSaved={() => {
+          if (fixIssue) markIssueFixed(fixIssue);
           queryClient.invalidateQueries({ queryKey: ["chapters-continuity", novelId] });
           queryClient.invalidateQueries({ queryKey: ["chapters", novelId] });
         }}
