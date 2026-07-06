@@ -24,6 +24,7 @@ export default function CharacterForm({ novelId, character, onDone, novelIdForVe
     desire: character?.desire || "",
     wound: character?.wound || "",
     relationships: character?.relationships || "",
+    voice_profile: character?.voice_profile || "",
     dialect: character?.dialect || "กลาง",
   });
   const [analyzing, setAnalyzing] = useState(false);
@@ -79,6 +80,7 @@ export default function CharacterForm({ novelId, character, onDone, novelIdForVe
       form.desire && `สิ่งที่ต้องการ (Want): ${form.desire}`,
       form.wound && `ปม/บาดแผล (Wound/Need): ${form.wound}`,
       form.relationships && `ความสัมพันธ์: ${form.relationships}`,
+      form.voice_profile && `เสียงพูด (ลายนิ้วมือเสียง): ${form.voice_profile}`,
     ].filter(Boolean).join("\n");
 
     const writerCtx = writerSystemPrompt ? `[สไตล์และแนวของนักเขียน]\n${writerSystemPrompt}\n\n` : "";
@@ -112,6 +114,7 @@ ${charDesc}
     { key: "desire", label: "สิ่งที่ต้องการ", type: "textarea", placeholder: "แรงจูงใจ เป้าหมาย..." },
     { key: "wound", label: "ปม/บาดแผลทางใจ", type: "textarea", placeholder: "ความเจ็บปวด ความกลัว..." },
     { key: "relationships", label: "ความสัมพันธ์", type: "textarea", placeholder: "ความสัมพันธ์กับตัวละครอื่น..." },
+    { key: "voice_profile", label: "เสียงพูด (ลายนิ้วมือเสียง)", type: "textarea", placeholder: "คำติดปาก, จังหวะประโยค (สั้นห้วน/ยาวเรื่อย), สรรพนาม/คำลงท้ายที่ใช้, ระดับภาษา (ทางการ/กันเอง/หยาบ), และประโยคเอกลักษณ์ที่มีแต่ตัวละครนี้พูดได้..." },
   ];
 
   const handleSubmit = (e) => {

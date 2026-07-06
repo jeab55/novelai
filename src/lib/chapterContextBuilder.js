@@ -84,6 +84,7 @@ export function buildChapterContext({
       if (c.desire) ctx += `  สิ่งที่ต้องการ (Want): ${c.desire}\n`;
       if (c.wound) ctx += `  ปมในใจ (Wound): ${c.wound}\n`;
       if (c.relationships) ctx += `  ความสัมพันธ์: ${c.relationships}\n`;
+      if (c.voice_profile) ctx += `  เสียงพูด (ลายนิ้วมือเสียง — ใช้อ้างอิงเขียนบทสนทนาให้คงเสียงเดิม): ${c.voice_profile}\n`;
     });
   }
 

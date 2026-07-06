@@ -77,10 +77,11 @@ ${variety}
 1) เขียน plot_outline สรุปภาพรวมของเรื่องแบบกระชับ (4-6 บรรทัด) เล่าให้เห็นจุดเริ่ม ความขัดแย้งหลัก และทิศทางที่เรื่องจะเดินไป
    - เลือกโครงสร้างการเล่าที่เหมาะกับเรื่องและแนวจริง (ไม่จำเป็นต้องเป็น 3 องก์; จะเป็นหลายเส้นเรื่อง เล่าไม่เรียงเวลา สืบสวน หรือ slice-of-life ก็ได้)
    - เขียนด้วยภาษาเฉพาะของเรื่องนี้ ห้ามใส่ป้ายกำกับสำเร็จรูปหรือวลีแม่แบบซ้ำๆ (เช่น "จุดหักเหกลางเรื่อง", "แก่น/ธีม", "คำถามหลักของเรื่อง")
-2) สร้างตัวละครหลักที่จำเป็น (รวมตัวที่มีอยู่แล้วถ้ายังขาดรายละเอียด แต่ห้ามซ้ำชื่อที่ระบุไว้) แต่ละตัวมีฟิลด์: name, role, age, appearance, personality, background, desire, wound, relationships
+2) สร้างตัวละครหลักที่จำเป็น (รวมตัวที่มีอยู่แล้วถ้ายังขาดรายละเอียด แต่ห้ามซ้ำชื่อที่ระบุไว้) แต่ละตัวมีฟิลด์: name, role, age, appearance, personality, background, desire, wound, relationships, voice_profile
+   - voice_profile คือ "เสียงพูด (ลายนิ้วมือเสียง)": คำติดปาก, จังหวะประโยค (สั้นห้วน/ยาวเรื่อย), สรรพนาม/คำลงท้ายที่ใช้, ระดับภาษา (ทางการ/กันเอง/หยาบ), และประโยคเอกลักษณ์ที่มีแต่ตัวละครนี้พูดได้ — ใช้อ้างอิงเขียนบทสนทนาให้คงเสียงเดิม
 
 ตอบ JSON โครงสร้างนี้เท่านั้น (ไม่มี markdown):
-{"plot_outline":"...","characters":[{"name":"","role":"ตัวเอก","age":"","appearance":"","personality":"","background":"","desire":"","wound":"","relationships":""}]}
+{"plot_outline":"...","characters":[{"name":"","role":"ตัวเอก","age":"","appearance":"","personality":"","background":"","desire":"","wound":"","relationships":"","voice_profile":""}]}
 
 ภาษาไทยทั้งหมด ตอบ JSON ล้วน`;
 
@@ -96,6 +97,7 @@ ${variety}
             name: { type: "string" }, role: { type: "string" }, age: { type: "string" },
             appearance: { type: "string" }, personality: { type: "string" }, background: { type: "string" },
             desire: { type: "string" }, wound: { type: "string" }, relationships: { type: "string" },
+            voice_profile: { type: "string" },
           },
         },
       },

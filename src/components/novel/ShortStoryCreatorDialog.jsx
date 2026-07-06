@@ -78,7 +78,8 @@ export default function ShortStoryCreatorDialog({ open, onOpenChange }) {
       "age": "อายุ",
       "appearance": "ลักษณะภายนอก 1 ประโยค",
       "personality": "นิสัย 1 ประโยค",
-      "desire": "สิ่งที่ต้องการ"
+      "desire": "สิ่งที่ต้องการ",
+      "voice_profile": "เสียงพูด (ลายนิ้วมือเสียง): คำติดปาก, จังหวะประโยค, สรรพนาม/คำลงท้าย, ระดับภาษา, ประโยคเอกลักษณ์ที่มีแต่ตัวละครนี้พูดได้"
     }
   ],
   "plot_outline": "โครง 3 องก์: เปิดปม / บีบให้ตึง / จุดพีคและตอนจบ (3-5 ประโยค)"
@@ -109,6 +110,7 @@ export default function ShortStoryCreatorDialog({ open, onOpenChange }) {
                 appearance: { type: "string" },
                 personality: { type: "string" },
                 desire: { type: "string" },
+                voice_profile: { type: "string" },
               },
             },
           },
@@ -147,6 +149,7 @@ export default function ShortStoryCreatorDialog({ open, onOpenChange }) {
             appearance: c.appearance || "",
             personality: c.personality || "",
             desire: c.desire || "",
+            voice_profile: c.voice_profile || "",
           })
         )
       );
@@ -156,7 +159,7 @@ export default function ShortStoryCreatorDialog({ open, onOpenChange }) {
     setStatusMsg(`✍️ AI กำลังเขียนเนื้อเรื่อง (เป้าหมาย ${form.word_count_target} คำ)...`);
 
     const charDesc = characters
-      .map((c) => `• ${c.name} (${c.role}): ${c.personality}. ลักษณะ: ${c.appearance}. ต้องการ: ${c.desire}`)
+      .map((c) => `• ${c.name} (${c.role}): ${c.personality}. ลักษณะ: ${c.appearance}. ต้องการ: ${c.desire}${c.voice_profile ? `. เสียงพูด (คงเสียงเดิมในบทสนทนา): ${c.voice_profile}` : ""}`)
       .join("\n");
 
     const endingInstruction = {
