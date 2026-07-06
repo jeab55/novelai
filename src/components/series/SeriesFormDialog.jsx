@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ImagePlus, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
 
-const GENRES = ["โรแมนติก", "แฟนตาซี", "อิงประวัติศาสตร์", "จีนย้อนยุค", "วาย", "สยองขวัญ", "ลึกลับ", "แอ็คชั่น", "ดราม่า", "อื่นๆ"];
+const GENRES = ["โรแมนติก", "แฟนตาซี", "อิงประวัติศาสตร์", "จีนย้อนยุค", "วาย", "สยองขวัญ", "ลึกลับ", "แอ็คชั่น", "ดราม่า", "ยูริ", "โรแมนซ์คอมเมดี้", "ดาร์กโรแมนซ์", "โรแมนซ์แฟนตาซี", "ชีวิต", "ต่างโลก-เกิดใหม่", "ไซไฟ", "สืบสวนสอบสวน", "ระทึกขวัญ", "ผจญภัย", "กำลังภายใน", "วัยรุ่น", "อื่นๆ"];
 
 export default function SeriesFormDialog({ open, onClose, series, onSaved }) {
   const isEdit = !!series;

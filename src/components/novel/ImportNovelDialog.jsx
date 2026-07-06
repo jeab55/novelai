@@ -97,7 +97,7 @@ export default function ImportNovelDialog({ open, onClose, novels = [], seriesLi
   const [importing, setImporting] = useState(false);
   const [done, setDone] = useState(false);
 
-  const genres = ["โรแมนติก","แฟนตาซี","อิงประวัติศาสตร์","จีนย้อนยุค","วาย","สยองขวัญ","ลึกลับ","แอ็คชั่น","ดราม่า","อื่นๆ"];
+  const genres = ["โรแมนติก","แฟนตาซี","อิงประวัติศาสตร์","จีนย้อนยุค","วาย","สยองขวัญ","ลึกลับ","แอ็คชั่น","ดราม่า","ยูริ","โรแมนซ์คอมเมดี้","ดาร์กโรแมนซ์","โรแมนซ์แฟนตาซี","ชีวิต","ต่างโลก-เกิดใหม่","ไซไฟ","สืบสวนสอบสวน","ระทึกขวัญ","ผจญภัย","กำลังภายใน","วัยรุ่น","อื่นๆ"];
 
   // Debug: log seriesList when dialog opens
   React.useEffect(() => {

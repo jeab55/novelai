@@ -20,6 +20,18 @@ const genreColors = {
   "ลึกลับ": "bg-indigo-100 text-indigo-700",
   "แอ็คชั่น": "bg-orange-100 text-orange-700",
   "ดราม่า": "bg-teal-100 text-teal-700",
+  "ยูริ": "bg-fuchsia-100 text-fuchsia-700",
+  "โรแมนซ์คอมเมดี้": "bg-rose-100 text-rose-700",
+  "ดาร์กโรแมนซ์": "bg-violet-100 text-violet-700",
+  "โรแมนซ์แฟนตาซี": "bg-purple-100 text-purple-700",
+  "ชีวิต": "bg-lime-100 text-lime-700",
+  "ต่างโลก-เกิดใหม่": "bg-cyan-100 text-cyan-700",
+  "ไซไฟ": "bg-blue-100 text-blue-700",
+  "สืบสวนสอบสวน": "bg-stone-100 text-stone-700",
+  "ระทึกขวัญ": "bg-red-100 text-red-700",
+  "ผจญภัย": "bg-green-100 text-green-700",
+  "กำลังภายใน": "bg-yellow-100 text-yellow-700",
+  "วัยรุ่น": "bg-pink-100 text-pink-700",
   "อื่นๆ": "bg-gray-100 text-gray-700",
 };
 

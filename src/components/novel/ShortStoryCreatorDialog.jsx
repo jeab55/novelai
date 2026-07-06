@@ -12,7 +12,7 @@ import { useNavigate } from "react-router-dom";
 import { enforceWordRange, buildWordCountInstruction, getWordRange } from "@/lib/wordCountControl";
 import { SHARED_CRAFT_RULES } from "@/lib/chapterContextBuilder";
 
-const GENRES = ["โรแมนติก", "แฟนตาซี", "อิงประวัติศาสตร์", "จีนย้อนยุค", "วาย", "สยองขวัญ", "ลึกลับ", "แอ็คชั่น", "ดราม่า", "อื่นๆ"];
+const GENRES = ["โรแมนติก", "แฟนตาซี", "อิงประวัติศาสตร์", "จีนย้อนยุค", "วาย", "สยองขวัญ", "ลึกลับ", "แอ็คชั่น", "ดราม่า", "ยูริ", "โรแมนซ์คอมเมดี้", "ดาร์กโรแมนซ์", "โรแมนซ์แฟนตาซี", "ชีวิต", "ต่างโลก-เกิดใหม่", "ไซไฟ", "สืบสวนสอบสวน", "ระทึกขวัญ", "ผจญภัย", "กำลังภายใน", "วัยรุ่น", "อื่นๆ"];
 const ENDING_TYPES = ["จบสุข (HEA)", "จบเศร้า (HFE)", "จบเปิด (Open Ending)", "จบตามจริง"];
 const WORD_COUNTS = [1000, 1500, 2000, 3000, 5000];
 
