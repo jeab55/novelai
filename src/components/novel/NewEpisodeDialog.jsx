@@ -129,7 +129,8 @@ EP ใหม่ชื่อ: "${epTitle}"
 ตัวละครเดิมที่มีอยู่: 
 ${charSummary || "(ยังไม่มี)"}
 
-กรุณาสร้างตัวละครใหม่ที่จำเป็นสำหรับพล็อตของ EP นี้ (2-4 ตัว) ที่ไม่ซ้ำกับตัวละครเดิม`,
+กรุณาสร้างตัวละครใหม่ที่จำเป็นสำหรับพล็อตของ EP นี้ (2-4 ตัว) ที่ไม่ซ้ำกับตัวละครเดิม
+แต่ละตัวให้ระบุ address_terms = "สรรพนาม & คำเรียกขาน (รายคู่)": ตัวละครเรียกตัวเองว่าอะไร และเรียกตัวละครอื่นแต่ละคนว่าอะไร (รายคู่) รวมถึงจังหวะเปลี่ยนคำเรียกตามพัฒนาการความสัมพันธ์ (ตอนต้น→สนิท→จุดพีค)`,
       response_json_schema: {
         type: "object",
         properties: {
@@ -146,6 +147,7 @@ ${charSummary || "(ยังไม่มี)"}
                 personality: { type: "string" },
                 background: { type: "string" },
                 desire: { type: "string" },
+                address_terms: { type: "string" },
               },
             },
           },
@@ -196,6 +198,8 @@ ${charSummary || "(ยังไม่มี)"}
           desire: c.desire || "",
           wound: c.wound || "",
           relationships: c.relationships || "",
+          voice_profile: c.voice_profile || "",
+          address_terms: c.address_terms || "",
         })
       )
     );
@@ -213,6 +217,7 @@ ${charSummary || "(ยังไม่มี)"}
           personality: c.personality || "",
           background: c.background || "",
           desire: c.desire || "",
+          address_terms: c.address_terms || "",
         })
       )
     );

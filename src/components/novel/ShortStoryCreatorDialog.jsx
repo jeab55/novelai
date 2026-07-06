@@ -79,7 +79,8 @@ export default function ShortStoryCreatorDialog({ open, onOpenChange }) {
       "appearance": "ลักษณะภายนอก 1 ประโยค",
       "personality": "นิสัย 1 ประโยค",
       "desire": "สิ่งที่ต้องการ",
-      "voice_profile": "เสียงพูด (ลายนิ้วมือเสียง): คำติดปาก, จังหวะประโยค, สรรพนาม/คำลงท้าย, ระดับภาษา, ประโยคเอกลักษณ์ที่มีแต่ตัวละครนี้พูดได้"
+      "voice_profile": "เสียงพูด (ลายนิ้วมือเสียง): คำติดปาก, จังหวะประโยค, สรรพนาม/คำลงท้าย, ระดับภาษา, ประโยคเอกลักษณ์ที่มีแต่ตัวละครนี้พูดได้",
+      "address_terms": "สรรพนาม & คำเรียกขาน (รายคู่): เรียกตัวเอง/เรียกตัวละครอื่นแต่ละคนว่าอะไร และจังหวะเปลี่ยนคำเรียกตามความสัมพันธ์ (ตอนต้น→สนิท→จุดพีค)"
     }
   ],
   "plot_outline": "โครง 3 องก์: เปิดปม / บีบให้ตึง / จุดพีคและตอนจบ (3-5 ประโยค)"
@@ -111,6 +112,7 @@ export default function ShortStoryCreatorDialog({ open, onOpenChange }) {
                 personality: { type: "string" },
                 desire: { type: "string" },
                 voice_profile: { type: "string" },
+                address_terms: { type: "string" },
               },
             },
           },
@@ -150,6 +152,7 @@ export default function ShortStoryCreatorDialog({ open, onOpenChange }) {
             personality: c.personality || "",
             desire: c.desire || "",
             voice_profile: c.voice_profile || "",
+            address_terms: c.address_terms || "",
           })
         )
       );
@@ -159,7 +162,7 @@ export default function ShortStoryCreatorDialog({ open, onOpenChange }) {
     setStatusMsg(`✍️ AI กำลังเขียนเนื้อเรื่อง (เป้าหมาย ${form.word_count_target} คำ)...`);
 
     const charDesc = characters
-      .map((c) => `• ${c.name} (${c.role}): ${c.personality}. ลักษณะ: ${c.appearance}. ต้องการ: ${c.desire}${c.voice_profile ? `. เสียงพูด (คงเสียงเดิมในบทสนทนา): ${c.voice_profile}` : ""}`)
+      .map((c) => `• ${c.name} (${c.role}): ${c.personality}. ลักษณะ: ${c.appearance}. ต้องการ: ${c.desire}${c.voice_profile ? `. เสียงพูด (คงเสียงเดิมในบทสนทนา): ${c.voice_profile}` : ""}${c.address_terms ? `. สรรพนาม & คำเรียกขาน (รายคู่ — ใช้คำเรียกให้ถูกและเปลี่ยนตามจังหวะความสัมพันธ์): ${c.address_terms}` : ""}`)
       .join("\n");
 
     const endingInstruction = {

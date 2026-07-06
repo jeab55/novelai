@@ -85,6 +85,7 @@ export function buildChapterContext({
       if (c.wound) ctx += `  ปมในใจ (Wound): ${c.wound}\n`;
       if (c.relationships) ctx += `  ความสัมพันธ์: ${c.relationships}\n`;
       if (c.voice_profile) ctx += `  เสียงพูด (ลายนิ้วมือเสียง — ใช้อ้างอิงเขียนบทสนทนาให้คงเสียงเดิม): ${c.voice_profile}\n`;
+      if (c.address_terms) ctx += `  สรรพนาม & คำเรียกขาน (รายคู่ — ใช้คำเรียกให้ถูกและเปลี่ยนคำเรียกให้ตรงจังหวะความสัมพันธ์/อารมณ์): ${c.address_terms}\n`;
     });
   }
 

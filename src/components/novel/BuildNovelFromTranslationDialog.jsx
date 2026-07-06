@@ -80,7 +80,7 @@ ${material}
   "synopsis": "เรื่องย่อ 2-4 ประโยค สรุปจากเนื้อหาจริง",
   "era": "ยุคสมัย/ฉากหลังตามเนื้อหา",
   "characters": [
-    { "name": "ชื่อตัวละครที่ปรากฏในเนื้อหา", "role": "ตัวเอก|ตัวรอง|ตัวร้าย|ตัวประกอบ", "age": "อายุถ้ามี", "personality": "นิสัยที่สังเกตได้", "background": "ปูมหลังจากเนื้อหา", "desire": "สิ่งที่ตัวละครต้องการ" }
+    { "name": "ชื่อตัวละครที่ปรากฏในเนื้อหา", "role": "ตัวเอก|ตัวรอง|ตัวร้าย|ตัวประกอบ", "age": "อายุถ้ามี", "personality": "นิสัยที่สังเกตได้", "background": "ปูมหลังจากเนื้อหา", "desire": "สิ่งที่ตัวละครต้องการ", "voice_profile": "เสียงพูด (ลายนิ้วมือเสียง) ที่สังเกตได้จากบทสนทนา: คำติดปาก จังหวะประโยค สรรพนาม/คำลงท้าย ระดับภาษา", "address_terms": "สรรพนาม & คำเรียกขาน (รายคู่): ตัวละครเรียกตัวเอง/เรียกตัวละครอื่นแต่ละคนว่าอะไร ตามที่ปรากฏในเนื้อหา" }
   ],
   "plot_outline": "โครงเรื่องตั้งต้นจากเนื้อหาจริง — เหตุการณ์/ฉากสำคัญเรียงตามลำดับ${isShort ? " (โครง 3 องก์บีบอัด)" : " ครอบคลุมทั้งเรื่อง"}"
 }
@@ -105,6 +105,8 @@ ${material}
                   personality: { type: "string" },
                   background: { type: "string" },
                   desire: { type: "string" },
+                  voice_profile: { type: "string" },
+                  address_terms: { type: "string" },
                 },
               },
             },
@@ -143,6 +145,8 @@ ${material}
               personality: c.personality || undefined,
               background: c.background || undefined,
               desire: c.desire || undefined,
+              voice_profile: c.voice_profile || undefined,
+              address_terms: c.address_terms || undefined,
             })
           )
         );

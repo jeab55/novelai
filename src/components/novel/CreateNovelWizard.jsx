@@ -16,7 +16,7 @@ const GENRES = ["โรแมนติก", "แฟนตาซี", "อิง�
 
 const CHAR_ROLES = ["ตัวเอก", "ตัวรอง", "ตัวร้าย", "ตัวประกอบ"];
 const DIALECTS = ["กลาง", "อีสาน", "เหนือ", "ใต้", "ตะวันออก", "อื่นๆ"];
-const emptyChar = () => ({ name: "", role: "ตัวเอก", age: "", occupation: "", dialect: "กลาง", dialect_examples: "", personality: "", background: "", wound: "", desire: "" });
+const emptyChar = () => ({ name: "", role: "ตัวเอก", age: "", occupation: "", dialect: "กลาง", dialect_examples: "", personality: "", background: "", wound: "", desire: "", voice_profile: "", address_terms: "" });
 
 const STEPS = [
   { id: 1, label: "ประเภทและข้อมูล", icon: BookOpen },
@@ -101,6 +101,8 @@ function CharacterCard({ c, onUpdate, onRemove, writerSystemPrompt }) {
             <Input placeholder="ปม/บาดแผล" value={c.wound} onChange={(e) => onUpdate("wound", e.target.value)} className="flex-1 h-8 text-xs" />
             <Input placeholder="สิ่งที่ต้องการ" value={c.desire} onChange={(e) => onUpdate("desire", e.target.value)} className="flex-1 h-8 text-xs" />
           </div>
+          <Textarea placeholder="เสียงพูด (ลายนิ้วมือเสียง): คำติดปาก จังหวะประโยค สรรพนาม/คำลงท้าย ระดับภาษา" value={c.voice_profile || ""} onChange={(e) => onUpdate("voice_profile", e.target.value)} rows={2} className="text-xs w-full" />
+          <Textarea placeholder="สรรพนาม & คำเรียกขาน (รายคู่): เรียกตัวเอง/เรียกตัวละครอื่นแต่ละคนว่าอะไร และจังหวะเปลี่ยนคำเรียกตามความสัมพันธ์" value={c.address_terms || ""} onChange={(e) => onUpdate("address_terms", e.target.value)} rows={2} className="text-xs w-full" />
         </div>
       )}
       <div className="px-2.5 pb-2.5 pt-1 border-t border-border/30">
@@ -609,6 +611,8 @@ export default function CreateNovelWizard({ open, onOpenChange, activeWriters, o
             background: c.background || undefined,
             wound: c.wound || undefined,
             desire: c.desire || undefined,
+            voice_profile: c.voice_profile || undefined,
+            address_terms: c.address_terms || undefined,
             ai_analysis: c.ai_analysis || undefined,
           })
         )));
@@ -632,6 +636,8 @@ export default function CreateNovelWizard({ open, onOpenChange, activeWriters, o
                 c.background && `ปูมหลัง: ${c.background}`,
                 c.desire && `want: ${c.desire}`,
                 c.wound && `wound: ${c.wound}`,
+                c.voice_profile && `เสียงพูด: ${c.voice_profile}`,
+                c.address_terms && `สรรพนาม & คำเรียกขาน: ${c.address_terms}`,
               ].filter(Boolean).join(", ");
               return `• ${parts}`;
             }).join("\n")

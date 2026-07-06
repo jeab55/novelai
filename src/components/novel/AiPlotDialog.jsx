@@ -114,6 +114,7 @@ ${fullCharSection}
 - wound: สิ่งที่ต้องการจริง (need — สิ่งที่ตัวละครต้องการจริงๆ) รวมกับปมในใจ (wound)
 - relationships: ความสัมพันธ์กับตัวละครอื่น
 - voice_profile: เสียงพูด (ลายนิ้วมือเสียง) — คำติดปาก, จังหวะประโยค (สั้นห้วน/ยาวเรื่อย), สรรพนาม/คำลงท้ายที่ใช้, ระดับภาษา (ทางการ/กันเอง/หยาบ), และประโยคเอกลักษณ์ที่มีแต่ตัวละครนี้พูดได้
+- address_terms: สรรพนาม & คำเรียกขาน (รายคู่) — ตัวละครเรียกตัวเองว่าอะไร และเรียกตัวละครอื่นแต่ละคนว่าอะไร (รายคู่) รวมถึงจังหวะเปลี่ยนคำเรียกตามพัฒนาการความสัมพันธ์ (ตอนต้น→สนิท→จุดพีค) เช่น "คุณเนย→เนย" หรือเลิกลงท้าย "ครับ"
 
 [ส่วนที่ 2] แบ่งโครงเรื่อง 3 องก์ออกเป็น ${targetChapters} ตอนเท่าๆ กัน โดยแต่ละตอนต้องมี:
 - order: เลขลำดับตอน (1-${targetChapters})
@@ -122,7 +123,7 @@ ${fullCharSection}
 - act: องก์ที่สังกัด (1=ต้นเรื่อง, 2=กลางเรื่อง, 3=จุด Climax และบทสรุป)
 
 ตอบด้วย JSON โครงสร้างนี้เท่านั้น (ไม่มี markdown, ไม่มี backtick):
-{"plot_outline":"สรุปโครงเรื่อง 3 องก์ แก่น/ธีม คำถามหลักของเรื่อง จุดหักเห","characters":[{"name":"ชื่อ","role":"ตัวเอก","age":"25 ปี","appearance":"...","personality":"...","background":"...","desire":"...","wound":"...","relationships":"...","voice_profile":"คำติดปาก จังหวะประโยค สรรพนาม/คำลงท้าย ระดับภาษา และประโยคเอกลักษณ์"}],"events":[{"order":1,"title":"ชื่อตอน","description":"สรุปเหตุการณ์","act":1}]}
+{"plot_outline":"สรุปโครงเรื่อง 3 องก์ แก่น/ธีม คำถามหลักของเรื่อง จุดหักเห","characters":[{"name":"ชื่อ","role":"ตัวเอก","age":"25 ปี","appearance":"...","personality":"...","background":"...","desire":"...","wound":"...","relationships":"...","voice_profile":"คำติดปาก จังหวะประโยค สรรพนาม/คำลงท้าย ระดับภาษา และประโยคเอกลักษณ์","address_terms":"เรียกตัวเอง/เรียกตัวละครอื่นแต่ละคนว่าอะไร (รายคู่) และจังหวะเปลี่ยนคำเรียกตามความสัมพันธ์"}],"events":[{"order":1,"title":"ชื่อตอน","description":"สรุปเหตุการณ์","act":1}]}
 
 สร้างโครงเรื่องให้ครบ ${targetChapters} ตอน ครอบคลุมทั้งสามองก์ ปรับให้เหมาะกับแนว "${novel.genre || "ทั่วไป"}" ตอบเป็นภาษาไทยทั้งหมด ตอบด้วย JSON ล้วนเท่านั้น`;
 }
@@ -145,6 +146,7 @@ async function generateChapterDraft({ novel, writer, characters, worldEntries, p
     characters.forEach((c) => {
       sysPrompt += `• ${c.name} (${c.role || "ตัวประกอบ"})${c.personality ? ` — ${c.personality}` : ""}\n`;
       if (c.voice_profile) sysPrompt += `  เสียงพูด (ลายนิ้วมือเสียง — คงเสียงเดิมในบทสนทนา): ${c.voice_profile}\n`;
+      if (c.address_terms) sysPrompt += `  สรรพนาม & คำเรียกขาน (รายคู่ — ใช้คำเรียกให้ถูกและเปลี่ยนตามจังหวะความสัมพันธ์): ${c.address_terms}\n`;
     });
   }
 
@@ -323,6 +325,7 @@ export default function AiPlotDialog({ open, onClose, novel, novelId, onOpenChap
               wound: c.wound,
               relationships: c.relationships,
               voice_profile: c.voice_profile,
+              address_terms: c.address_terms,
             })
           )
         );
@@ -349,6 +352,7 @@ export default function AiPlotDialog({ open, onClose, novel, novelId, onOpenChap
         wound: c.wound || "",
         relationships: c.relationships || "",
         voice_profile: c.voice_profile || "",
+        address_terms: c.address_terms || "",
         checked: !alreadyExists,
         expanded: false,
         alreadyExists,
@@ -966,6 +970,10 @@ export default function AiPlotDialog({ open, onClose, novel, novelId, onOpenChap
                             <div>
                               <label className="text-xs text-muted-foreground mb-1 block">เสียงพูด (ลายนิ้วมือเสียง)</label>
                               <Textarea value={char.voice_profile} onChange={(e) => updateAiChar(idx, "voice_profile", e.target.value)} rows={2} className="text-xs" placeholder="คำติดปาก, จังหวะประโยค, สรรพนาม/คำลงท้าย, ระดับภาษา, ประโยคเอกลักษณ์" />
+                            </div>
+                            <div>
+                              <label className="text-xs text-muted-foreground mb-1 block">สรรพนาม & คำเรียกขาน (รายคู่)</label>
+                              <Textarea value={char.address_terms} onChange={(e) => updateAiChar(idx, "address_terms", e.target.value)} rows={2} className="text-xs" placeholder="เรียกตัวเอง/เรียกตัวละครอื่นแต่ละคนว่าอะไร และจังหวะเปลี่ยนคำเรียกตามความสัมพันธ์ (ตอนต้น→สนิท→จุดพีค)" />
                             </div>
                           </div>
                         )}

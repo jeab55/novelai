@@ -25,6 +25,7 @@ export default function CharacterForm({ novelId, character, onDone, novelIdForVe
     wound: character?.wound || "",
     relationships: character?.relationships || "",
     voice_profile: character?.voice_profile || "",
+    address_terms: character?.address_terms || "",
     dialect: character?.dialect || "กลาง",
   });
   const [analyzing, setAnalyzing] = useState(false);
@@ -81,6 +82,7 @@ export default function CharacterForm({ novelId, character, onDone, novelIdForVe
       form.wound && `ปม/บาดแผล (Wound/Need): ${form.wound}`,
       form.relationships && `ความสัมพันธ์: ${form.relationships}`,
       form.voice_profile && `เสียงพูด (ลายนิ้วมือเสียง): ${form.voice_profile}`,
+      form.address_terms && `สรรพนาม & คำเรียกขาน (รายคู่): ${form.address_terms}`,
     ].filter(Boolean).join("\n");
 
     const writerCtx = writerSystemPrompt ? `[สไตล์และแนวของนักเขียน]\n${writerSystemPrompt}\n\n` : "";
@@ -115,6 +117,7 @@ ${charDesc}
     { key: "wound", label: "ปม/บาดแผลทางใจ", type: "textarea", placeholder: "ความเจ็บปวด ความกลัว..." },
     { key: "relationships", label: "ความสัมพันธ์", type: "textarea", placeholder: "ความสัมพันธ์กับตัวละครอื่น..." },
     { key: "voice_profile", label: "เสียงพูด (ลายนิ้วมือเสียง)", type: "textarea", placeholder: "คำติดปาก, จังหวะประโยค (สั้นห้วน/ยาวเรื่อย), สรรพนาม/คำลงท้ายที่ใช้, ระดับภาษา (ทางการ/กันเอง/หยาบ), และประโยคเอกลักษณ์ที่มีแต่ตัวละครนี้พูดได้..." },
+    { key: "address_terms", label: "สรรพนาม & คำเรียกขาน (รายคู่)", type: "textarea", placeholder: "เรียกตัวเองว่าอะไร, เรียกตัวละครอื่นแต่ละคนว่าอะไร (รายคู่) และจังหวะเปลี่ยนคำเรียกตามความสัมพันธ์ (ตอนต้น→สนิท→จุดพีค) เช่น 'คุณเนย→เนย' หรือเลิกลงท้าย 'ครับ'..." },
   ];
 
   const handleSubmit = (e) => {

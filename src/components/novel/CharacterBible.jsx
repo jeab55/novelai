@@ -273,6 +273,7 @@ export default function CharacterBible({ novelId, novel, focusCharacterName, onF
                     {char.wound && <div><span className="text-muted-foreground font-medium">ปม/บาดแผล:</span> {char.wound}</div>}
                     {char.relationships && <div><span className="text-muted-foreground font-medium">ความสัมพันธ์:</span> {char.relationships}</div>}
                     {char.voice_profile && <div><span className="text-muted-foreground font-medium">เสียงพูด (ลายนิ้วมือเสียง):</span> {char.voice_profile}</div>}
+                    {char.address_terms && <div><span className="text-muted-foreground font-medium">สรรพนาม & คำเรียกขาน (รายคู่):</span> {char.address_terms}</div>}
                   </motion.div>
                 )}
               </motion.div>

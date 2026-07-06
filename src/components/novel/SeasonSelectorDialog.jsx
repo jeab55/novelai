@@ -199,7 +199,8 @@ Season ใหม่ชื่อ: "${seasonTitle}"
 ${charSummary || "(ยังไม่มี)"}
 
 กรุณาสร้างตัวละครใหม่ที่จำเป็นสำหรับพล็อตของ Season นี้ (2-4 ตัว) ที่ไม่ซ้ำกับตัวละครเดิม
-แต่ละตัวให้ระบุ voice_profile = "เสียงพูด (ลายนิ้วมือเสียง)": คำติดปาก, จังหวะประโยค (สั้นห้วน/ยาวเรื่อย), สรรพนาม/คำลงท้ายที่ใช้, ระดับภาษา (ทางการ/กันเอง/หยาบ), และประโยคเอกลักษณ์ที่มีแต่ตัวละครนี้พูดได้`,
+แต่ละตัวให้ระบุ voice_profile = "เสียงพูด (ลายนิ้วมือเสียง)": คำติดปาก, จังหวะประโยค (สั้นห้วน/ยาวเรื่อย), สรรพนาม/คำลงท้ายที่ใช้, ระดับภาษา (ทางการ/กันเอง/หยาบ), และประโยคเอกลักษณ์ที่มีแต่ตัวละครนี้พูดได้
+และระบุ address_terms = "สรรพนาม & คำเรียกขาน (รายคู่)": ตัวละครเรียกตัวเองว่าอะไร และเรียกตัวละครอื่นแต่ละคนว่าอะไร (รายคู่) รวมถึงจังหวะเปลี่ยนคำเรียกตามพัฒนาการความสัมพันธ์ (ตอนต้น→สนิท→จุดพีค)`,
       response_json_schema: {
         type: "object",
         properties: {
@@ -217,6 +218,7 @@ ${charSummary || "(ยังไม่มี)"}
                 background: { type: "string" },
                 desire: { type: "string" },
                 voice_profile: { type: "string" },
+                address_terms: { type: "string" },
               },
             },
           },
@@ -278,6 +280,8 @@ ${charSummary || "(ยังไม่มี)"}
             desire: c.desire || "",
             wound: c.wound || "",
             relationships: c.relationships || "",
+            voice_profile: c.voice_profile || "",
+            address_terms: c.address_terms || "",
           })
         )
       );
@@ -295,6 +299,8 @@ ${charSummary || "(ยังไม่มี)"}
             personality: c.personality || "",
             background: c.background || "",
             desire: c.desire || "",
+            voice_profile: c.voice_profile || "",
+            address_terms: c.address_terms || "",
           })
         )
       );
