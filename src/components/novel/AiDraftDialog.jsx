@@ -15,6 +15,7 @@ import { invokeAIStable } from "@/lib/aiInvoke";
 import { enforceWordRange, buildWordCountInstruction, getWordRange } from "@/lib/wordCountControl";
 import { buildChapterContext } from "@/lib/chapterContextBuilder";
 import { proseVarietyInstruction } from "@/lib/creativeVariety";
+import { generateChapterRecap } from "@/lib/chapterRecap";
 import AiProgressBar from "@/components/novel/AiProgressBar";
 
 const LOADING_LABELS = {
@@ -280,6 +281,16 @@ export default function AiDraftDialog({ open, onClose, chapter, novel, novelId, 
       queryClient.invalidateQueries({ queryKey: ["chapters", novelId] });
       setSaved(true);
       toast.success("บันทึกร่างแล้ว");
+      // สร้าง recap (ความจำต่อเนื่อง) แบบ best-effort — ไม่บล็อกถ้าล้มเหลว
+      if (result.chapterId) {
+        try {
+          const recap = await generateChapterRecap({ title: form.chapterTitle || chapter?.title, content });
+          if (recap) {
+            await base44.entities.Chapter.update(result.chapterId, { recap });
+            queryClient.invalidateQueries({ queryKey: ["chapters", novelId] });
+          }
+        } catch { /* recap ล้มไม่กระทบการบันทึกตอน */ }
+      }
     } else {
       setSaveError(result.error || "บันทึกไม่สำเร็จ กรุณาลองใหม่");
       toast.error(`บันทึกร่างไม่สำเร็จ: ${result.error || "กรุณาลองใหม่"}`);
@@ -307,7 +318,8 @@ export default function AiDraftDialog({ open, onClose, chapter, novel, novelId, 
           { prompt: firstPrompt, model: "claude_sonnet_4_6" },
           { onRetry: ({ attempt, maxAttempts }) => toast.info(`AI ไม่ตอบสนอง กำลังลองใหม่ (${attempt}/${maxAttempts - 1})...`) }
         );
-        const secondPrompt = `${sysPrompt}\n\n[โจทย์ — เขียนครึ่งหลังต่อจากครึ่งแรก]\nชื่อตอน: "${form.chapterTitle}"\n\n[ครึ่งแรกที่เขียนไปแล้ว]\n${firstHalf.substring(0, 3000)}${firstHalf.length > 3000 ? "\n…(ต่อ)" : ""}\n\nเขียน "ครึ่งหลัง" ต่อจากครึ่งแรกให้ลื่นไหล ประมาณ ${half} คำ พาเรื่องไปสู่จุดพีคและจบตอน อย่าเขียนซ้ำครึ่งแรก:`;
+        const firstTail = firstHalf.length > 3000 ? "…(ช่วงต้นของครึ่งแรกถูกตัด)\n" + firstHalf.slice(-3000) : firstHalf;
+        const secondPrompt = `${sysPrompt}\n\n[โจทย์ — เขียนครึ่งหลังให้เนียนเป็นตอนเดียวกัน]\nชื่อตอน: "${form.chapterTitle}"\n\n[ตอนท้ายของครึ่งแรก — เขียนต่อจากจุดนี้ตรงๆ]\n${firstTail}\n\n[คำสั่ง]\n- ต่อเนื่องจากประโยคสุดท้ายของครึ่งแรกทันที ไม่เปิดฉากใหม่แบบตัดขาด ไม่เท้าความหรือสรุปสิ่งที่เกิดในครึ่งแรกซ้ำ\n- รักษาโทน สำนวน และอารมณ์ให้ต่อเนื่องไร้รอยต่อ\n- พาเรื่องไปสู่จุดพีคและปิดตอน ประมาณ ${half} คำ\n\n[เขียนครึ่งหลังต่อจากนี้]:`;
         const secondHalf = await invokeAIStable({ prompt: secondPrompt, model: "claude_sonnet_4_6" });
         text = `${firstHalf}\n\n${secondHalf}`.trim();
       } else {
