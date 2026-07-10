@@ -11,6 +11,7 @@ import { invokeAIStable } from "@/lib/aiInvoke";
 import { enforceWordRange, buildWordCountInstruction, getWordRange, countThaiWords as countWords } from "@/lib/wordCountControl";
 import { buildChapterContext } from "@/lib/chapterContextBuilder";
 import { proseVarietyInstruction } from "@/lib/creativeVariety";
+import { generateChapterRecap } from "@/lib/chapterRecap";
 
 // บล็อกคำสั่งเฉพาะเรื่องสั้น (one-shot) — ส่งต่อให้ตัวประกอบ context กลาง
 function buildOneShotSection(novel) {
@@ -284,7 +285,8 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
           const firstWords = countThaiWords(firstHalf || "");
           setLog((l) => l.map((e) => e.order === i ? { ...e, partialWords: firstWords } : e));
           setCurrentMsg(`✍️ ตอนที่ ${i}: ครึ่งแรกเสร็จ (${firstWords.toLocaleString()} คำ) — ร่างครึ่งหลัง...`);
-          const secondPrompt = `${sysPrompt}\n\n[โจทย์ — เขียนครึ่งหลังต่อจากครึ่งแรก]\nชื่อตอน: "${chapterTitle}"\n\n[ครึ่งแรกที่เขียนไปแล้ว]\n${(firstHalf || "").substring(0, 3000)}${(firstHalf || "").length > 3000 ? "\n…(ต่อ)" : ""}\n\nเขียน "ครึ่งหลัง" ต่อจากครึ่งแรกให้ลื่นไหล ประมาณ ${half} คำ พาเรื่องไปสู่จุดพีคและจบตอน อย่าเขียนซ้ำครึ่งแรก:`;
+          const firstTail = (firstHalf || "").length > 3000 ? "…(ช่วงต้นของครึ่งแรกถูกตัด)\n" + (firstHalf || "").slice(-3000) : (firstHalf || "");
+          const secondPrompt = `${sysPrompt}\n\n[โจทย์ — เขียนครึ่งหลังให้เนียนเป็นตอนเดียวกัน]\nชื่อตอน: "${chapterTitle}"\n\n[ตอนท้ายของครึ่งแรก — เขียนต่อจากจุดนี้ตรงๆ]\n${firstTail}\n\n[คำสั่ง]\n- ต่อเนื่องจากประโยคสุดท้ายของครึ่งแรกทันที ไม่เปิดฉากใหม่แบบตัดขาด ไม่เท้าความหรือสรุปสิ่งที่เกิดในครึ่งแรกซ้ำ\n- รักษาโทน สำนวน และอารมณ์ให้ต่อเนื่องไร้รอยต่อ\n- พาเรื่องไปสู่จุดพีคและปิดตอน ประมาณ ${half} คำ\n\n[เขียนครึ่งหลังต่อจากนี้]:`;
           const secondHalf = await invokeLLMWithTimeout(secondPrompt);
           text = `${firstHalf || ""}\n\n${secondHalf || ""}`.trim();
         } else {
@@ -318,6 +320,7 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
         }
 
         // บันทึกทันทีหลัง generate เสร็จแต่ละตอน
+        let savedChapterId = existingChapter?.id || null;
         if (existingChapter) {
           await base44.entities.Chapter.update(existingChapter.id, {
             content: finalContent,
@@ -326,7 +329,7 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
             title: chapterTitle,
           });
         } else {
-          await base44.entities.Chapter.create({
+          const created = await base44.entities.Chapter.create({
             novel_id: novelId,
             title: chapterTitle,
             order: i,
@@ -334,10 +337,23 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
             content: finalContent,
             word_count: finalWordCount,
           });
+          savedChapterId = created?.id || created || null;
         }
 
         // invalidate ทันทีหลังบันทึกแต่ละตอน — กันงานหายถ้าหลุดกลางคัน
         queryClient.invalidateQueries({ queryKey: ["chapters", novelId] });
+
+        // สร้าง recap (ความจำต่อเนื่อง) แบบ best-effort — ช่วยให้ตอนถัดๆ ไปจำปมได้ (ข้ามเรื่องสั้น one-shot)
+        if (savedChapterId && !isOneShot) {
+          try {
+            setCurrentMsg(`🧠 สรุปความจำตอนที่ ${i}...`);
+            const recap = await generateChapterRecap({ title: chapterTitle, content: finalContent });
+            if (recap) {
+              await base44.entities.Chapter.update(savedChapterId, { recap });
+              queryClient.invalidateQueries({ queryKey: ["chapters", novelId] });
+            }
+          } catch { /* recap ล้มไม่กระทบงานเขียน */ }
+        }
 
         return { content: finalContent, wordCount: finalWordCount, success: true };
       } catch (err) {
