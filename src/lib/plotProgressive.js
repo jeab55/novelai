@@ -64,6 +64,7 @@ export async function generatePlotSkeleton({ novel, writer, characters }, option
   const ctx = buildNovelContext(novel, writer, { sourceMode, writtenContext });
   const { known, detailed } = buildCharsContext(characters);
   const variety = varietyInstruction({ count: 1 });
+  const mainCount = novel?.main_character_count || 3;
 
   const prompt = `${ctx}
 
@@ -77,7 +78,7 @@ ${variety}
 1) เขียน plot_outline สรุปภาพรวมของเรื่องแบบกระชับ (4-6 บรรทัด) เล่าให้เห็นจุดเริ่ม ความขัดแย้งหลัก และทิศทางที่เรื่องจะเดินไป
    - เลือกโครงสร้างการเล่าที่เหมาะกับเรื่องและแนวจริง (ไม่จำเป็นต้องเป็น 3 องก์; จะเป็นหลายเส้นเรื่อง เล่าไม่เรียงเวลา สืบสวน หรือ slice-of-life ก็ได้)
    - เขียนด้วยภาษาเฉพาะของเรื่องนี้ ห้ามใส่ป้ายกำกับสำเร็จรูปหรือวลีแม่แบบซ้ำๆ (เช่น "จุดหักเหกลางเรื่อง", "แก่น/ธีม", "คำถามหลักของเรื่อง")
-2) สร้างตัวละครหลักที่จำเป็น (รวมตัวที่มีอยู่แล้วถ้ายังขาดรายละเอียด แต่ห้ามซ้ำชื่อที่ระบุไว้) แต่ละตัวมีฟิลด์: name, role, age, appearance, personality, background, desire, wound, relationships, voice_profile, address_terms
+2) สร้างตัวละครหลักประมาณ ${mainCount} ตัว (นับรวมตัวที่มีอยู่แล้ว ถ้ายังขาดให้เติมจนครบราว ${mainCount} ตัว ห้ามซ้ำชื่อที่ระบุไว้) แต่ละตัวมีฟิลด์: name, role, age, appearance, personality, background, desire, wound, relationships, voice_profile, address_terms
    - voice_profile คือ "เสียงพูด (ลายนิ้วมือเสียง)": คำติดปาก, จังหวะประโยค (สั้นห้วน/ยาวเรื่อย), สรรพนาม/คำลงท้ายที่ใช้, ระดับภาษา (ทางการ/กันเอง/หยาบ), และประโยคเอกลักษณ์ที่มีแต่ตัวละครนี้พูดได้ — ใช้อ้างอิงเขียนบทสนทนาให้คงเสียงเดิม
    - address_terms คือ "สรรพนาม & คำเรียกขาน (รายคู่)": ตัวละครเรียกตัวเองว่าอะไร และเรียกตัวละครอื่นแต่ละคนว่าอะไร (รายคู่) รวมถึงจังหวะเปลี่ยนคำเรียกตามพัฒนาการความสัมพันธ์ (ตอนต้น→สนิท→จุดพีค) เช่น "คุณเนย→เนย" หรือเลิกลงท้าย "ครับ"
 
