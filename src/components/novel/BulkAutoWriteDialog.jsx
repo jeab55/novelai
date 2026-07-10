@@ -250,7 +250,7 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
     taskPrompt += buildWordCountInstruction(wordTarget) + `\n`;
     taskPrompt += `[คำสั่งสำคัญ]\n`;
     taskPrompt += `1. เขียนเนื้อหาเต็มตอนเป็นร้อยแก้วนิยายภาษาไทยให้อยู่ในช่วงจำนวนคำที่กำหนด\n`;
-    taskPrompt += `2. ประกอบด้วยหลายฉาก มีทั้งบทบรรยายและบทสนทนาที่ลื่นไหล\n`;
+    taskPrompt += `2. โดยทั่วไปประกอบด้วยหลายฉาก มีทั้งบทบรรยายและบทสนทนา (เว้นแต่สไตล์นักเขียนกำหนดเป็นฉากเดียว/สัดส่วนอื่น)\n`;
     taskPrompt += `3. ห้ามเขียนเป็นเค้าโครง สรุปย่อ หรือรายการสั้นๆ\n`;
     taskPrompt += `4. รักษาความต่อเนื่องกับตอนก่อนหน้า\n\n`;
     if (linkedEvent) {
