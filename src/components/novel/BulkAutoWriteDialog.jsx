@@ -10,6 +10,7 @@ import { useBulkWrite } from "@/lib/BulkWriteContext";
 import { invokeAIStable } from "@/lib/aiInvoke";
 import { enforceWordRange, buildWordCountInstruction, getWordRange, countThaiWords as countWords } from "@/lib/wordCountControl";
 import { buildChapterContext } from "@/lib/chapterContextBuilder";
+import { proseVarietyInstruction } from "@/lib/creativeVariety";
 
 // บล็อกคำสั่งเฉพาะเรื่องสั้น (one-shot) — ส่งต่อให้ตัวประกอบ context กลาง
 function buildOneShotSection(novel) {
@@ -256,6 +257,9 @@ export default function BulkAutoWriteDialog({ open, onClose, novel, novelId }) {
       if (linkedEvent.description) taskPrompt += `\n  ${linkedEvent.description}`;
       if (linkedEvent.time_period) taskPrompt += `\n  ช่วงเวลา: ${linkedEvent.time_period}`;
       taskPrompt += `\n\n`;
+    }
+    if (novel.novel_type !== "เรื่องสั้น") {
+      taskPrompt += proseVarietyInstruction() + `\n\n`;
     }
     taskPrompt += `[เริ่มเขียนตอนนี้เลย — ${getWordRange(wordTarget).min.toLocaleString()}-${getWordRange(wordTarget).max.toLocaleString()} คำ]:\n`;
 
