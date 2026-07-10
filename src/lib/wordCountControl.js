@@ -1,7 +1,7 @@
 import { invokeAIStable } from "@/lib/aiInvoke";
 
-// ความคลาดเคลื่อนที่ยอมรับได้ของจำนวนคำ (บวก/ลบ)
-export const WORD_TOLERANCE = 500;
+// ความคลาดเคลื่อนขั้นต่ำของจำนวนคำ (คำ) — ช่วงจริงคิดเป็น 15% ของเป้า แต่ไม่ต่ำกว่าค่านี้
+export const WORD_TOLERANCE = 400;
 
 // timeout สั้นสำหรับขั้น "เกลาจำนวนคำ" (ปิดท้าย) — ถ้า AI ช้าเกินนี้ให้ข้าม ไม่รอ 180 วิ
 const POLISH_TIMEOUT_MS = 75000; // 75 วินาที ต่อครั้ง
@@ -23,10 +23,12 @@ export function countThaiWords(text) {
   }
 }
 
-// ช่วงจำนวนคำที่ยอมรับ: เป้าหมาย ± WORD_TOLERANCE
+// ช่วงจำนวนคำที่ยอมรับ: เป้าหมาย ± max(15% ของเป้า, WORD_TOLERANCE)
+// — ตอนยาว (เช่น 5,000 คำ) จะได้ช่วงกว้างขึ้นตามสัดส่วน ไม่บีบเท่าตอนสั้น
 export function getWordRange(target) {
   const t = Number(target) || 1500;
-  return { target: t, min: Math.max(t - WORD_TOLERANCE, 100), max: t + WORD_TOLERANCE };
+  const tol = Math.max(Math.round(t * 0.15), WORD_TOLERANCE);
+  return { target: t, min: Math.max(t - tol, 100), max: t + tol };
 }
 
 // ข้อความคำสั่งจำนวนคำที่ใส่ลงใน prompt ทุกครั้งที่ AI สร้างเนื้อเรื่อง
@@ -94,8 +96,8 @@ async function shrinkToRange(content, target, { writerPrompt = "", onProgress } 
   prompt += `[ย่อ/กระชับเนื้อหา]\n`;
   prompt += `เนื้อหาด้านล่างมี ${wc} คำ ซึ่งยาวเกินไป ต้องการให้อยู่ในช่วง ${min.toLocaleString()}-${max.toLocaleString()} คำ (เป้าหมาย ${t.toLocaleString()} คำ)\n\n`;
   prompt += `[คำสั่ง]\n`;
-  prompt += `- เขียนเนื้อเรื่องเดิมใหม่ให้กระชับขึ้น คงโครงเรื่อง เหตุการณ์สำคัญ และตอนจบไว้ครบ\n`;
-  prompt += `- ตัดรายละเอียดที่ซ้ำซ้อนหรือเยิ่นเย้อ แต่ยังคงอารมณ์และสำนวนของเรื่อง\n`;
+  prompt += `- เขียนเนื้อเรื่องเดิมใหม่ให้กระชับขึ้น คงโครงเรื่อง เหตุการณ์สำคัญ ตอนจบ และน้ำเสียงเฉพาะตัวของนักเขียนไว้ครบ\n`;
+  prompt += `- ตัดเฉพาะส่วนที่ซ้ำซ้อนหรือเยิ่นเย้อจริงๆ เท่านั้น — รักษาจังหวะประโยค ลูกเล่น และการซ้ำที่นักเขียนตั้งใจไว้ (อย่าเข้าใจผิดว่าเป็นน้ำ)\n`;
   prompt += `- ผลลัพธ์ต้องอยู่ในช่วง ${min.toLocaleString()}-${max.toLocaleString()} คำ\n`;
   prompt += `- ตอบเฉพาะเนื้อเรื่องที่ย่อแล้ว ไม่ต้องมีคำอธิบาย\n\n`;
   prompt += `[เนื้อหาเดิม]\n${content}\n\n[เนื้อหาที่ย่อแล้ว]:\n`;
@@ -111,13 +113,16 @@ async function shrinkToRange(content, target, { writerPrompt = "", onProgress } 
 }
 
 /**
- * บังคับให้เนื้อหาอยู่ในช่วงเป้าหมาย ±500 คำ:
- * - สั้นกว่าช่วง → ขยาย
- * - ยาวกว่าช่วง → ย่อ
+ * ปรับเนื้อหาให้ใกล้เคียงช่วงเป้าหมาย (± สัดส่วน):
+ * - สั้นกว่าช่วง → เขียนใหม่ให้แน่นขึ้น
+ * - ยาวเกินเป้ามากจริง (> 25%) → ย่อ (เกินช่วงเล็กน้อยปล่อยไว้ ไม่เสี่ยงตัดจังหวะที่ตั้งใจ)
  * คืน { content, wordCount, skipped } — skipped=true เมื่อ AI ไม่ตอบในขั้นเกลา (ใช้ร่างเดิมแทน)
  */
 export async function enforceWordRange(content, target, options = {}) {
-  const { min, max } = getWordRange(target);
+  const { min } = getWordRange(target);
+  const t = Number(target) || 1500;
+  // ย่อเฉพาะตอนที่ยาวเกินเป้า > 25% — เกินช่วงเล็กน้อยปล่อยไว้ กันการตัดจังหวะ/ลูกเล่นที่นักเขียนตั้งใจ
+  const shrinkThreshold = Math.round(t * 1.25);
   let text = content;
   let wc = countThaiWords(text);
   let skipped = false;
@@ -128,7 +133,7 @@ export async function enforceWordRange(content, target, options = {}) {
     if (res.skipped) skipped = true;
     wc = countThaiWords(text);
   }
-  if (wc > max) {
+  if (wc > shrinkThreshold) {
     const res = await shrinkToRange(text, target, options);
     text = res.text;
     if (res.skipped) skipped = true;
