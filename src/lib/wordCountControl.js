@@ -33,10 +33,11 @@ export function getWordRange(target) {
 export function buildWordCountInstruction(target) {
   const { target: t, min, max } = getWordRange(target);
   return (
-    `[ข้อกำหนดจำนวนคำ — สำคัญมาก ต้องปฏิบัติตามอย่างเคร่งครัด]\n` +
-    `- จำนวนคำเป้าหมาย: ${t.toLocaleString()} คำ\n` +
-    `- ช่วงที่ยอมรับได้: ${min.toLocaleString()} ถึง ${max.toLocaleString()} คำ (คลาดเคลื่อนได้ไม่เกิน ±${WORD_TOLERANCE} คำ)\n` +
-    `- ห้ามเขียนสั้นกว่า ${min.toLocaleString()} คำ และห้ามยาวเกิน ${max.toLocaleString()} คำเด็ดขาด\n`
+    `[ความยาวเป้าหมาย — คุมความยาว แต่คุณภาพการเล่าเรื่องต้องมาก่อนเสมอ]\n` +
+    `- ความยาวที่ต้องการ: ประมาณ ${t.toLocaleString()} คำ (ช่วงที่ดี ${min.toLocaleString()}-${max.toLocaleString()} คำ)\n` +
+    `- ให้ความยาวมาจากเนื้อเรื่องที่แน่นและสมบูรณ์ — เล่าฉากให้ครบ พัฒนาอารมณ์ให้ถึง ไม่ยืดน้ำหรือย้ำความเดิมเพียงเพื่อให้ครบคำ\n` +
+    `- อย่าจบฉากห้วนหรือตัดจบกลางคันเพียงเพราะถึงจำนวนคำ และอย่ายัดเนื้อฟุ่มเฟือยเพียงเพื่อให้ยาวขึ้น\n` +
+    `- ถ้าเรื่องต้องการมากหรือน้อยกว่าช่วงนี้เล็กน้อยเพื่อให้ฉากสมบูรณ์ ทำได้\n`
   );
 }
 
@@ -54,24 +55,24 @@ async function expandToRange(content, target, { context = "", writerPrompt = "",
     if (onProgress) onProgress({ phase: "expand", attempt, maxAttempts, wordCount: wc, target });
     if (wc >= min) break;
 
-    const needed = Math.max(target - wc, 200);
     let prompt = writerPrompt ? `[บทบาทและสไตล์การเขียน]\n${writerPrompt}\n\n` : "";
-    prompt += `[ขยายเนื้อหา — เขียนต่อจากเดิม]\n`;
-    prompt += `เนื้อหาปัจจุบันมี ${wc} คำ แต่ต้องการให้อยู่ในช่วง ${min.toLocaleString()}-${max.toLocaleString()} คำ\n`;
-    prompt += `โปรดเขียนเนื้อหาต่อจากด้านล่าง เพิ่มอีกประมาณ ${needed.toLocaleString()} คำ แต่อย่าให้รวมแล้วเกิน ${max.toLocaleString()} คำ\n\n`;
+    prompt += `[เขียนตอนนี้ใหม่ทั้งตอนให้แน่นและลึกขึ้น]\n`;
+    prompt += `ร่างปัจจุบันมี ${wc} คำ ซึ่งบางเกินไป ต้องการให้อยู่ในช่วง ${min.toLocaleString()}-${max.toLocaleString()} คำ\n\n`;
     prompt += `[คำสั่ง]\n`;
-    prompt += `- เขียนต่อจากเนื้อหาเดิมทันที ไม่ต้องมีคำนำ\n`;
-    prompt += `- เพิ่มฉาก บทสนทนา รายละเอียดการกระทำและความคิดของตัวละคร\n`;
-    prompt += `- รักษาโทนและสไตล์ให้สม่ำเสมอ\n\n`;
+    prompt += `- เขียนตอนนี้ใหม่ทั้งตอน คงโครงเรื่อง ลำดับเหตุการณ์ และตอนจบเดิมไว้ครบทุกอย่าง\n`;
+    prompt += `- เพิ่มความลึกแทรกไปทั่วทั้งตอน (ไม่ใช่ต่อหางท้ายเรื่อง): ขยายบทสนทนาให้มีชั้นเชิง เพิ่มความคิด/ความรู้สึกภายในตัวละคร ประสาทสัมผัสที่คม และการกระทำที่เห็นภาพ\n`;
+    prompt += `- ห้ามเพิ่มเหตุการณ์/ตัวละครใหม่ที่ขัดกับเรื่องเดิม และห้ามยืดน้ำหรือย้ำความเดิมเพียงเพื่อให้ยาว\n`;
+    prompt += `- รักษาโทนและสำนวนเดิม ตอบเฉพาะเนื้อเรื่องที่เขียนใหม่ ไม่ต้องมีคำอธิบาย\n\n`;
     if (context) prompt += `${context}\n\n`;
-    prompt += `[เนื้อหาปัจจุบัน — เขียนต่อจากบรรทัดสุดท้าย]\n${text.substring(0, 2500)}${text.length > 2500 ? "\n...(ต่อ)" : ""}\n\n`;
-    prompt += `[เขียนต่อจากนี้ — ประมาณ ${needed.toLocaleString()} คำ]:\n`;
+    prompt += `[ร่างเดิมที่ต้องเขียนใหม่ให้แน่นขึ้น]\n${text}\n\n[เนื้อเรื่องฉบับเขียนใหม่ (${min.toLocaleString()}-${max.toLocaleString()} คำ)]:\n`;
 
     try {
-      const expansion = await invokeAIStable({ prompt, model: "claude_sonnet_4_6" }, POLISH_INVOKE_OPTS);
-      if (!expansion || expansion.length < 50) { if (!expandedAny) failedFirst = true; break; }
-      text = text + "\n\n" + expansion;
-      expandedAny = true;
+      const rewritten = await invokeAIStable({ prompt, model: "claude_sonnet_4_6" }, POLISH_INVOKE_OPTS);
+      if (!rewritten || rewritten.length < 100) { if (!expandedAny) failedFirst = true; break; }
+      if (countThaiWords(rewritten) > countThaiWords(text)) {
+        text = rewritten;
+        expandedAny = true;
+      } else if (!expandedAny) { failedFirst = true; break; }
     } catch {
       if (!expandedAny) failedFirst = true;
       break;
