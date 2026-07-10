@@ -75,13 +75,13 @@ export function buildChapterContext({
 
   if (isOneShotSection) ctx += isOneShotSection;
 
-  // ── บริบทเรื่อง + โครง 3 องก์ทั้งหมด ──
+  // ── บริบทเรื่อง + โครงเรื่องภาพรวมทั้งหมด ──
   ctx += `[บริบทเรื่อง]\n`;
   ctx += `ชื่อเรื่อง: ${novel.title}\n`;
   if (novel.genre) ctx += `แนว: ${novel.genre}\n`;
   if (novel.era) ctx += `ยุคสมัย/ฉากหลัง: ${novel.era}\n`;
   if (novel.synopsis) ctx += `เรื่องย่อ: ${novel.synopsis}\n`;
-  if (novel.plot_outline) ctx += `\n[โครงเรื่อง 3 องก์ของทั้งเรื่อง — ภาพรวมที่ตอนนี้ต้องสอดคล้อง]\n${novel.plot_outline}\n`;
+  if (novel.plot_outline) ctx += `\n[โครงเรื่องภาพรวมของทั้งเรื่อง — โครงสร้างการเล่าที่ตอนนี้ต้องสอดคล้อง (ยึดโครงสร้างตามที่โครงนี้กำหนดจริง จะเป็น 3 องก์หรือแบบอื่นก็ได้)]\n${novel.plot_outline}\n`;
 
   // ── ตัวละครหลักทั้งหมด ──
   if (characters.length > 0) {
