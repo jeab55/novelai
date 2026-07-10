@@ -14,6 +14,7 @@ import { saveVersion } from "@/lib/saveVersion";
 import { invokeAIStable } from "@/lib/aiInvoke";
 import { enforceWordRange, buildWordCountInstruction, getWordRange } from "@/lib/wordCountControl";
 import { buildChapterContext } from "@/lib/chapterContextBuilder";
+import { proseVarietyInstruction } from "@/lib/creativeVariety";
 import AiProgressBar from "@/components/novel/AiProgressBar";
 
 const LOADING_LABELS = {
@@ -127,13 +128,25 @@ function buildDraftPrompt(form, systemPrompt, wordTarget) {
   if (form.summary) prompt += `[สิ่งที่ต้องเกิดในตอนนี้]:\n${form.summary}\n\n`;
   if (form.characters) prompt += `[ตัวละครในตอน]: ${form.characters}\n\n`;
   if (form.tone) prompt += `[โทน/มุมมอง]: ${form.tone}\n\n`;
+  prompt += `${proseVarietyInstruction()}\n\n`;
   prompt += `[เริ่มเขียนเนื้อหาตอนนี้เลย — ความยาว ${min.toLocaleString()}-${max.toLocaleString()} คำ]:\n`;
   return prompt;
 }
 
 // ขัดเกลาสำนวน
 function buildPolishPrompt(draft, systemPrompt) {
-  return `${systemPrompt}\n\n[งาน: ขัดเกลาสำนวน]\nนำเนื้อหาต่อไปนี้มาขัดเกลาสำนวนให้อ่านลื่นและมีพลังขึ้น รักษาโครงเรื่องและเนื้อหาเดิมทั้งหมดไว้ ปรับเฉพาะภาษาและจังหวะประโยค:\n\n${draft}`;
+  return `${systemPrompt}
+
+[งาน: ขัดเกลาสำนวน — เก็บโครงเรื่อง เหตุการณ์ บทสนทนา และน้ำเสียงเฉพาะตัวของนักเขียนไว้ครบ ห้ามเปลี่ยนเนื้อเรื่องหรือความยาวอย่างมีนัยสำคัญ]
+ขัดเกลาเนื้อหาด้านล่างโดยโฟกัสที่:
+- ตัดคำกรอง (filter words) เช่น "รู้สึกว่า/เห็นว่า/ได้ยินว่า/นึกว่า" แล้วเล่าสิ่งนั้นตรงๆ
+- เปลี่ยนประโยคที่ "บอก" อารมณ์ตรงๆ ให้ "แสดง" ผ่านการกระทำ ท่าทาง หรือรายละเอียดที่เห็นภาพ
+- เปลี่ยนกริยากลางๆ ให้มีพลังและเฉพาะเจาะจง ตัดคำวิเศษณ์ฟุ่มเฟือย
+- สลับความยาวประโยคให้มีจังหวะ ตัดคำซ้ำและวลีเฝือ
+- ในบทสนทนา: แทน "เขากล่าว" ซ้ำๆ ด้วย action beat และคงลายเซ็นการพูดของแต่ละตัวละคร
+อย่าเพิ่มเหตุการณ์ใหม่ อย่าสรุปย่อ อย่าเปลี่ยนตอนจบ ตอบเฉพาะเนื้อเรื่องที่ขัดเกลาแล้ว:
+
+${draft}`;
 }
 
 // Step 1: form, Step 2: review draft
