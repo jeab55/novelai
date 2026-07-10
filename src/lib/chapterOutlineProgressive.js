@@ -47,7 +47,7 @@ function buildBatchPrompt({ novel, writer, eventsContext, fromOrder, toOrder, to
 - แนว: ${novel.genre || "ไม่ระบุ"}
 - เรื่องย่อ: ${novel.synopsis || "ไม่มี"}
 - จำนวนตอนทั้งหมด: ${totalChapters} ตอน
-- โครงเรื่อง 3 องก์: ${novel.plot_outline || "ไม่มี"}
+- โครงเรื่องภาพรวม: ${novel.plot_outline || "ไม่มี"}
 
 ${eventsContext}
 
@@ -55,7 +55,7 @@ ${eventsContext}
 - order: ลำดับตอน (${fromOrder}-${toOrder})
 - title: ชื่อตอน
 - content: โครงย่อของตอน (3-5 บรรทัด) ระบุว่าเกิดอะไรขึ้น ใครทำอะไร มีปมอะไร
-- act: องก์ที่สังกัด (1, 2, หรือ 3)
+- act: ช่วงของเรื่องโดยคร่าว (1=ช่วงต้น, 2=ช่วงกลาง, 3=ช่วงท้าย) ใช้จัดกลุ่มหลวมๆ
 - plot_event_title: (ถ้ามี) ชื่อเหตุการณ์ไทม์ไลน์ที่ตอนนี้อ้างอิง
 
 ให้สอดคล้องต่อเนื่องกับภาพรวมทั้งเรื่อง ตอบ JSON ล้วนเท่านั้น ไม่มี markdown:
