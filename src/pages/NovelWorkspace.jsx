@@ -217,6 +217,15 @@ export default function NovelWorkspace() {
             </div>
           </div>
           <div className="flex items-center gap-1 ml-auto shrink-0">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-muted-foreground hover:text-primary"
+              title="จัดรูปเล่ม"
+              onClick={() => navigate(`/book-layout?novelId=${novelId}`)}
+            >
+              <BookMarked className="w-4 h-4" />
+            </Button>
             {canShare && (
               <Button
                 variant="ghost"

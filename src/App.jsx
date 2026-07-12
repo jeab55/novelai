@@ -20,6 +20,7 @@ import Settings from '@/pages/Settings';
 import SeriesDashboard from '@/pages/SeriesDashboard';
 import SeriesDetail from '@/pages/SeriesDetail';
 import EpisodeEditor from '@/pages/EpisodeEditor';
+import BookLayout from '@/pages/BookLayout';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -54,6 +55,7 @@ const AuthenticatedApp = () => {
         <Route path="/novel/:id/relationships" element={<CharacterRelationships />} />
         <Route path="/trash" element={<Trash />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/book-layout" element={<BookLayout />} />
         <Route path="/series" element={<SeriesDashboard />} />
         <Route path="/series/:id" element={<SeriesDetail />} />
         <Route path="/series/:id/episode/:episodeId" element={<EpisodeEditor />} />

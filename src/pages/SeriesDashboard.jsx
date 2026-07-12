@@ -1,10 +1,10 @@
 import React, { useState, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { BookOpen, Layers, ChevronDown, ChevronUp, MoreVertical, ImagePlus, FolderOpen, BookMarked, FolderPlus, ArrowRightLeft, ArrowUp, ArrowDown, BookPlus, Plus, Library, Loader2, CheckCircle2 } from "lucide-react";
+import { BookOpen, Layers, ChevronDown, ChevronUp, MoreVertical, ImagePlus, FolderOpen, BookMarked, FolderPlus, ArrowRightLeft, ArrowUp, ArrowDown, BookPlus, Plus, Library, Loader2, CheckCircle2, BookText } from "lucide-react";
 import ImportNovelDialog from "@/components/novel/ImportNovelDialog";
 import SeriesFormDialog from "@/components/series/SeriesFormDialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -43,7 +43,7 @@ const genreColors = {
 
 
 
-function NovelCard({ novel, chapters, uploadingFor, onUploadClick, seriesList, onMoveToSeries, onMoveChapter, onReorderChapter }) {
+function NovelCard({ novel, chapters, uploadingFor, onUploadClick, seriesList, onMoveToSeries, onMoveChapter, onReorderChapter, onBookLayout }) {
   const [isOpen, setIsOpen] = useState(false);
   const [readerStartIdx, setReaderStartIdx] = useState(null);
   const gradient = genreColors[novel.genre] || "from-gray-400 to-slate-500";
@@ -91,6 +91,11 @@ function NovelCard({ novel, chapters, uploadingFor, onUploadClick, seriesList, o
                 <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => onMoveToSeries(novel)}>
                   <FolderPlus className="w-4 h-4" />
                   ใส่ในซีรีย์ / ตอนที่
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => onBookLayout(novel)}>
+                  <BookText className="w-4 h-4" />
+                  จัดรูปเล่ม
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -209,6 +214,7 @@ export default function SeriesDashboard() {
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const coverInputRef = useRef(null);
   const [uploadingFor, setUploadingFor] = useState(null);
   const [seriesDialog, setSeriesDialog] = useState({ open: false, novel: null, selectedSeries: "", episodeNumber: "" });
@@ -265,6 +271,10 @@ export default function SeriesDashboard() {
   const handleUploadClick = (novelId) => {
     coverInputRef.current.dataset.novelid = novelId;
     coverInputRef.current.click();
+  };
+
+  const handleBookLayout = (novel) => {
+    navigate(`/book-layout?novelId=${novel.id}`);
   };
 
   const handleMoveToSeries = (novel) => {
@@ -460,6 +470,12 @@ export default function SeriesDashboard() {
               <BookPlus className="w-4 h-4" />
               นำเข้านิยายจากไฟล์
             </Button>
+            <Link to="/book-layout">
+              <Button variant="outline" className="gap-2 border-amber-300 text-amber-700 hover:bg-amber-50 dark:text-amber-400 dark:border-amber-800/40 dark:hover:bg-amber-950/20">
+                <BookText className="w-4 h-4" />
+                จัดรูปเล่ม
+              </Button>
+            </Link>
           </div>
         </div>
 
@@ -499,7 +515,7 @@ export default function SeriesDashboard() {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                   {sNovels.map((novel) => (
-                    <NovelCard key={novel.id} novel={novel} chapters={chapters} uploadingFor={uploadingFor} onUploadClick={handleUploadClick} seriesList={seriesList} onMoveToSeries={handleMoveToSeries} onMoveChapter={handleMoveChapter} onReorderChapter={handleReorderChapter} />
+                    <NovelCard key={novel.id} novel={novel} chapters={chapters} uploadingFor={uploadingFor} onUploadClick={handleUploadClick} seriesList={seriesList} onMoveToSeries={handleMoveToSeries} onMoveChapter={handleMoveChapter} onReorderChapter={handleReorderChapter} onBookLayout={handleBookLayout} />
                   ))}
                 </div>
               </motion.div>
@@ -518,7 +534,7 @@ export default function SeriesDashboard() {
                 )}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                   {novelsWithoutSeries.map((novel) => (
-                    <NovelCard key={novel.id} novel={novel} chapters={chapters} uploadingFor={uploadingFor} onUploadClick={handleUploadClick} seriesList={seriesList} onMoveToSeries={handleMoveToSeries} onMoveChapter={handleMoveChapter} onReorderChapter={handleReorderChapter} />
+                    <NovelCard key={novel.id} novel={novel} chapters={chapters} uploadingFor={uploadingFor} onUploadClick={handleUploadClick} seriesList={seriesList} onMoveToSeries={handleMoveToSeries} onMoveChapter={handleMoveChapter} onReorderChapter={handleReorderChapter} onBookLayout={handleBookLayout} />
                   ))}
                 </div>
               </motion.div>
