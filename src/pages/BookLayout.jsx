@@ -18,7 +18,7 @@ import BookStepper from "@/components/booklayout/BookStepper";
 import ExportButton from "@/components/booklayout/ExportButton";
 import {
   buildBookObject, buildMarkdown, buildTxt, buildPrintHtml, analyzeManuscript,
-  countThaiWords, safeFilename,
+  countThaiWords, safeFilename, PAGE_ESTIMATE_WARNING,
 } from "@/lib/bookExport";
 
 const STEPS = [
@@ -326,6 +326,20 @@ export default function BookLayout() {
           {/* 4: สารบัญ */}
           {step === 4 && (
             <SectionCard title="สารบัญ (สร้างอัตโนมัติจากลำดับตอนจริง)" icon={ListOrdered}>
+              <div className="mb-4 rounded-xl border border-amber-200/60 dark:border-amber-800/40 bg-amber-50/60 dark:bg-amber-950/20 p-3.5 text-xs space-y-1.5">
+                <p className="flex items-start gap-2 text-foreground">
+                  <FileText className="w-3.5 h-3.5 mt-0.5 shrink-0 text-muted-foreground" />
+                  <span><b>Markdown / TXT / JSON:</b> เป็นไฟล์อ่านต่อเนื่อง สารบัญ<b> ไม่มีเลขหน้า</b> (ไล่ตามลำดับบท)</span>
+                </p>
+                <p className="flex items-start gap-2 text-foreground">
+                  <Code2 className="w-3.5 h-3.5 mt-0.5 shrink-0 text-amber-600" />
+                  <span><b>HTML / PDF:</b> สารบัญแสดง<b> ชื่อบท ....... หน้า N</b> พร้อมเลขหน้า footer ทุกหน้า ตามรูปแบบ A5</span>
+                </p>
+                <p className="flex items-start gap-2 text-muted-foreground pt-0.5 border-t border-amber-200/40 dark:border-amber-800/30 mt-1">
+                  <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0 text-amber-500" />
+                  <span>{PAGE_ESTIMATE_WARNING}</span>
+                </p>
+              </div>
               {chapters.length === 0 ? (
                 <EmptyHint text="ยังไม่มีตอน" />
               ) : (
@@ -441,6 +455,20 @@ export default function BookLayout() {
                   </Button>
                 </div>
               )}
+              <div className="mb-4 rounded-xl border border-border/60 bg-secondary/40 p-3.5 text-xs space-y-1.5">
+                <p className="flex items-start gap-2 text-foreground">
+                  <Code2 className="w-3.5 h-3.5 mt-0.5 shrink-0 text-amber-600" />
+                  <span><b>HTML / PDF:</b> มี<b> เลขหน้า</b> — สารบัญโยงเลขหน้า และมีเลขหน้า footer ทุกหน้าตามรูปแบบ A5</span>
+                </p>
+                <p className="flex items-start gap-2 text-muted-foreground">
+                  <FileText className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                  <span><b>Markdown / TXT / JSON:</b> ไฟล์อ่านต่อเนื่อง <b>ไม่มีเลขหน้า</b> (JSON เก็บ <code>tableOfContents</code> ไม่มีเลขหน้า แยกจาก <code>printPageEstimates</code>)</span>
+                </p>
+                <p className="flex items-start gap-2 text-muted-foreground pt-0.5 border-t border-border/40 mt-1">
+                  <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0 text-amber-500" />
+                  <span>{PAGE_ESTIMATE_WARNING}</span>
+                </p>
+              </div>
               <div className="flex flex-wrap gap-2 mb-4">
                 <Button variant="outline" className="gap-2" onClick={openPrintPreview}>
                   <Eye className="w-4 h-4" /> เปิดพรีวิวเพื่อพิมพ์/บันทึกเป็น PDF
@@ -448,10 +476,10 @@ export default function BookLayout() {
                 <span className="text-xs text-muted-foreground self-center">ในหน้าพรีวิว กด Ctrl/Cmd+P → บันทึกเป็น PDF (ขนาด A5)</span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <ExportButton label="Markdown" icon={FileText} description="ต้นฉบับ .md พร้อมสารบัญ" filename={`${fnameBase}.md`} mimeType="text/markdown" content={buildMarkdown(book)} />
-                <ExportButton label="HTML (พิมพ์/PDF)" icon={Code2} description="เลย์เอาต์ A5 มี page-break" filename={`${fnameBase}.html`} mimeType="text/html" content={buildPrintHtml(book)} />
-                <ExportButton label="ข้อความล้วน" icon={FileType} description="ไฟล์ .txt อ่านง่าย" filename={`${fnameBase}.txt`} mimeType="text/plain" content={buildTxt(book)} />
-                <ExportButton label="JSON รูปเล่ม" icon={Braces} description="โครงสร้างข้อมูลหนังสือ" filename={`${fnameBase}.json`} mimeType="application/json" content={JSON.stringify(book, null, 2)} />
+                <ExportButton label="Markdown" icon={FileText} description="ต้นฉบับ .md · สารบัญอ่านต่อเนื่อง (ไม่มีเลขหน้า)" filename={`${fnameBase}.md`} mimeType="text/markdown" content={buildMarkdown(book)} />
+                <ExportButton label="HTML (พิมพ์/PDF)" icon={Code2} description="เลย์เอาต์ A5 · มีเลขหน้า + สารบัญโยงหน้า" filename={`${fnameBase}.html`} mimeType="text/html" content={buildPrintHtml(book)} />
+                <ExportButton label="ข้อความล้วน" icon={FileType} description="ไฟล์ .txt อ่านต่อเนื่อง (ไม่มีเลขหน้า)" filename={`${fnameBase}.txt`} mimeType="text/plain" content={buildTxt(book)} />
+                <ExportButton label="JSON รูปเล่ม" icon={Braces} description="tableOfContents (ไม่มีเลขหน้า) + printPageEstimates" filename={`${fnameBase}.json`} mimeType="application/json" content={JSON.stringify(book, null, 2)} />
               </div>
             </SectionCard>
           )}

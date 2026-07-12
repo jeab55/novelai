@@ -87,6 +87,32 @@ export function analyzeManuscript(chapters = [], { maxParagraphWords = 400 } = {
   return issues;
 }
 
+// ─── ค่าประมาณเลย์เอาต์ A5 (ใช้คำนวณเลขหน้าโดยประมาณสำหรับ HTML/PDF) ─────────
+// อ้างอิงรูปแบบ A5 ของระบบ: หน้า A5 148×210mm, ขอบ 18/16mm, ฟอนต์ Sarabun ~14pt
+// ค่าเหล่านี้เป็น "ค่าประมาณ" — จะคลาดเคลื่อนหากผู้ใช้เปลี่ยนฟอนต์/ขอบกระดาษ/ขนาดตัวอักษร
+export const A5_LAYOUT = {
+  words_per_page: 220, // คำโดยประมาณต่อหน้า A5 (Sarabun 14pt, line-height 1.75)
+  front_matter_pages: 2, // ปก + ปกใน (ก่อนส่วนเนื้อหา)
+};
+
+// ─── คำเตือนความคลาดเคลื่อนของเลขหน้า (ใช้ทั้ง UI และ HTML) ──────────────────
+export const PAGE_ESTIMATE_WARNING =
+  "เลขหน้าคำนวณโดยประมาณจากรูปแบบ A5 มาตรฐานของระบบ (ฟอนต์ Sarabun, ขอบ 18/16mm) " +
+  "หากเปลี่ยนฟอนต์ ขนาดตัวอักษร หรือขอบกระดาษตอนพิมพ์/บันทึก PDF เลขหน้าอาจคลาดเคลื่อนได้";
+
+// คำนวณเลขหน้าเริ่มต้นของแต่ละบท (ประมาณ) — สำหรับ HTML/PDF เท่านั้น
+function estimatePageStarts(bookChapters, layout = A5_LAYOUT) {
+  const wpp = layout.words_per_page || 220;
+  // หน้าเริ่มเนื้อหา = ปก + ปกใน + front matter + สารบัญ (เผื่ออย่างน้อย 1 หน้า)
+  let cursor = (layout.front_matter_pages || 2) + 1 /* toc */ + 1;
+  return bookChapters.map((c) => {
+    const startPage = cursor;
+    const pages = Math.max(1, Math.ceil((c.word_count || 0) / wpp));
+    cursor += pages; // แต่ละบทขึ้นหน้าใหม่
+    return { index: c.index, title: c.title, start_page: startPage, estimated_pages: pages };
+  });
+}
+
 // ─── สร้าง object รูปเล่ม (สำหรับ JSON + เป็น source ของ export อื่น) ─────────
 export function buildBookObject(meta, chapters = []) {
   const sorted = [...chapters].sort((a, b) => (a.order || 0) - (b.order || 0));
@@ -98,11 +124,31 @@ export function buildBookObject(meta, chapters = []) {
     content: ch.content || "",
   }));
   const totalWords = bookChapters.reduce((s, c) => s + c.word_count, 0);
+
+  // สารบัญแบบอ่านต่อเนื่อง — ไม่มีเลขหน้า (ใช้กับ Markdown/TXT/JSON)
+  const tableOfContents = bookChapters.map((c) => ({
+    index: c.index,
+    title: c.title,
+    word_count: c.word_count,
+  }));
+
+  // เลขหน้าประมาณ — เฉพาะ HTML/PDF (แยกออกจาก tableOfContents ไม่ปนกัน)
+  const printPageEstimates = {
+    layout: "A5",
+    words_per_page: A5_LAYOUT.words_per_page,
+    note: PAGE_ESTIMATE_WARNING,
+    chapters: estimatePageStarts(bookChapters),
+  };
+
   return {
-    version: 1,
+    version: 2,
     generated_at: new Date().toISOString(),
     meta,
     stats: { chapter_count: bookChapters.length, total_words: totalWords },
+    // สารบัญอ่านต่อเนื่อง (ไม่มีเลขหน้า)
+    tableOfContents,
+    // เลขหน้าประมาณสำหรับ HTML/PDF เท่านั้น (แยกกันชัดเจน)
+    printPageEstimates,
     chapters: bookChapters,
   };
 }
@@ -179,20 +225,25 @@ export function buildTxt(book) {
   return lines.join("\n");
 }
 
-// ─── HTML (A5 print / PDF friendly) ─────────────────────────────────────────
+// ─── HTML (A5 print / PDF friendly — มีเลขหน้า) ─────────────────────────────
 export function buildPrintHtml(book) {
   const { meta, chapters } = book;
+  // map เลขหน้าประมาณต่อ index
+  const pageByIndex = {};
+  (book.printPageEstimates?.chapters || []).forEach((p) => { pageByIndex[p.index] = p.start_page; });
+
+  // สารบัญ HTML: ชื่อบท ........ หน้า N
   const toc = chapters
-    .map((c) => `<li><span class="toc-title">${esc(c.title)}</span><span class="toc-dots"></span><span class="toc-num">${c.index}</span></li>`)
+    .map((c) => `<li><span class="toc-num-left">${c.index}.</span><span class="toc-title">${esc(c.title)}</span><span class="toc-dots"></span><span class="toc-page">หน้า ${pageByIndex[c.index] ?? "—"}</span></li>`)
     .join("\n");
 
   const body = chapters
     .map(
       (c) => `
-    <section class="chapter">
+    <div class="page chapter">
       <h2 class="chapter-title"><span class="chapter-num">บทที่ ${c.index}</span>${esc(c.title)}</h2>
       <div class="chapter-body">${paragraphsToHtml(c.content) || "<p><em>(ไม่มีเนื้อหา)</em></p>"}</div>
-    </section>`
+    </div>`
     )
     .join("\n");
 
@@ -208,7 +259,12 @@ export function buildPrintHtml(book) {
 <title>${esc(meta.title || "หนังสือ")}</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&family=Noto+Serif+Thai:wght@400;500;600;700&display=swap');
-@page { size: A5; margin: 18mm 16mm; }
+@page {
+  size: A5;
+  margin: 18mm 16mm;
+  /* เลขหน้าที่ footer ทุกหน้า (เท่าที่ CSS print ทำได้) */
+  @bottom-center { content: counter(page); font-family: 'Sarabun', sans-serif; font-size: 9pt; color: #78716c; }
+}
 * { box-sizing: border-box; }
 body { font-family: 'Sarabun', sans-serif; color: #1c1917; line-height: 1.75; margin: 0; background: #f5f5f4; }
 .page { background: #fff; width: 148mm; min-height: 210mm; margin: 12px auto; padding: 18mm 16mm; box-shadow: 0 4px 18px rgba(0,0,0,.12); page-break-after: always; }
@@ -228,16 +284,19 @@ h1,h2,h3 { font-family: 'Noto Serif Thai', serif; }
 /* Front matter */
 .front h2 { font-size: 17pt; border-bottom: 2px solid #f59e0b; padding-bottom: 6px; margin-bottom: 14px; }
 .front p { white-space: pre-line; }
-/* TOC */
-.toc h2 { font-size: 18pt; margin-bottom: 16px; }
+/* TOC — ชื่อบท ....... หน้า N */
+.toc h2 { font-size: 18pt; margin-bottom: 6px; }
+.toc .toc-hint { font-size: 8.5pt; color:#a8a29e; margin: 0 0 14px; }
 .toc ol { list-style:none; padding:0; margin:0; }
 .toc li { display:flex; align-items:baseline; gap:6px; padding: 5px 0; font-size: 11pt; }
-.toc-title { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width: 78%; }
+.toc-num-left { color:#f59e0b; font-weight:600; min-width: 2.2em; }
+.toc-title { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width: 64%; }
 .toc-dots { flex:1; border-bottom: 1px dotted #a8a29e; transform: translateY(-3px); }
-.toc-num { color:#78716c; }
-/* Chapters */
-.chapter { }
-.chapter + .chapter { page-break-before: always; }
+.toc-page { color:#78716c; white-space:nowrap; }
+/* footer เลขหน้า fallback บนจอ (บนกระดาษใช้ @page counter) */
+.page-footer { position:absolute; bottom:8mm; left:0; right:0; text-align:center; font-size:9pt; color:#a8a29e; }
+@media print { .page-footer { display:none; } }
+/* Chapters — แต่ละบทขึ้นหน้าใหม่ (ตรงกับการประมาณเลขหน้า) */
 .chapter-title { font-size: 18pt; margin: 0 0 18px; text-align:center; }
 .chapter-num { display:block; font-size: 11pt; color:#f59e0b; font-weight:600; letter-spacing:1px; margin-bottom:4px; }
 .chapter-body p { text-indent: 2em; margin: 0 0 10px; text-align: justify; }
@@ -273,16 +332,15 @@ h1,h2,h3 { font-family: 'Noto Serif Thai', serif; }
   ${meta.editor_note ? `<div class="page front"><h2>หมายเหตุผู้เรียบเรียง</h2><p>${esc(meta.editor_note)}</p></div>` : ""}
   ${meta.copyright ? `<div class="page front"><h2>ลิขสิทธิ์ / เครดิต</h2><p>${esc(meta.copyright)}</p></div>` : ""}
 
-  <!-- สารบัญ -->
+  <!-- สารบัญ (มีเลขหน้าประมาณตามรูปแบบ A5) -->
   <div class="page toc">
     <h2>สารบัญ</h2>
+    <p class="toc-hint">* ${esc(PAGE_ESTIMATE_WARNING)}</p>
     <ol>${toc}</ol>
   </div>
 
-  <!-- เนื้อหา -->
-  <div class="page">
-    ${body}
-  </div>
+  <!-- เนื้อหา (แต่ละบท = 1 หน้าเริ่มต้น) -->
+  ${body}
 
   ${meta.afterword ? `<div class="page front"><h2>บทส่งท้าย</h2><p>${esc(meta.afterword)}</p></div>` : ""}
   ${meta.about_author ? `<div class="page front"><h2>เกี่ยวกับผู้แต่ง</h2><p>${esc(meta.about_author)}</p></div>` : ""}
